@@ -1,0 +1,14 @@
+name = "BraketCircuitSimulator"
+uuid = "76d27892-9a0b-406c-98e4-7c178e9b3dff"
+authors = ["Katharine Hyatt <hyatkath@amazon.com> and contributors"]
+version = "1.0.0-DEV"
+
+[compat]
+julia = "1.9"
+
+[extras]
+Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Aqua", "Test"]
