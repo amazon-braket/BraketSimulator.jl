@@ -1,10 +1,18 @@
-using BraketCircuitSimulator
-using Test
-using Aqua
+using Test, Aqua, BraketSimulator
 
-@testset "BraketCircuitSimulator.jl" begin
-    @testset "Code quality (Aqua.jl)" begin
-        Aqua.test_all(BraketCircuitSimulator)
+Aqua.test_all(BraketSimulator, ambiguities=false, piracies=false)
+
+@testset "BraketSimulator" begin
+    for test in (
+        "openqasm",
+        "sv_simulator",
+        "dm_simulator",
+        "utils",
+        "result_types",
+        "braket_integration",
+    )
+        @testset "$test" begin
+            include(test * ".jl")
+        end
     end
-    # Write your tests here.
 end

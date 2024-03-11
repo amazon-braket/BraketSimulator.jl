@@ -1,14 +1,14 @@
-using BraketCircuitSimulator
+using BraketSimulator
 using Documenter
 
-DocMeta.setdocmeta!(BraketCircuitSimulator, :DocTestSetup, :(using BraketCircuitSimulator); recursive=true)
+DocMeta.setdocmeta!(BraketSimulator, :DocTestSetup, :(using BraketSimulator); recursive=true)
 
 makedocs(;
-    modules=[BraketCircuitSimulator],
+    modules=[BraketSimulator],
     authors="Katharine Hyatt <hyatkath@amazon.com> and contributors",
-    sitename="BraketCircuitSimulator.jl",
+    sitename="BraketSimulator.jl",
     format=Documenter.HTML(;
-        canonical="https://kshyatt-aws.github.io/BraketCircuitSimulator.jl",
+        canonical="https://amazon-braket.github.io/BraketSimulator.jl",
         edit_link="main",
         assets=String[],
     ),
@@ -18,6 +18,6 @@ makedocs(;
 )
 
 deploydocs(;
-    repo="github.com/kshyatt-aws/BraketCircuitSimulator.jl",
+    repo="github.com/amazon-braket/BraketSimulator.jl",
     devbranch="main",
 )

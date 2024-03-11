@@ -1,14 +1,14 @@
 ```@meta
-CurrentModule = BraketCircuitSimulator
+CurrentModule = BraketSimulator
 ```
 
-# BraketCircuitSimulator
+# BraketSimulator
 
-Documentation for [BraketCircuitSimulator](https://github.com/kshyatt-aws/BraketCircuitSimulator.jl).
+Documentation for [BraketSimulator](https://github.com/amazon-braket/BraketSimulator.jl).
 
 ```@index
 ```
 
 ```@autodocs
-Modules = [BraketCircuitSimulator]
+Modules = [BraketSimulator]
 ```
