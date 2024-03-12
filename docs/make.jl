@@ -7,8 +7,10 @@ makedocs(;
     modules=[BraketSimulator],
     authors="Katharine Hyatt <hyatkath@amazon.com> and contributors",
     sitename="BraketSimulator.jl",
+    repo="git@ssh.gitlab.aws.dev:braket-science/braketsimulator.git",
     format=Documenter.HTML(;
-        canonical="https://amazon-braket.github.io/BraketSimulator.jl",
+        #canonical="https://amazon-braket.github.io/BraketSimulator.jl",
+        canonical="git@ssh.gitlab.aws.dev:braket-science/braketsimulator.git",
         edit_link="main",
         assets=String[],
     ),

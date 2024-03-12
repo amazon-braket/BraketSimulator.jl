@@ -1,3 +1,4 @@
 [deps]
+Braket = "19504a0f-b47d-4348-9127-acc6cc69ef67"
 BraketSimulator = "76d27892-9a0b-406c-98e4-7c178e9b3dff"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"

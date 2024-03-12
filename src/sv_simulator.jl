@@ -1,4 +1,9 @@
-mutable struct StateVectorSimulator{T,S} <: AbstractSimulator
+"""
+    StateVectorSimulator{T, S<:AbstractVector{T}} <: AbstractSimulator
+
+Simulator representing a pure state evolution of a statevector of type S, with element type T.
+"""
+mutable struct StateVectorSimulator{T,S<:AbstractVector{T}} <: AbstractSimulator
     state_vector::S
     qubit_count::Int
     shots::Int
@@ -52,11 +57,21 @@ function StateVectorSimulator{T,S}(
     sv = init(StateVectorSimulator{T,S}, qubit_count)
     return StateVectorSimulator{T,S}(sv, qubit_count, shots)
 end
+"""
+    StateVectorSimulator([::T], qubit_count::Int, shots::Int) -> StateVectorSimulator{T, Vector{T}}
+
+Create a StateVectorSimulator with `2^qubit_count` elements and `shots` shots to be measured. The default element type is `ComplexF64`.
+"""
 StateVectorSimulator(::Type{T}, qubit_count::Int, shots::Int) where {T<:Number} =
     StateVectorSimulator{T,StateVector{T}}(qubit_count, shots)
 StateVectorSimulator(qubit_count::Int, shots::Int) =
     StateVectorSimulator(ComplexF64, qubit_count, shots)
 Braket.qubit_count(svs::StateVectorSimulator) = svs.qubit_count
+"""
+    properties(svs::StateVectorSimulator) -> GateModelSimulatorDeviceCapabilities
+
+Query the properties and capabilities of a `StateVectorSimulator`, including which gates and result types are supported and the minimum and maximum shot and qubit counts.
+"""
 Braket.properties(svs::StateVectorSimulator) = sv_props
 supported_operations(svs::StateVectorSimulator) =
     sv_props.action["braket.ir.openqasm.program"].supportedOperations
@@ -111,6 +126,11 @@ function reinit!(
     return
 end
 
+"""
+    evolve!(svs::StateVectorSimulator{T, S<:AbstractVector{T}}, operations::Vector{Instruction})
+
+Apply each operation of `operations` to the state vector contained in `svs`.
+"""
 function evolve!(
     svs::StateVectorSimulator{T,S},
     operations::Vector{Instruction},
@@ -226,6 +246,13 @@ function apply_observable!(
     return sv
 end
 
+"""
+    expectation(svs::StateVectorSimulator, observable::Observables.Observable, targets::Int...) -> Float64
+
+Compute the exact (`shots=0`) expectation value of `observable` applied to `targets`
+given the evolved state vector in `svs`. In other words, compute
+``\\langle \\psi | \\hat{O} | \\psi \\rangle``.
+"""
 function expectation(
     svs::StateVectorSimulator,
     observable::Observables.Observable,
@@ -253,6 +280,11 @@ function apply_observables!(svs::StateVectorSimulator, observables)
     end
     return svs
 end
+"""
+    probabilities(svs::StateVectorSimulator) -> Vector{Float64}
+
+Compute the observation probabilities of all amplitudes in the state vector in `svs`.
+"""
 probabilities(svs::StateVectorSimulator) = abs2.(svs.state_vector)
 
 function _apply_ag_Hamiltonian(sv::StateVector{T}, H::Sum, targets) where {T<:Complex}
