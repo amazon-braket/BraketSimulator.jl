@@ -33,19 +33,17 @@ function pl_qft(qubit_count::Int)
     return tape.expand(depth=5)
 end
 
-for n_qubits in 4:30
-    shots = 100
-    suite["qft"][(string(n_qubits), string(shots))] = BenchmarkGroup()
-    g = suite["qft"][(string(n_qubits), string(shots))]
-    g["Julia"] = @benchmarkable sim(circ, shots=shots) setup = (sim=LocalSimulator("braket_sv"); circ = qft_circuit($n_qubits))
-    g["Lightning.Qubit"] = @benchmarkable sim.execute(circ) setup = (sim=qml.device("lightning.qubit", wires=$n_qubits, shots=shots); circ = pl_qft($n_qubits))
-    g["Qiskit.Aer"]      = @benchmarkable sim.backend.run(circ, shots=shots).result()  setup = (sim=qml.device("qiskit.aer", backend="aer_simulator_statevector", wires=$n_qubits, shots=shots, statevector_parallel_threshold=8); circ = sim.compile_circuits(pylist([pl_qft($n_qubits)])))
-end
-
-for n_qubits in 4:32
-    shots = 0
-    suite["qft"][(string(n_qubits), string(shots))] = BenchmarkGroup()
-    g = suite["qft"][(string(n_qubits), string(shots))]
-    g["Julia"] = @benchmarkable sim(circ, shots=shots) setup = (sim=LocalSimulator("braket_sv"); circ = qft_circuit($n_qubits))
-    g["Lightning.Qubit"] = @benchmarkable sim.execute(circ) setup = (sim=qml.device("lightning.qubit", wires=$n_qubits, shots=shots); circ = pl_qft($n_qubits))
+for mode in (:noise, :pure), n_qubits in 4:max_qubits(Val(mode)), shots in (0, 100)
+    key = (string(n_qubits), string(shots), string(mode))
+    suite["qft"][key] = BenchmarkGroup()
+    g = suite["qft"][key]
+    if mode == :pure
+        g["Julia"]           = @benchmarkable sim(circ, shots=shots) setup = (sim=LocalSimulator("braket_sv"); circ = qft_circuit($n_qubits))
+        g["Lightning.Qubit"] = @benchmarkable sim.execute(circ) setup = (sim=qml.device("lightning.qubit", wires=$n_qubits, shots=shots); circ = pl_qft($n_qubits))
+    elseif mode == :noise
+        g["Julia"]           = @benchmarkable sim(circ, shots=shots) setup = (sim=LocalSimulator("braket_dm"); circ = Braket.apply(nm, qft_circuit($n_qubits)))
+    end
+    if shots > 0 && n_qubits <= 30
+        g["Qiskit.Aer"]      = @benchmarkable sim.backend.run(circ, shots=shots).result()  setup = (sim=qml.device("qiskit.aer", backend="aer_simulator_statevector", wires=$n_qubits, shots=shots, statevector_parallel_threshold=8); circ = sim.compile_circuits(pylist([pl_qft($n_qubits)])))
+    end
 end

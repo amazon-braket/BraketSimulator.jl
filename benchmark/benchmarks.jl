@@ -1,6 +1,13 @@
-using BraketStateVector, Braket, PythonCall, BenchmarkTools
+using BraketSimulator, Braket, PythonCall, BenchmarkTools
 
-using Braket: Instruction
+using Braket: Instruction, NoiseModel, add_noise!, GateCriteria
+
+nm = NoiseModel() 
+add_noise!(nm, BitFlip(0.1), GateCriteria(H))
+add_noise!(nm, PhaseFlip(0.1), GateCriteria(CNot))
+
+max_qubits(::Val{:noise}) = 16
+max_qubits(::Val{:pure})  = 32
 
 gate_operations  = pyimport("braket.default_simulator.gate_operations")
 noise_operations = pyimport("braket.default_simulator.noise_operations")
@@ -16,7 +23,7 @@ include("gate_kernels.jl")
 include("qaoa.jl")
 include("qft.jl")
 include("ghz.jl")
-include("vqe.jl")
+#include("vqe.jl")
 
 # this is expensive! only do it if we're sure we need to regen parameters
 if !isfile("params.json")
