@@ -499,6 +499,16 @@ function (d::AbstractSimulator)(
     PythonCall.GC.enable()
     return r
 end
+
+function Py(r::GateModelTaskResult)
+    py_measurements  = pylist( pylist(Py(m) for m in meas) for meas in r.measurements)
+    py_probabilities = !isnothing(r.measurementProbabilities) ? pydict(r.measurementProbabilities) : PythonCall.pybuiltins.None
+    py_qubits = !isnothing(r.measuredQubits) ? pylist(r.measuredQubits) : PythonCall.pybuiltins.None
+    py_results = pylist(r.resultTypes)
+    py_task_mtd = braket.task_result.task_metadata_v1.TaskMetadata(id=pystr(r.taskMetadata.id), shots=Py(r.taskMetadata.id), deviceId=pystr(r.taskMetadata.deviceId))
+    py_addl_mtd = braket.task_result.additional_metadata.AdditionalMetadata(action=r.additionalMetadata.action)
+    return braket.task_result.GateModelTaskResult(measurements=py_measurements, measurementProbabilities=py_probabilities, resultTypes=py_results, measuredQubits=py_qubits, taskMetadata=py_task_mtd, additionalMetadata=py_addl_mtd)
+end
 # PL specific -- some way we can dispatch here?
 function Py(r::GateModelQuantumTaskResult)
     return pylist([numpy[].array(v).squeeze() for v in r.values])
