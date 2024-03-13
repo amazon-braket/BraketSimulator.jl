@@ -470,6 +470,7 @@ function (d::AbstractSimulator)(
     # fix me to use OpenQASM if needed
     jl_specs  = [] 
     jl_inputs = nothing
+    shots = args[end]
     stats = @timed begin
         if input isa PyDict{Any,Any}
             jl_inputs = pyconvert(Dict{String,Float64}, input)
@@ -491,10 +492,10 @@ function (d::AbstractSimulator)(
     @debug "Time for conversion of specs and inputs: $(stats.time)."
     PythonCall.GC.disable()
     if length(jl_specs) == 1
-        t = d(jl_specs[1], args...; inputs = jl_inputs, kwargs...)
+        t = d(jl_specs[1], args[1:end-1]...; inputs = jl_inputs, shots=shots, kwargs...)
         r = result(t)
     else
-        t = d(jl_specs, args...; inputs = jl_inputs, kwargs...)
+        t = d(jl_specs, args[1:end-1]...; inputs = jl_inputs, shots=shots, kwargs...)
         r = results(t)
     end
     PythonCall.GC.enable()
