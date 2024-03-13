@@ -462,8 +462,8 @@ end
 
 function (d::AbstractSimulator)(
     task_specs::Union{PyList{Any},NTuple{N,PyIterable}, Py},
-    inputs::Union{PyList{Any},PyDict{Any,Any},Py},
     args...;
+    input::Union{PyList{Any},PyDict{Any,Any},Py}=PyDict{Any,Any}(),
     kwargs...,
 ) where {N}
     # handle inputs
@@ -471,10 +471,10 @@ function (d::AbstractSimulator)(
     jl_specs  = [] 
     jl_inputs = nothing
     stats = @timed begin
-        if inputs isa PyDict{Any,Any}
-            jl_inputs = pyconvert(Dict{String,Float64}, inputs)
+        if input isa PyDict{Any,Any}
+            jl_inputs = pyconvert(Dict{String,Float64}, input)
         else
-            jl_inputs = [pyconvert(Dict{String,Float64}, py_inputs) for py_inputs in inputs]
+            jl_inputs = [pyconvert(Dict{String,Float64}, py_inputs) for py_inputs in input]
         end
         s_ix = 1
         for spec in task_specs
@@ -486,7 +486,7 @@ function (d::AbstractSimulator)(
             s_ix += 1
         end
         task_specs = nothing
-        inputs = nothing
+        input = nothing
     end
     @debug "Time for conversion of specs and inputs: $(stats.time)."
     PythonCall.GC.disable()
