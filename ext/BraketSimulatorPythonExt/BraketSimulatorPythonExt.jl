@@ -492,11 +492,9 @@ function (d::AbstractSimulator)(
     @debug "Time for conversion of specs and inputs: $(stats.time)."
     PythonCall.GC.disable()
     if length(jl_specs) == 1
-        t = d(jl_specs[1], args[1:end-1]...; inputs = jl_inputs, shots=shots, kwargs...)
-        r = result(t)
+        r = d(jl_specs[1], args[1:end-1]...; inputs = jl_inputs, shots=shots, kwargs...)
     else
-        t = d(jl_specs, args[1:end-1]...; inputs = jl_inputs, shots=shots, kwargs...)
-        r = results(t)
+        r = d(jl_specs, args[1:end-1]...; inputs = jl_inputs, shots=shots, kwargs...)
     end
     PythonCall.GC.enable()
     return r
