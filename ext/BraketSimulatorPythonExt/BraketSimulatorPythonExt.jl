@@ -500,13 +500,18 @@ function (d::AbstractSimulator)(
     return r
 end
 
+function Py(ir::OpenQasmProgram)
+    py_inputs = isnothing(ir.inputs) ? PythonCall.pybuiltins.None : pydict(ir.inputs)
+    return braket[].ir.openqasm.program_v1.Program(source=pystr(ir.source), inputs=py_inputs)
+end
+
 function Py(r::GateModelTaskResult)
     py_measurements  = pylist( pylist(Py(m) for m in meas) for meas in r.measurements)
     py_probabilities = !isnothing(r.measurementProbabilities) ? pydict(r.measurementProbabilities) : PythonCall.pybuiltins.None
     py_qubits = !isnothing(r.measuredQubits) ? pylist(r.measuredQubits) : PythonCall.pybuiltins.None
     py_results = pylist(r.resultTypes)
     py_task_mtd = braket[].task_result.task_metadata_v1.TaskMetadata(id=pystr(r.taskMetadata.id), shots=Py(r.taskMetadata.shots), deviceId=pystr(r.taskMetadata.deviceId))
-    py_addl_mtd = braket[].task_result.additional_metadata.AdditionalMetadata(action=r.additionalMetadata.action)
+    py_addl_mtd = braket[].task_result.additional_metadata.AdditionalMetadata(action=Py(r.additionalMetadata.action))
     return braket[].task_result.GateModelTaskResult(measurements=py_measurements, measurementProbabilities=py_probabilities, resultTypes=py_results, measuredQubits=py_qubits, taskMetadata=py_task_mtd, additionalMetadata=py_addl_mtd)
 end
 # PL specific -- some way we can dispatch here?
