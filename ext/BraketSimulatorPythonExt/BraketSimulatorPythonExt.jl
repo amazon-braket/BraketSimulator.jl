@@ -460,7 +460,7 @@ function classical_shadow(
     return shadow
 end
 
-function (d::LocalSimulator)(
+function (d::AbstractSimulator)(
     task_specs::Union{PyList{Any},NTuple{N,PyIterable}, Py},
     inputs::Union{PyList{Any},PyDict{Any,Any},Py},
     args...;
