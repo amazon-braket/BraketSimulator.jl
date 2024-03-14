@@ -501,15 +501,18 @@ function (d::AbstractSimulator)(
 end
 
 function Py(r::Braket.IR.Sample)
-    return braket[].ir.jaqcd.results.Sample(targets=pylist(r.targets), observable=pylist(r.observable))
+    py_targets = isnothing(r.targets) ? PythonCall.pybuiltins.None : pylist(r.targets)
+    return braket[].ir.jaqcd.results.Sample(targets=py_targets, observable=pylist(r.observable))
 end
 
 function Py(r::Braket.IR.Expectation)
-    return braket[].ir.jaqcd.results.Expectation(targets=pylist(r.targets), observable=pylist(r.observable))
+    py_targets = isnothing(r.targets) ? PythonCall.pybuiltins.None : pylist(r.targets)
+    return braket[].ir.jaqcd.results.Expectation(targets=py_targets, observable=pylist(r.observable))
 end
 
 function Py(r::Braket.IR.Variance)
-    return braket[].ir.jaqcd.results.Variance(targets=pylist(r.targets), observable=pylist(r.observable))
+    py_targets = isnothing(r.targets) ? PythonCall.pybuiltins.None : pylist(r.targets)
+    return braket[].ir.jaqcd.results.Variance(targets=py_targets, observable=pylist(r.observable))
 end
 
 function Py(r::Braket.IR.Amplitude)
@@ -525,11 +528,13 @@ function Py(r::Braket.IR.DensityMatrix)
 end
 
 function Py(r::Braket.IR.Probability)
-    return braket[].ir.jaqcd.results.Probability(targets=pylist(r.targets))
+    py_targets = isnothing(r.targets) ? PythonCall.pybuiltins.None : pylist(r.targets)
+    return braket[].ir.jaqcd.results.Probability(targets=py_targets)
 end
 
 function Py(r::Braket.IR.AdjointGradient)
-    return braket[].ir.jaqcd.results.AdjointGradient(targets=pylist(r.targets), observable=pylist(r.observable), parameters=pylist(pystr(p) for p in r.parameters))
+    py_targets = isnothing(r.targets) ? PythonCall.pybuiltins.None : pylist(r.targets)
+    return braket[].ir.jaqcd.results.AdjointGradient(targets=py_targets, observable=pylist(r.observable), parameters=pylist(pystr(p) for p in r.parameters))
 end
 
 function Py(rt::Braket.ResultTypeValue)
