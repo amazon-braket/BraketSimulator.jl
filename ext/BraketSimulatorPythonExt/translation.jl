@@ -138,15 +138,15 @@ end
 function jl_convert_circuit(::Type{Braket.IR.Program}, x)
     x_jaqcd      = x._to_jaqcd()
     instructions = [pyconvert(Instruction, ix) for ix in x_jaqcd.instructions]
-    results      = [pyconvert(AbstractProgramResult, rt) for rt in x_jaqcd.results]
-    bris         = pyisinstance(x_jaqcd.basis_rotation_instructions, PythonCall.pybuiltins.list) [pyconvert(Instruction, ix) for ix in x_jaqcd.basis_rotation_instructions] : Instruction[]
+    results      = pyisinstance(x_jaqcd.results, PythonCall.pybuiltins.list) ? [pyconvert(AbstractProgramResult, rt) for rt in x_jaqcd.results] : AbstractProgramResult[]
+    bris         = pyisinstance(x_jaqcd.basis_rotation_instructions, PythonCall.pybuiltins.list) ? [pyconvert(Instruction, ix) for ix in x_jaqcd.basis_rotation_instructions] : Instruction[]
     prog         = Braket.Program(Braket.header_dict[Braket.Program], instructions, results, bris)
     PythonCall.pyconvert_return(prog)
 end
 function jl_convert_program(::Type{Braket.IR.Program}, x_jaqcd)
     instructions = [pyconvert(Instruction, ix) for ix in x_jaqcd.instructions]
-    results      = [pyconvert(AbstractProgramResult, rt) for rt in x_jaqcd.results]
-    bris         = [pyconvert(Instruction, ix) for ix in x_jaqcd.basis_rotation_instructions]
+    results      = pyisinstance(x_jaqcd.results, PythonCall.pybuiltins.list) ? [pyconvert(AbstractProgramResult, rt) for rt in x_jaqcd.results] : AbstractProgramResult[]
+    bris         = pyisinstance(x_jaqcd.basis_rotation_instructions, PythonCall.pybuiltins.list) ? [pyconvert(Instruction, ix) for ix in x_jaqcd.basis_rotation_instructions] : Instruction[]
     prog         = Braket.Program(Braket.header_dict[Braket.Program], instructions, results, bris)
     PythonCall.pyconvert_return(prog)
 end

@@ -80,7 +80,7 @@ mutable struct QASMGlobalContext{W, F} <: AbstractQASMContext
     output::WalkerOutput
 end
 
-function QASMGlobalContext{W}(ext_lookup::F=nothing) where {W, F}
+function QASMGlobalContext{W}(ext_lookup::F=Dict{String,Any}()) where {W, F}
     ctx = QASMGlobalContext{W, F}(
         Dict{String, QASMDefinition}(),
         Dict{Union{String, Tuple{String, Int}}, Union{Int, Vector{Int}}}(),
@@ -401,7 +401,7 @@ function (ctx::AbstractQASMContext)(::Val{:density_matrix}, body::AbstractString
 end
 
 function (ctx::AbstractQASMContext)(::Val{:probability}, body::AbstractString)
-    chopped_body = chopprefix(body, "probability ")
+    chopped_body = chopprefix(body, "probability")
     targets = ctx(Val(:pragma), Val(:qubits), chopped_body)
     push!(ctx, Braket.Probability(targets))
     return
@@ -470,7 +470,7 @@ end
 lookup_mapping(q::String, ctx) = ctx.qubit_mapping[q]
 lookup_mapping(q::Tuple{String, T}, ctx) where {T} = [ctx.qubit_mapping[q[1]][q_+1] for q_ in q[2]]
 function (ctx::AbstractQASMContext)(::Val{:pragma}, ::Val{:qubits}, body::AbstractString)
-    (body == "all" || isempty(body)) && return nothing
+    (occursin("all", body) || isempty(body)) && return nothing
     has_brakets = occursin('[', body)
     if has_brakets # more complicated...
         qubits = Int[]
@@ -586,7 +586,8 @@ end
 (ctx::AbstractQASMContext)(node::OpenQASM3.Pragma) = ctx(Val(:pragma), node.command)
 
 function _lookup_ext_scalar(name, ctx::QASMGlobalContext)
-    val = ctx.ext_lookup[name]
+    isnothing(ctx.ext_lookup) && error("Context lookup is empty")
+    val = get(ctx.ext_lookup, name, nothing)
     isnothing(val) || val isa Number || error("QASM program expects '$name' to be a scalar. Got '$val'.")
     return val
 end
@@ -711,6 +712,7 @@ function (ctx::AbstractQASMContext)(node::OpenQASM3.QuantumGate, gate_name::Stri
     braket_gate = ctx(gate_mods, braket_gate)
     qc          = qubit_count(braket_gate)
     if qc == 1
+        @show resolved_qubits
         gate_qubits = _get_qubits_from_mapping(Iterators.flatten(resolved_qubits), ctx)
         for q in gate_qubits, ix in braket_gate
             push!(ctx, Instruction(ix.operator, q))
@@ -938,6 +940,7 @@ end
 
 _get_qubits_from_mapping(q, ctx::AbstractQASMContext) = map(q) do qubit
     _is_hardware_qubit(qubit) ? tryparse(Int, replace(qubit, "\$"=>"")) : ctx.qubit_mapping[qubit]
+    #qubit isa Tuple && return [ctx.qubit_mapping[(qubit[1], t)] for t in qubit[2]]
 end
 
 # does nothing for now
