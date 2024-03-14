@@ -502,39 +502,39 @@ end
 
 function Py(r::Braket.IR.Sample)
     py_targets = isnothing(r.targets) ? PythonCall.pybuiltins.None : pylist(r.targets)
-    return braket[].ir.jaqcd.results.Sample(targets=py_targets, observable=pylist(r.observable))
+    return braket[].ir.jaqcd.results.Sample(targets=py_targets, observable=pylist(r.observable), type=pystr("sample"))
 end
 
 function Py(r::Braket.IR.Expectation)
     py_targets = isnothing(r.targets) ? PythonCall.pybuiltins.None : pylist(r.targets)
-    return braket[].ir.jaqcd.results.Expectation(targets=py_targets, observable=pylist(r.observable))
+    return braket[].ir.jaqcd.results.Expectation(targets=py_targets, observable=pylist(r.observable), type=pystr("expectation"))
 end
 
 function Py(r::Braket.IR.Variance)
     py_targets = isnothing(r.targets) ? PythonCall.pybuiltins.None : pylist(r.targets)
-    return braket[].ir.jaqcd.results.Variance(targets=py_targets, observable=pylist(r.observable))
+    return braket[].ir.jaqcd.results.Variance(targets=py_targets, observable=pylist(r.observable), type=pystr("variance"))
 end
 
 function Py(r::Braket.IR.Amplitude)
-    return braket[].ir.jaqcd.results.Amplitude(states=pylist(pystr(s) for s in r.states))
+    return braket[].ir.jaqcd.results.Amplitude(states=pylist(pystr(s) for s in r.states), type=pystr("amplitude"))
 end
 
 function Py(r::Braket.IR.StateVector)
-    return braket[].ir.jaqcd.results.StateVector()
+    return braket[].ir.jaqcd.results.StateVector(type=pystr("statevector"))
 end
 
 function Py(r::Braket.IR.DensityMatrix)
-    return braket[].ir.jaqcd.results.DensityMatrix(targets=pylist(r.targets))
+    return braket[].ir.jaqcd.results.DensityMatrix(targets=pylist(r.targets), type=pystr("densitymatrix"))
 end
 
 function Py(r::Braket.IR.Probability)
     py_targets = isnothing(r.targets) ? PythonCall.pybuiltins.None : pylist(r.targets)
-    return braket[].ir.jaqcd.results.Probability(targets=py_targets)
+    return braket[].ir.jaqcd.results.Probability(targets=py_targets, type=pystr("probability"))
 end
 
 function Py(r::Braket.IR.AdjointGradient)
     py_targets = isnothing(r.targets) ? PythonCall.pybuiltins.None : pylist(r.targets)
-    return braket[].ir.jaqcd.results.AdjointGradient(targets=py_targets, observable=pylist(r.observable), parameters=pylist(pystr(p) for p in r.parameters))
+    return braket[].ir.jaqcd.results.AdjointGradient(targets=py_targets, observable=pylist(r.observable), parameters=pylist(pystr(p) for p in r.parameters), type=pystr("adjoint_gradient"))
 end
 
 function Py(rt::Braket.ResultTypeValue)
