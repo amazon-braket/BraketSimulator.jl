@@ -507,7 +507,9 @@ end
 
 function Py(r::Braket.IR.Expectation)
     py_targets = isnothing(r.targets) ? PythonCall.pybuiltins.None : pylist(r.targets)
-    return braket[].ir.jaqcd.results.Expectation(targets=py_targets, observable=pylist(r.observable), type=pystr("expectation"))
+    py_obs = pylist(r.observable)
+    @show py_targets, py_obs 
+    return braket[].ir.jaqcd.results.Expectation(targets=py_targets, observable=py_obs, type=pystr("expectation"))
 end
 
 function Py(r::Braket.IR.Variance)
