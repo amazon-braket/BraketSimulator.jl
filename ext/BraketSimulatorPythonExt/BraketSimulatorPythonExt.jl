@@ -500,6 +500,50 @@ function (d::AbstractSimulator)(
     return r
 end
 
+function Py(r::Braket.IR.Sample)
+    return braket[].ir.jaqcd.results.Sample(targets=pylist(r.targets), observable=pylist(r.observable))
+end
+
+function Py(r::Braket.IR.Expectation)
+    return braket[].ir.jaqcd.results.Expectation(targets=pylist(r.targets), observable=pylist(r.observable))
+end
+
+function Py(r::Braket.IR.Variance)
+    return braket[].ir.jaqcd.results.Variance(targets=pylist(r.targets), observable=pylist(r.observable))
+end
+
+function Py(r::Braket.IR.Amplitude)
+    return braket[].ir.jaqcd.results.Amplitude(states=pylist(pystr(s) for s in r.states))
+end
+
+function Py(r::Braket.IR.StateVector)
+    return braket[].ir.jaqcd.results.StateVector()
+end
+
+function Py(r::Braket.IR.DensityMatrix)
+    return braket[].ir.jaqcd.results.DensityMatrix(targets=pylist(r.targets))
+end
+
+function Py(r::Braket.IR.Probability)
+    return braket[].ir.jaqcd.results.Probability(targets=pylist(r.targets))
+end
+
+function Py(r::Braket.IR.AdjointGradient)
+    return braket[].ir.jaqcd.results.AdjointGradient(targets=pylist(r.targets), observable=pylist(r.observable), parameters=pylist(pystr(p) for p in r.parameters))
+end
+
+function Py(rt::Braket.ResultTypeValue)
+    py_typ = Py(rt.type) 
+    py_val = if rt.value isa Dict
+        pydict(rt.value)
+    elseif rt.value isa Float64
+        rt.value
+    else
+        pylist(rt.value)
+    end
+    return braket[].task_result.gate_model_task_result_v1.ResultTypeValue(type=py_typ, value=py_val)
+end
+
 function Py(ir::OpenQasmProgram)
     py_inputs = isnothing(ir.inputs) ? PythonCall.pybuiltins.None : pydict(ir.inputs)
     return braket[].ir.openqasm.program_v1.Program(source=pystr(ir.source), inputs=py_inputs)
