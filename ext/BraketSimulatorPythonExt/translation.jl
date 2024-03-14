@@ -115,6 +115,26 @@ function jl_convert(::Type{T}, x::Py) where {T<:AbstractIR}
     end
     PythonCall.pyconvert_return(T(args..., pyconvert(String, pygetattr(x, "type"))))
 end
+function jl_convert(::Type{Braket.IR.AbstractProgramResult}, x::Py)
+    r_typ = pyconvert(String, x.type)
+    if r_typ == "amplitude"
+        return pyconvert(Braket.IR.Amplitude, x)
+    elseif r_typ == "sample"
+        return pyconvert(Braket.IR.Sample, x)
+    elseif r_typ == "expectation"
+        return pyconvert(Braket.IR.Expectation, x)
+    elseif r_typ == "variance"
+        return pyconvert(Braket.IR.Variance, x)
+    elseif r_typ == "probability"
+        return pyconvert(Braket.IR.Probability, x)
+    elseif r_typ == "densitymatrix"
+        return pyconvert(Braket.IR.DensityMatrix, x)
+    elseif r_typ == "statevector"
+        return pyconvert(Braket.IR.StateVector, x)
+    elseif r_typ == "adjoint_gradient"
+        return pyconvert(Braket.IR.AdjointGradient, x)
+    end
+end
 function jl_convert_circuit(::Type{Braket.IR.Program}, x)
     x_jaqcd      = x._to_jaqcd()
     instructions = [pyconvert(Instruction, ix) for ix in x_jaqcd.instructions]
