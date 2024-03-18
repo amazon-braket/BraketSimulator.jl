@@ -46,14 +46,15 @@ const OBS_LIST = (Observables.X(), Observables.Y(), Observables.Z())
 const CHUNK_SIZE = 2^10
 
 function parse_program(d::D, program::OpenQasmProgram) where {D<:AbstractSimulator}
-    parsed_prog      = OpenQASM3.parse(program.source)
+    if endswith(program.source, "qasm") && isfile(program.source)
+        parsed_prog      = OpenQASM3.parse(read(program.source, String))
+    else
+        parsed_prog      = OpenQASM3.parse(program.source)
+    end
     interpreted_circ = interpret(parsed_prog, extern_lookup=program.inputs)
     if d.shots > 0
         Braket.basis_rotation_instructions!(interpreted_circ)
     end
-    println("circuit instructions:")
-    foreach(println, interpreted_circ.instructions)
-    flush(stdout)
     return convert(Braket.Program, interpreted_circ)
 end
 

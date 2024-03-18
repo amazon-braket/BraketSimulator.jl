@@ -617,9 +617,6 @@ function (ctx::AbstractQASMContext)(node::OpenQASM3.IODeclaration{T, OpenQASM3.i
     val = _lookup_ext_scalar(name, ctx)
     isnothing(val) && error("Input variable $name was not supplied at $(node.span).")
     scalar_matches_type(T, val, "Input variable $name at $(node.span): type does not match ")
-    println("Input type: $(node.type)")
-    println("Input type size: $(node.type.size)")
-    flush(stdout)
     ctx.definitions[name] = ClassicalDef(val, node.type, ClassicalInput)
     return nothing
 end
