@@ -517,8 +517,6 @@ function Py(r::Braket.IR.Expectation)
         return pylist(pylist(pylist(o__) for o__ in o_) for o_ in o)
     end
     py_obs = pylist(raw_obs)
-    PythonCall.pyprint("targets: ", py_targets)
-    PythonCall.pyprint("obs: ", py_obs)
     return braket[].ir.jaqcd.results.Expectation(targets=py_targets, observable=py_obs, type=pystr("expectation"))
 end
 
@@ -556,11 +554,13 @@ function Py(r::Braket.IR.AdjointGradient)
 end
 
 function Py(rt::Braket.ResultTypeValue)
-    py_typ = Py(rt.type) 
+    py_typ = Py(rt.type)
     py_val = if rt.value isa Dict
         pydict(rt.value)
     elseif rt.value isa Float64
         rt.value
+    elseif rt.value isa Vector{Vector{Vector{Float64}}}
+        pylist(pylist(pycomplex(v_...) for v_ in v) for v in rt.value)
     else
         pylist(rt.value)
     end

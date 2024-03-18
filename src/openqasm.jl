@@ -275,7 +275,14 @@ function _lookup_name(node::OpenQASM3.IndexExpression, ctx::AbstractQASMContext)
 end
 _lookup_name(node, ctx) = id(node)
 
-_generate_elements_from_obj(obj::QASMDefinition, name::String, inds) = obj.value[inds .+ 1]
+_index_val(val, inds, typ) = val[inds .+ 1]
+function _index_val(val::T, inds, typ) where {T<:Integer}
+    width = sizeof(T)
+    v_digits = digits(val, base=2, pad=typ.size.value)
+    vals = reverse(v_digits)[inds .+ 1]
+    return vals
+end
+_generate_elements_from_obj(obj::ClassicalDef, name::String, inds) = _index_val(obj.value, inds, obj.valtype)
 _generate_elements_from_obj(obj::QubitDef, name::String, inds)       = [(name, inds)]
 function (ctx::AbstractQASMContext)(node::OpenQASM3.IndexExpression)
     names    = _lookup_name(node, ctx)
@@ -349,6 +356,7 @@ scalar_cast(::OpenQASM3.UintType, val) = UInt(val)
 scalar_cast(::OpenQASM3.BoolType, val) = Bool(val)
 scalar_cast(::OpenQASM3.BoolType, val::BitVector) = any(i->i>0, val)
 scalar_cast(::Type{OpenQASM3.BoolType}, val) = Bool(val)
+scalar_cast(::Type{OpenQASM3.BoolType}, val::Vector{Int}) = any(i->i>0, val)
 scalar_cast(::Type{OpenQASM3.BoolType}, val::BitVector) = any(i->i>0, val)
 
 _new_inner_scope(ctx::AbstractQASMContext)      = QASMBlockContext(ctx)
@@ -382,7 +390,7 @@ function (ctx::AbstractQASMContext)(::Val{:adjoint_gradient}, body::AbstractStri
 end
 
 function (ctx::AbstractQASMContext)(::Val{:amplitude}, body::AbstractString)
-    chopped_body = replace(chopprefix(body, "amplitude "), "\""=>"")
+    chopped_body = replace(chopprefix(body, "amplitude "), "\""=>"", "'"=>"")
     states       = split(chopped_body, " ")
     push!(ctx, Braket.Amplitude([String(replace(s, ","=>"")) for s in states]))
     return
@@ -402,7 +410,7 @@ end
 
 function (ctx::AbstractQASMContext)(::Val{:probability}, body::AbstractString)
     chopped_body = chopprefix(body, "probability")
-    targets = ctx(Val(:pragma), Val(:qubits), chopped_body)
+    targets      = ctx(Val(:pragma), Val(:qubits), chopped_body)
     push!(ctx, Braket.Probability(targets))
     return
 end
@@ -505,7 +513,7 @@ for (tag, type, type_str) in ((Val{:expectation}, :(Braket.Expectation), "expect
             op_str       = chopped_body
             op, targets  = ctx(Val(:operator), op_str)
             rt           = $type(op, targets)
-            push!(output(ctx).results, rt)
+            push!(ctx, rt)
             return
         end
     end
@@ -609,7 +617,10 @@ function (ctx::AbstractQASMContext)(node::OpenQASM3.IODeclaration{T, OpenQASM3.i
     val = _lookup_ext_scalar(name, ctx)
     isnothing(val) && error("Input variable $name was not supplied at $(node.span).")
     scalar_matches_type(T, val, "Input variable $name at $(node.span): type does not match ")
-    ctx.definitions[name] = ClassicalDef(val, T, ClassicalInput)
+    println("Input type: $(node.type)")
+    println("Input type size: $(node.type.size)")
+    flush(stdout)
+    ctx.definitions[name] = ClassicalDef(val, node.type, ClassicalInput)
     return nothing
 end
 
@@ -712,7 +723,6 @@ function (ctx::AbstractQASMContext)(node::OpenQASM3.QuantumGate, gate_name::Stri
     braket_gate = ctx(gate_mods, braket_gate)
     qc          = qubit_count(braket_gate)
     if qc == 1
-        @show resolved_qubits
         gate_qubits = _get_qubits_from_mapping(Iterators.flatten(resolved_qubits), ctx)
         for q in gate_qubits, ix in braket_gate
             push!(ctx, Instruction(ix.operator, q))
@@ -924,7 +934,7 @@ _is_hardware_qubit(qname) = false
 resolve_qubit(q::Tuple{String, Int}, q_name::String, def::QubitDef, ctx::AbstractQASMContext)   = [q]
 resolve_qubit(q::String, q_name::String, def::QubitDef, ctx::AbstractQASMContext)               = length(def) == 1 ? [q] : [(q, ix) for ix in 0:def.size-1]
 resolve_qubit(q::OpenQASM3.Identifier, q_name::String, def::QubitDef, ctx::AbstractQASMContext) = resolve_qubit(q_name, q_name, def, ctx) 
-resolve_qubit(q::Tuple{String, T}, q_name::String, def::QubitDef, ctx::AbstractQASMContext) where {T} = [(q_name, ix) for ix in q[2]]
+resolve_qubit(q::Tuple{String, T}, q_name::String, def::QubitDef, ctx::AbstractQASMContext) where {T} = [(q_name, ix) for ix in Iterators.flatten(q[2])]
 function resolve_qubit(node::OpenQASM3.IndexedIdentifier, q_name::String, def::QubitDef, ctx::AbstractQASMContext)
     ix  = map(ctx, node.indices)[1]
     ixs = ix isa Int ? [ix] : ix
@@ -1032,7 +1042,14 @@ function Base.collect(ctx::QASMGlobalContext)
     c = Circuit()
     wo = output(ctx)
     foreach(ix->Braket.add_instruction!(c, ix), wo.ixs)
-    foreach(rt->Braket.add_result_type!(c, rt), wo.results)
+    for rt in wo.results
+        obs = Braket.extract_observable(rt)
+        if !isnothing(obs) && c.observables_simultaneously_measureable && !(rt isa AdjointGradient)
+            Braket.add_to_qubit_observable_mapping!(c, obs, rt.targets)
+        end
+        Braket.add_to_qubit_observable_set!(c, rt)
+        push!(c.result_types, rt)
+    end
     return c
 end
 function interpret(program::OpenQASM3.Program; extern_lookup=Dict{String,Float64}())

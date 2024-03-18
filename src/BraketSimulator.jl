@@ -51,6 +51,9 @@ function parse_program(d::D, program::OpenQasmProgram) where {D<:AbstractSimulat
     if d.shots > 0
         Braket.basis_rotation_instructions!(interpreted_circ)
     end
+    println("circuit instructions:")
+    foreach(println, interpreted_circ.instructions)
+    flush(stdout)
     return convert(Braket.Program, interpreted_circ)
 end
 

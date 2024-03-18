@@ -103,11 +103,12 @@ function calculate(a::Braket.Amplitude, sim::AbstractSimulator)
     )
 end
 
+# need to handle reordered targets here
 function marginal_probability(probs::Vector{T}, qubit_count::Int, targets) where {T<:Real}
     unused_qubits = setdiff(collect(0:qubit_count-1), targets)
     endian_unused = qubit_count .- unused_qubits .- 1
-    final_probs = zeros(Float64, 2^length(targets))
-    q_combos = vcat([Int[]], collect(combinations(endian_unused)))
+    final_probs   = zeros(Float64, 2^length(targets))
+    q_combos      = vcat([Int[]], collect(combinations(endian_unused)))
     Threads.@threads for ix = 0:2^length(targets)-1
         padded_ix = ix
         for pad_q in sort(endian_unused)
@@ -129,11 +130,49 @@ function marginal_probability(probs::Vector{T}, qubit_count::Int, targets) where
     return final_probs
 end
 
+function permute_probability(probs::Vector{T}, qubit_count::Int, targets) where {T<:Real}
+    new_probs = zeros(T, 2^length(targets))
+    Threads.@threads for ix = 0:2^length(targets)-1
+        unpermed_bits = [(ix >> q) & 1 for q in 0:qubit_count - 1]
+        permed_bits   = unpermed_bits[qubit_count .- targets] 
+        new_ix = 0
+        for (b, q) in zip(permed_bits, 0:qubit_count - 1)
+            new_ix += b << q
+        end
+        new_probs[new_ix+1] = probs[ix+1]
+    end
+    return new_probs
+end
+
+function permute_density_matrix(ρ::Matrix{T}, qubit_count::Int, targets) where {T}
+    new_ρ = zeros(T, 2^length(targets), 2^length(targets))
+    Threads.@threads for ix = 0:2^length(targets)-1
+        unpermed_ix_bits = [(ix >> q) & 1 for q in 0:qubit_count - 1]
+        permed_ix_bits   = unpermed_ix_bits[qubit_count .- targets] 
+        new_ix = 0
+        for (b, q) in zip(permed_ix_bits, 0:qubit_count - 1)
+            new_ix += b << q
+        end
+        for jx = 0:2^length(targets)-1
+            unpermed_jx_bits = [(jx >> q) & 1 for q in 0:qubit_count - 1]
+            permed_jx_bits   = unpermed_jx_bits[qubit_count .- targets] 
+            new_jx = 0
+            for (b, q) in zip(permed_jx_bits, 0:qubit_count - 1)
+                new_jx += b << q
+            end
+            new_ρ[new_ix+1, new_jx+1] = ρ[ix+1, jx+1]
+        end
+    end
+    return new_ρ
+end
+
 function calculate(p::Braket.Probability, sim::AbstractSimulator)
     targets = p.targets
-    probs = probabilities(sim)
-    qc = qubit_count(sim)
-    (isempty(targets) || targets == collect(0:qc-1)) && return probs
+    probs   = probabilities(sim)
+    qc      = qubit_count(sim)
+    (isempty(targets) || [targets...] == collect(0:qc-1)) && return probs
+    # reordered
+    length(targets) == qc && return permute_probability(probs, qc, [targets...])
     return marginal_probability(probs, qc, targets)
 end
 
@@ -214,7 +253,8 @@ end
 function calculate(dm::Braket.DensityMatrix, sim::AbstractSimulator)
     ρ = density_matrix(sim)
     full_qubits = collect(0:sim.qubit_count-1)
-    sort(dm.targets) == full_qubits || isempty(dm.targets) && return ρ
+    (collect(dm.targets) == full_qubits || isempty(dm.targets)) && return ρ
+    length(dm.targets) == sim.qubit_count && return permute_density_matrix(ρ, sim.qubit_count, collect(dm.targets))
     # otherwise must compute a partial trace
     return partial_trace(ρ, dm.targets)
 end
