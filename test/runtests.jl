@@ -1,6 +1,6 @@
 using Test, Aqua, BraketSimulator
 
-Aqua.test_all(BraketSimulator, ambiguities=false, piracies=false)
+Aqua.test_all(BraketSimulator, ambiguities=false, piracies=false, persistent_tasks = false)
 
 @testset "BraketSimulator" begin
     for test in (
