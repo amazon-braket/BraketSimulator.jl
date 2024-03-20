@@ -1,3 +1,18 @@
+const _NOISE_INSTRUCTIONS = Set(replace(lowercase(op), "_"=>"") for op in
+                                ["amplitude_damping",
+                                 "bit_flip",
+                                 "depolarizing",
+                                 "generalized_amplitude_damping",
+                                 "kraus",
+                                 "pauli_channel",
+                                 "two_qubit_pauli_channel",
+                                 "phase_flip",
+                                 "phase_damping",
+                                 "two_qubit_dephasing",
+                                 "two_qubit_depolarizing",
+                                ]
+                            )
+
 function _validate_amplitude_states(states::Vector{String}, qubit_count::Int)
     !all(length(state) == qubit_count for state in states) && error("all states in $states must have length $qubit_count.")
     return
@@ -68,17 +83,57 @@ function _validate_input_provided(circuit)
     end
     return
 end
-function _validate_ir_instructions_compatibility(
-    d::D,
-    circuit::Union{Program,Circuit},
-    ::Val{:OpenQASM},
-) where {D<:AbstractSimulator} end
 
 function _validate_ir_instructions_compatibility(
     d::D,
     circuit::Union{Program,Circuit},
     ::Val{:JAQCD},
-) where {D<:AbstractSimulator} end
+) where {D<:AbstractSimulator}
+    circuit_instruction_names = [replace(lowercase(string(typeof(ix.operator))), "_"=>"") for ix in circuit.instructions] 
+    supported_instructions    = Set(replace(lowercase(op), "_"=>"") for op in properties(d).action["braket.ir.jaqcd.program"].supportedOperations)
+    no_noise = true
+    println("circuit instruction names: $circuit_instruction_names")
+    println("supported_instructions: $supported_instructions")
+    flush(stdout)
+    for name in circuit_instruction_names
+        if name in _NOISE_INSTRUCTIONS
+            no_noise = false
+            if name ∉ supported_instructions
+                throw("Noise instructions are not supported by the state vector simulator (by default). You need to use the density matrix simulator: LocalSimulator(\"braket_dm\").")
+            end
+        end
+        if no_noise && !isempty(intersect(_NOISE_INSTRUCTIONS, supported_instructions))
+            @warn "You are running a noise-free circuit on the density matrix simulator. Consider running this circuit on the state vector simulator: LocalSimulator(\"default\") for a better user experience."
+        end
+    end
+    return
+end
+
+        
+function _validate_ir_instructions_compatibility(
+    d::D,
+    circuit::Union{Program,Circuit},
+    ::Val{:OpenQASM},
+) where {D<:AbstractSimulator}
+    circuit_instruction_names = [replace(lowercase(string(typeof(ix.operator))), "_"=>"") for ix in circuit.instructions] 
+    supported_instructions    = Set(replace(lowercase(op), "_"=>"") for op in properties(d).action["braket.ir.openqasm.program"].supportedOperations)
+    no_noise = true
+    println("circuit instruction names: $circuit_instruction_names")
+    println("supported_instructions: $supported_instructions")
+    flush(stdout)
+    for name in circuit_instruction_names
+        if name in _NOISE_INSTRUCTIONS
+            no_noise = false
+            if name ∉ supported_instructions
+                throw("Noise instructions are not supported by the state vector simulator (by default). You need to use the density matrix simulator: LocalSimulator(\"braket_dm\").")
+            end
+        end
+        if no_noise && !isempty(intersect(_NOISE_INSTRUCTIONS, supported_instructions))
+            @warn "You are running a noise-free circuit on the density matrix simulator. Consider running this circuit on the state vector simulator: LocalSimulator(\"default\") for a better user experience."
+        end
+    end
+    return
+end
 
 function _validate_result_types_qubits_exist(result_types::Vector, qubit_count::Int)
     for rt in result_types
