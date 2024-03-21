@@ -14,7 +14,7 @@ using Braket,
 
 import Braket:
     Instruction,
-    BraketSimulator,
+    AbstractBraketSimulator,
     Program,
     OpenQasmProgram,
     apply_gate!,
