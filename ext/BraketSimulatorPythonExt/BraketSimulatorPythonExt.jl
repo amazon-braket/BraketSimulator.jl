@@ -694,7 +694,7 @@ end
                jl_device = LocalSimulator(backend=JuliaStateVectorSimulator())
                result = jl_device.run(ghz, shots=1000).result()
                result = jl_device.run(qft, shots=1000).result()
-               """)
+               """, pydict())
     end
 end
 
