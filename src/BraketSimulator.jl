@@ -31,7 +31,7 @@ const DensityMatrix{T} = Matrix{T}
 const AbstractStateVector{T} = AbstractVector{T}
 const AbstractDensityMatrix{T} = AbstractMatrix{T}
 
-abstract type AbstractSimulator <: Braket.BraketSimulator end
+abstract type AbstractSimulator <: Braket.AbstractBraketSimulator end
 Braket.name(s::AbstractSimulator) = device_id(s)
 ap_size(shots::Int, qubit_count::Int) = (shots > 0 && qubit_count < 30) ? 2^qubit_count : 0
 
