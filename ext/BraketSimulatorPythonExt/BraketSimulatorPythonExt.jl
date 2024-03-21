@@ -1,5 +1,7 @@
 module BraketSimulatorPythonExt
 
+using PrecompileTools: @setup_workload, @compile_workload
+
 using BraketSimulator, BraketSimulator.Braket, BraketSimulator.Braket.JSON3, PythonCall, BraketSimulator.Dates
 
 import BraketSimulator.Braket:
@@ -39,7 +41,6 @@ const numpy     = Ref{Py}()
 const braket    = Ref{Py}()
 
 include("translation.jl")
-include("precompile.jl")
 
 function __init__()
     # must set these when this code is actually loaded
@@ -646,6 +647,55 @@ end
 # PL specific -- some way we can dispatch here?
 function Py(r::GateModelQuantumTaskResult)
     return pylist([numpy[].array(v).squeeze() for v in r.values])
+end
+
+@setup_workload begin
+    @compile_workload begin
+        pyexec("""
+               import math
+               import time
+
+               from braket.circuits import Circuit, Observable
+               from braket.devices import LocalSimulator
+               from braket.julia_simulator import JuliaStateVectorSimulator
+               def qft_circuit(num_qubits):
+                   qftcirc = Circuit()
+                   qubits = range(num_qubits)
+                   for k in range(num_qubits):
+                       # First add a Hadamard gate
+                       qftcirc.h(qubits[k])
+
+                       # Then apply the controlled rotations, with weights (angles) defined by the distance to the control qubit.
+                       # Start on the qubit after qubit k, and iterate until the end.  When num_qubits==1, this loop does not run.
+                       for j in range(1, num_qubits - k):
+                           angle = 2 * math.pi / (2 ** (j + 1))
+                           qftcirc.cphaseshift(qubits[k + j], qubits[k], angle)
+
+                   # Then add SWAP gates to reverse the order of the qubits:
+                   for i in range(math.floor(num_qubits / 2)):
+                       qftcirc.swap(qubits[i], qubits[-i - 1])
+
+                   return qftcirc
+
+
+               # function to build a GHZ state
+               def ghz_circuit(n_qubits):
+
+                   # instantiate circuit object
+                   circuit = Circuit()
+                   # add Hadamard gate on first qubit
+                   circuit.h(0)
+                   # apply series of CNOT gates
+                   for ii in range(0, n_qubits - 1):
+                       circuit.cnot(control=ii, target=ii + 1)
+
+                   return circuit
+               n_qubits = 10
+               jl_device = LocalSimulator(backend=JuliaStateVectorSimulator())
+               result = jl_device.run(ghz, shots=1000).result()
+               result = jl_device.run(qft, shots=1000).result()
+               """)
+    end
 end
 
 end
