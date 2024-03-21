@@ -1,8 +1,8 @@
 if ccall(:jl_generating_output, Cint, ()) == 1   # if we're precompiling the package
     let
-        pybraket = pyimport("braket")
+        pybraket = pyimport("braket.circuits")
         n_qubits = 10
-        c = pybraket.circuits.circuit.Circuit()
+        c = pybraket.Circuit()
         c.h(0)
         # ghz
         for q in 1:n_qubits-1
