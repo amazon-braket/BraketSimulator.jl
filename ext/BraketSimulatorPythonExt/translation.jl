@@ -150,7 +150,7 @@ function jl_convert_program(::Type{Braket.IR.Program}, x_jaqcd)
     prog         = Braket.Program(Braket.header_dict[Braket.Program], instructions, results, bris)
     PythonCall.pyconvert_return(prog)
 end
-pennylane_convert_tensor(::Type{Float64}, x::Py) =
+#=pennylane_convert_tensor(::Type{Float64}, x::Py) =
     PythonCall.pyconvert_return(pyconvert(Float64, x.numpy()))
 pennylane_convert_parameters(::Type{Float64}, x::Py) =
     PythonCall.pyconvert_return(pyconvert(Float64, x[0]))
@@ -397,4 +397,4 @@ function _translate_parameter_names(
     ::Val{true},
 )
     return fill("", n_params), param_index + n_params
-end
+end=#

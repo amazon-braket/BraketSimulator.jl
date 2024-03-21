@@ -34,7 +34,7 @@ import BraketSimulator:
     SingleExcitation,
     MultiRZ
 
-const pennylane = Ref{Py}()
+#const pennylane = Ref{Py}()
 const numpy     = Ref{Py}()
 const braket    = Ref{Py}()
 
@@ -43,7 +43,7 @@ include("translation.jl")
 function __init__()
     # must set these when this code is actually loaded
     braket[]    = pyimport("braket")
-    pennylane[] = pyimport("pennylane")
+    #pennylane[] = pyimport("pennylane")
     numpy[]     = pyimport("numpy")
     PythonCall.pyconvert_add_rule("braket.schema_common.schema_header:BraketSchemaHeader", Braket.braketSchemaHeader, jl_convert)
     PythonCall.pyconvert_add_rule("braket.circuits.circuit:Circuit", BraketSimulator.Braket.IR.Program, jl_convert_circuit)
@@ -161,7 +161,7 @@ function __init__()
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.shared_models:CompilerDirective", CompilerDirective, jl_convert)
     PythonCall.pyconvert_add_rule("braket.ir.openqasm.program_v1:Program", OpenQasmProgram, jl_convert)
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.results:Variance", Variance, jl_convert)
-    PythonCall.pyconvert_add_rule(
+    #=PythonCall.pyconvert_add_rule(
         "pennylane.ops.op_math:Adjoint",
         Instruction,
         pennylane_convert_Adjoint,
@@ -430,10 +430,10 @@ function __init__()
         "pennylane.tape.qscript:QuantumScript",
         BraketSimulator.Braket.IR.Program,
         pennylane_convert_QuantumScript,
-    )
+    )=#
 end
-BraketSimulator.Braket.qubit_count(o::Py) =
-    pyisinstance(o, pennylane.tape.QuantumTape) ? length(o.wires) : o.qubit_count
+#BraketSimulator.Braket.qubit_count(o::Py) =
+#    pyisinstance(o, pennylane.tape.QuantumTape) ? length(o.wires) : o.qubit_count
 
 function classical_shadow(d::LocalSimulator, obs_qubits, circuit, shots::Int, seed::Int)
     raw_jl_spec = _translate_from_python(circuit, d._delegate)
