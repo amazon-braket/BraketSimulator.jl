@@ -92,9 +92,6 @@ function _validate_ir_instructions_compatibility(
     circuit_instruction_names = [replace(lowercase(string(typeof(ix.operator))), "_"=>"") for ix in circuit.instructions] 
     supported_instructions    = Set(replace(lowercase(op), "_"=>"") for op in properties(d).action["braket.ir.jaqcd.program"].supportedOperations)
     no_noise = true
-    println("circuit instruction names: $circuit_instruction_names")
-    println("supported_instructions: $supported_instructions")
-    flush(stdout)
     for name in circuit_instruction_names
         if name in _NOISE_INSTRUCTIONS
             no_noise = false

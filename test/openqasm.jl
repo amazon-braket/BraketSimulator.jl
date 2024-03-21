@@ -168,7 +168,7 @@ get_tol(shots::Int) = return (
                 tol   = get_tol(shots)
                 j_simulation = sim(qubit_count(circuit), shots)
                 p_simulation = sim(qubit_count(circuit), shots)
-                parsed_circ = BraketSimulator.parse_program(p_simulation, oq3_circ)
+                parsed_circ = BraketSimulator.parse_program(p_simulation, oq3_circ, shots)
                 @test length(parsed_circ.instructions) == length(jaqcd_circ.instructions) 
                 for (p_ix, j_ix) in zip(parsed_circ.instructions, jaqcd_circ.instructions)
                     @test p_ix == j_ix
