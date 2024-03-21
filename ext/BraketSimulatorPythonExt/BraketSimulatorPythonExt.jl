@@ -660,7 +660,7 @@ end
         end
         c.state_vector()
         svs = StateVectorSimulator(n_qubits, 0)
-        svs((c,), 0)
+        svs(pylist([c]), 0)
     end
 end
 
