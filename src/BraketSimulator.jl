@@ -45,14 +45,15 @@ const BuiltinGates = merge(Braket.StructTypes.subtypes(Braket.Gate), custom_gate
 const OBS_LIST = (Observables.X(), Observables.Y(), Observables.Z())
 const CHUNK_SIZE = 2^10
 
-function parse_program(d::D, program::OpenQasmProgram) where {D<:AbstractSimulator}
+function parse_program(d::D, program::OpenQasmProgram, shots::Int) where {D<:AbstractSimulator}
     if endswith(program.source, "qasm") && isfile(program.source)
         parsed_prog      = OpenQASM3.parse(read(program.source, String))
     else
         parsed_prog      = OpenQASM3.parse(program.source)
     end
     interpreted_circ = interpret(parsed_prog, extern_lookup=program.inputs)
-    if d.shots > 0
+    if shots > 0
+        Braket.validate_circuit_and_shots(interpreted_circ, shots)
         Braket.basis_rotation_instructions!(interpreted_circ)
     end
     return convert(Braket.Program, interpreted_circ)
@@ -287,7 +288,7 @@ function (d::AbstractSimulator)(
     shots::Int = 0,
     kwargs...,
 )
-    program = parse_program(d, circuit_ir)
+    program = parse_program(d, circuit_ir, shots)
     qc      = qubit_count(program)
     _validate_ir_results_compatibility(d, program.results, Val(:JAQCD))
     _validate_ir_instructions_compatibility(d, program, Val(:JAQCD))
