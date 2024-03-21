@@ -39,6 +39,7 @@ const numpy     = Ref{Py}()
 const braket    = Ref{Py}()
 
 include("translation.jl")
+include("precompile.jl")
 
 function __init__()
     # must set these when this code is actually loaded
