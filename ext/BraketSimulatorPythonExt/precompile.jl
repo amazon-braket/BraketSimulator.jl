@@ -1,5 +1,6 @@
 if ccall(:jl_generating_output, Cint, ()) == 1   # if we're precompiling the package
     let
+        braket[]    = pyimport("braket")
         n_qubits = 10
         c = braket[].circuits.circuit.Circuit()
         c.h(0)
