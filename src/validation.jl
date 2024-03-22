@@ -1,3 +1,7 @@
+struct ValidationError <: Exception
+    msg::String
+end
+
 const _NOISE_INSTRUCTIONS = Set(replace(lowercase(op), "_"=>"") for op in
                                 ["amplitude_damping",
                                  "bit_flip",
@@ -55,7 +59,7 @@ end
 
 function _validate_shots_and_ir_results(shots::Int, results, qubit_count::Int)
     if shots == 0
-        isempty(results) && error("Result types must be specified in the IR when shots=0")
+        isempty(results) && throw(ValidationError("Result types must be specified in the IR when shots=0"))
         for rt in results
             rt.type == "sample" && error("sample can only be specified when shots>0")
             rt.type == "amplitude" && _validate_amplitude_states(rt.states, qubit_count)

@@ -882,4 +882,17 @@ get_tol(shots::Int) = return (
         @test global_ctx.definitions["array_2"].value == zeros(Int, 10) 
         @test global_ctx.definitions["array_3"].value == [1, 2, 3, 4, 0, 6, 0, 8, 0, 10]
     end
+    @testset "No result types no shots" begin
+        qasm = """
+        qubit[2] q;
+
+        h q[0];
+        ctrl @ x q[0], q[1];
+        """
+        parsed_qasm = BraketSimulator.OpenQASM3.parse(qasm)
+        circuit     = BraketSimulator.interpret(parsed_qasm)
+        program     = Braket.Program(circuit)
+        simulation  = BraketSimulator.StateVectorSimulator(2, 0)
+        @test_throws BraketSimulator.ValidationError simulation(program, 2)
+    end
 end
