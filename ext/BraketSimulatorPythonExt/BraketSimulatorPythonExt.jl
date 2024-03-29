@@ -463,50 +463,48 @@ function classical_shadow(
     return shadow
 end
 
-@recompile_invalidations begin
-    function simulate(
-        d::AbstractSimulator,
-        task_specs::Union{PyList{Any},NTuple{N,PyIterable},Py},
-        args...;
-        input::Union{PyList{Any},PyDict{Any,Any},Py}=PyDict{Any,Any}(),
-        kwargs...,
-    ) where {N}
-        # handle inputs
-        # fix me to use OpenQASM if needed
-        jl_specs  = [] 
-        jl_inputs = nothing
-        shots = args[end]
-        stats = @timed begin
-            if input isa PyDict{Any,Any}
-                jl_inputs = pyconvert(Dict{String,Float64}, input)
-            else
-                jl_inputs = [pyconvert(Dict{String,Float64}, py_inputs) for py_inputs in input]
-            end
-            s_ix = 1
-            for spec in task_specs
-                jl_prog = if pyhasattr(spec, "source")
-                    pyconvert(OpenQasmProgram, spec)
-                else
-                    pyconvert(Program, spec)
-                end
-                push!(jl_specs, jl_prog)
-                s_ix += 1
-            end
-            #task_specs = nothing
-            input = nothing
-        end
-        @debug "Time for conversion of specs and inputs: $(stats.time)."
-        PythonCall.GC.disable()
-        if length(jl_specs) == 1
-            r = simulate(d, jl_specs[1], args[1:end-1]...; inputs = jl_inputs, shots=shots, kwargs...)
-            py_r = Py(r, task_specs[1])
+function simulate(
+    d::AbstractSimulator,
+    task_specs::Union{PyList{Any},NTuple{N,PyIterable},Py},
+    args...;
+    input::Union{PyList{Any},PyDict{Any,Any},Py}=PyDict{Any,Any}(),
+    kwargs...,
+) where {N}
+    # handle inputs
+    # fix me to use OpenQASM if needed
+    jl_specs  = [] 
+    jl_inputs = nothing
+    shots = args[end]
+    stats = @timed begin
+        if input isa PyDict{Any,Any}
+            jl_inputs = pyconvert(Dict{String,Float64}, input)
         else
-            r = simulate(d, jl_specs, args[1:end-1]...; inputs = jl_inputs, shots=shots, kwargs...)
-            py_r = Py(r, task_specs)
+            jl_inputs = [pyconvert(Dict{String,Float64}, py_inputs) for py_inputs in input]
         end
-        PythonCall.GC.enable()
-        return py_r
+        s_ix = 1
+        for spec in task_specs
+            jl_prog = if pyhasattr(spec, "source")
+                pyconvert(OpenQasmProgram, spec)
+            else
+                pyconvert(Program, spec)
+            end
+            push!(jl_specs, jl_prog)
+            s_ix += 1
+        end
+        #task_specs = nothing
+        input = nothing
     end
+    @debug "Time for conversion of specs and inputs: $(stats.time)."
+    PythonCall.GC.disable()
+    if length(jl_specs) == 1
+        r = simulate(d, jl_specs[1], args[1:end-1]...; inputs = jl_inputs, shots=shots, kwargs...)
+        py_r = Py(r, task_specs[1])
+    else
+        r = simulate(d, jl_specs, args[1:end-1]...; inputs = jl_inputs, shots=shots, kwargs...)
+        py_r = Py(r, task_specs)
+    end
+    PythonCall.GC.enable()
+    return py_r
 end
 
 function Py(r::Braket.IR.Sample)
