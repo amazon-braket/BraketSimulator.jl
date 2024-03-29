@@ -29,7 +29,7 @@ get_tol(shots::Int) = return (
         __bit_0__[3] = measure __qubits__[3];
         """
         braket_circ = Circuit([(H, 0), (CNot, 0, 1), (H, 2), (CNot, 2, 3),  (H, 2), (CNot, 2, 3),  (H, 2), (CNot, 2, 3),  (H, 2), (CNot, 2, 3),  (H, 2), (CNot, 2, 3)])
-        parsed_circ = BraketSimulator.interpret(BraketSimulator.OpenQASM3.parse(qasm_str), extern_lookup=Dict("theta"=>0.2))
+        parsed_circ = BraketSimulator.interpret(BraketSimulator.OpenQASM3.parse(qasm_str), Dict("theta"=>0.2))
         @test ir(parsed_circ, Val(:JAQCD)) == Braket.Program(braket_circ)
     end
     @testset "For Loop" begin
@@ -143,7 +143,7 @@ get_tol(shots::Int) = return (
         eigsz   = eigvals(kron(z_array, ho_mat))
         eigsh   = [-70.90875406, -31.04969387, 0, 3.26468993, 38.693758]
         eigsii  = eigvals(kron(i_array, kron(i_array, ho_mat3)))
-        d       = LocalSimulator("braket_sv")
+        d       = LocalSimulator("braket_jl_sv")
         @testset "Obs $obs" for (obs, expected_mean, expected_var, expected_eigs) in
                                 [
             (Observables.I() * ho, meani, vari, eigsi),
@@ -268,7 +268,7 @@ get_tol(shots::Int) = return (
             x = 1.0
             y = 2.0
             inputs      = Dict("x"=>x, "y"=>y)
-            circuit     = BraketSimulator.interpret(parsed_qasm, extern_lookup=inputs)
+            circuit     = BraketSimulator.interpret(parsed_qasm, inputs)
             ixs = [Braket.Instruction(Rx(x), 0),  
                    Braket.Instruction(Rx(acos(x)), 0),  
                    Braket.Instruction(Rx(asin(x)), 0),  
@@ -297,7 +297,7 @@ get_tol(shots::Int) = return (
         #pragma braket result adjoint_gradient expectation(-6 * y(q[0]) @ i(q[1]) + 0.75 * y(q[2]) @ z(q[3])) theta
         """
         parsed_prog = BraketSimulator.OpenQASM3.parse(qasm)
-        circuit     = BraketSimulator.interpret(parsed_prog, extern_lookup=Dict("theta"=>0.1))
+        circuit     = BraketSimulator.interpret(parsed_prog, Dict("theta"=>0.1))
         θ           = FreeParameter("theta")
         obs         = -2 * Braket.Observables.Y() * (3 * Braket.Observables.I()) + 0.75 * Braket.Observables.Y() * Braket.Observables.Z()
         @test circuit.result_types[1].observable == obs

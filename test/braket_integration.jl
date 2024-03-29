@@ -10,8 +10,8 @@ using Braket: I, name
 
 @testset "Basic integration of local simulators with Braket.jl" begin
     @testset "Simulator $sim_type" for (sim_type, rt) in (
-        ("braket_sv", Braket.StateVector),
-        ("braket_dm", Braket.DensityMatrix),
+        ("braket_jl_sv", Braket.StateVector),
+        ("braket_jl_dm", Braket.DensityMatrix),
     )
         d = LocalSimulator(sim_type)
         @test d.backend == sim_type
@@ -28,8 +28,8 @@ end
 
 @testset "Correctness" begin
     Braket.IRType[] = :JAQCD
-    PURE_DEVICE = LocalSimulator("braket_sv")
-    NOISE_DEVICE = LocalSimulator("braket_dm")
+    PURE_DEVICE = LocalSimulator("braket_jl_sv")
+    NOISE_DEVICE = LocalSimulator("braket_jl_dm")
     ALL_DEVICES = [PURE_DEVICE, NOISE_DEVICE]
     PURE_DEVICES = [PURE_DEVICE]
     NOISE_DEVICES = [NOISE_DEVICE]
@@ -104,8 +104,8 @@ end
     @testset "Local Braket Simulator" begin
         @testset for (backend, device_name) in [
             ("default", "StateVectorSimulator"),
-            ("braket_sv", "StateVectorSimulator"),
-            ("braket_dm", "DensityMatrixSimulator"),
+            ("braket_jl_sv", "StateVectorSimulator"),
+            ("braket_jl_dm", "DensityMatrixSimulator"),
         ]
             local_simulator_device = LocalSimulator(backend)
             @test name(local_simulator_device) == device_name

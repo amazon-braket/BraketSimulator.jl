@@ -133,8 +133,8 @@ Apply each operation of `operations` to the state vector contained in `svs`.
 """
 function evolve!(
     svs::StateVectorSimulator{T,S},
-    operations::Vector{Instruction},
-) where {T<:Complex,S<:AbstractVector{T}}
+    operations,
+)::StateVectorSimulator{T,S} where {T<:Complex,S<:AbstractVector{T}}
     for (oix, op) in enumerate(operations)
         apply_gate!(op.operator, svs.state_vector, op.target...)
     end

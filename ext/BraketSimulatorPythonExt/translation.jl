@@ -1,81 +1,223 @@
-function union_convert(::Type{IRObservable}, x)
-    PythonCall.pyisinstance(x, PythonCall.pybuiltins.str) && return pyconvert(String, x)
-    x_vec = Union{String, Vector{Vector{Vector{Float64}}}}[PythonCall.pyisinstance(x_, PythonCall.pybuiltins.str) ? pyconvert(String, x_) : pyconvert(Vector{Vector{Vector{Float64}}}, x_) for x_ in x] 
-    return x_vec
+function convert_ir_matrix(m)
+    raw_mats = [[m__[0]+im*m__[1] for m__ in m_] for m_ in m]
+    return hcat(raw_mats...)
 end
 
-function union_convert(union_type, x)
-    union_ts = union_type isa Union ? Type[] : [union_type]
-    union_t = union_type
-    while union_t isa Union
-        union_t.a != Nothing && push!(union_ts, union_t.a)
-        !(union_t.b isa Union) && push!(union_ts, union_t.b)
-        union_t = union_t.b
+function convert_ir_obs(o)
+    if pyisinstance(o, pybuiltins.str)
+        return pyconvert(String, o)
+    elseif pyisinstance(o, pybuiltins.list) && pyisinstance(o[0], pybuiltins.str)
+        return [pyconvert(String, o_) for o_ in o]
+    else
+        return convert_ir_matrix(o)
     end
-    arg = nothing
-    for t_ in union_ts
-        try
-            if pyisinstance(x, PythonCall.pybuiltins.list) && t_ <: Vector
-                return [union_convert(Union{eltype(t_)}, attr_) for attr_ in x]
-            elseif pyisinstance(x, pybuiltins.str) && t_ <: Integer
-                return tryparse(t_, pyconvert(String, x))
-            elseif t_ == ResultTypeValue
-                if pyhasattr(x, "value")
-                    typ = jl_convert(AbstractProgramResult, pygetattr(x, "type"))
-                    val = union_convert(Union{Dict{String, ComplexF64}, Float64, Vector}, pygetattr(x, "value"))
-                    return PythonCall.pyconvert_return(ResultTypeValue(typ, val))
-                else
-                    rt = jl_convert(AbstractProgramResult, x)
-                    return PythonCall.pyconvert_return(ResultTypeValue(rt, 0.0))
-                end
-            else
-                return pyconvert(t_, x)
-            end
-        catch e
+end
+function convert_ir_target(t)
+    pyis(t, pybuiltins.None) && return nothing
+    return [pyconvert(Int, t_) for t_ in t]
+end
+for (rt, fn) in ((:(Braket.IR.Sample), :jl_convert_sample),
+                 (:(Braket.IR.Expectation), :jl_convert_expectation),
+                 (:(Braket.IR.Variance), :jl_convert_variance),
+                )
+    @eval begin
+        function $fn(::Type{$rt}, x::Py)
+            jl_obs = convert_ir_obs(x.observable)
+            jl_ts = convert_ir_target(x.target)
+            jl_rt = $rt(jl_obs, jl_ts, pyconvert(String, x.type))
+            PythonCall.pyconvert_return(jl_rt)
+        end
+        function $fn(::Type{AbstractProgramResult}, x::Py)
+            jl_obs = convert_ir_obs(x.observable)
+            jl_ts = convert_ir_target(x.target)
+            jl_rt = $rt(jl_obs, jl_ts, pyconvert(String, x.type))
+            PythonCall.pyconvert_return(jl_rt)
         end
     end
-    arg isa Vector{Nothing} && (arg = nothing)
-    return arg
 end
 
-function jl_convert_attr(n, t::Type{T}, attr) where {T<:Tuple}
-    if pyisinstance(attr, PythonCall.pybuiltins.float)
-        return (pyconvert(Float64, attr),)
-    else
-        return pyconvert(t, attr)
-    end
-end
-
-function jl_convert_attr(n, t, attr)
-    if !(t isa Union)
-        if pyisinstance(attr, PythonCall.pybuiltins.list)
-            if eltype(t) isa Union
-                return [union_convert(eltype(t), attr_) for attr_ in attr]
-            else
-                return [pyconvert(eltype(t), attr_) for attr_ in attr]
-            end
-        else
-            return pyconvert(t, attr)
+for (rt, fn) in ((:(Braket.IR.Probability), :jl_convert_probability),
+                 (:(Braket.IR.DensityMatrix), :jl_convert_densitymatrix),
+                )
+    @eval begin
+        function $fn(::Type{$rt}, x::Py)
+            jl_ts = convert_ir_target(x.target)
+            jl_rt = $rt(jl_ts, pyconvert(String, x.type))
+            PythonCall.pyconvert_return(jl_rt)
         end
-    else
-        PythonCall.pyisnone(attr) && return nothing
-        return union_convert(t, attr)
+        function $fn(::Type{AbstractProgramResult}, x::Py)
+            jl_ts = convert_ir_target(x.target)
+            jl_rt = $rt(jl_ts, pyconvert(String, x.type))
+            PythonCall.pyconvert_return(jl_rt)
+        end
     end
 end
 
-function jl_convert(::Type{T}, x::Py) where {T}
-    fts = fieldtypes(T)
-    fns = fieldnames(T)
-    args = Any[]
-    for (n, t) in zip(fns, fts)
-        attr = pygetattr(x, string(n))
-        arg = jl_convert_attr(n, t, attr)
-        push!(args, arg)
-    end
-    PythonCall.pyconvert_return(T(args...))
+function jl_convert_oqprogram(::Type{OpenQasmProgram}, x::Py)
+    bsh = pyconvert(Braket.braketSchemaHeader, x.braketSchemaHeader)
+    source = pyconvert(String, x.source)
+    inputs = pyis(x.inputs, pybuiltins.None) ? nothing : Dict(pyconvert(String, k)=>pyconvert(Float64, v) for (k,v) in x.inputs)
+    PythonCall.pyconvert_return(OpenQasmProgram(bsh, source, inputs))
 end
 
-function jl_convert(::Type{Instruction}, x::Py)
+function jl_convert_amplitude(::Type{Braket.IR.Amplitude}, x::Py)
+    jl_rt = Braket.IR.Amplitude([pyconvert(String, s) for s in x.states], pyconvert(String, x.type))
+    PythonCall.pyconvert_return(jl_rt)
+end
+function jl_convert_amplitude(::Type{AbstractProgramResult}, x::Py)
+    jl_rt = Braket.IR.Amplitude([pyconvert(String, s) for s in x.states], pyconvert(String, x.type))
+    PythonCall.pyconvert_return(jl_rt)
+end
+
+function jl_convert_statevector(::Type{Braket.IR.StateVector}, x::Py)
+    jl_rt = Braket.IR.StateVector(pyconvert(String, x.type))
+    PythonCall.pyconvert_return(jl_rt)
+end
+function jl_convert_statevector(::Type{AbstractProgramResult}, x::Py)
+    jl_rt = Braket.IR.StateVector(pyconvert(String, x.type))
+    PythonCall.pyconvert_return(jl_rt)
+end
+
+function jl_convert_adjointgradient(::Type{Braket.IR.AdjointGradient}, x::Py)
+    jl_targets = pyis(x.targets, pybuiltins.None) ? nothing : [[pyconvert(Int, t__) for t__ in t_] for t_ in t]
+    jl_params = pyis(x.targets, pybuiltins.None) ? nothing : [pyconvert(String, p) for p in x.parameters]
+    jl_obs = pyisinstance(x.observable, pybuiltins.str) ? pyconvert(String, x.observable) : [convert_ir_obs(o) for o in x.observable] 
+    jl_rt = Braket.IR.AdjointGradient(jl_params, jl_obs, jl_targets, pyconvert(String, x.type))
+    PythonCall.pyconvert_return(jl_rt)
+end
+function jl_convert_adjointgradient(::Type{AbstractProgramResult}, x::Py)
+    jl_targets = pyis(x.targets, pybuiltins.None) ? nothing : [[pyconvert(Int, t__) for t__ in t_] for t_ in t]
+    jl_params = pyis(x.targets, pybuiltins.None) ? nothing : [pyconvert(String, p) for p in x.parameters]
+    jl_obs = pyisinstance(x.observable, pybuiltins.str) ? pyconvert(String, x.observable) : [convert_ir_obs(o) for o in x.observable] 
+    jl_rt = Braket.IR.AdjointGradient(jl_params, jl_obs, jl_targets, pyconvert(String, x.type))
+end
+
+jl_convert_kraus(::Type{Kraus}, x::Py)::Kraus = PythonCall.pyconvert_return(Kraus([convert_ir_matrix(m) for m in x.matrices]))
+jl_convert_kraus(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction(Kraus([convert_ir_matrix(m) for m in x.matrices]), [t for t in x.targets]))
+
+jl_convert_unitary(::Type{Unitary}, x::Py)::Unitary = PythonCall.pyconvert_return(Unitary(convert_ir_matrix(x.matrix)))
+jl_convert_unitary(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction(Unitary(convert_ir_matrix(x.matrix)), [t for t in x.targets]))
+
+jl_convert_cswap(::Type{CSwap}, x::Py)::CSwap = PythonCall.pyconvert_return(CSwap())
+jl_convert_cswap(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction(CSwap(), [t for t in x.targets]))
+jl_convert_ccnot(::Type{CCNot}, x::Py)::CCNot = PythonCall.pyconvert_return(CCNot())
+jl_convert_ccnot(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction(CCNot(), vcat([c for c in x.controls], x.target)))
+
+jl_convert_paulichannel(::Type{PauliChannel}, x::Py)::PauliChannel = PythonCall.pyconvert_return(PauliChannel(x.probX, x.probY, x.probZ))
+jl_convert_paulichannel(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction(PauliChannel(x.probX, x.probY, x.probZ), x.target))
+
+jl_convert_generalizedampdamp(::Type{GeneralizedAmplitudeDamping}, x::Py)::GeneralizedAmplitudeDamping = PythonCall.pyconvert_return(GeneralizedAmplitudeDamping(x.probability, x.gamma))
+jl_convert_generalizedampdamp(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction(GeneralizedAmplitudeDamping(x.probability, x.gamma), x.target))
+
+jl_convert_multi_qubit_pauli_channel(::Type{MultiQubitPauliChannel}, x::Py)::MultiQubitPauliChannel = PythonCall.pyconvert_return(MultiQubitPauliChannel(Dict(pyconvert(String, k)=>pyconvert(Float64, v) for (k,v) in x.probabilities)))
+jl_convert_multi_qubit_pauli_channel(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction(MultiQubitPauliChannel(Dict(pyconvert(String, k)=>pyconvert(Float64, v) for (k,v) in x.probabilities)), x.target))
+
+for (g, fn) in ((:CNot, :jl_convert_cnot),
+                (:CY, :jl_convert_cy),
+                (:CZ, :jl_convert_cz),
+                (:CV, :jl_convert_cv))
+    @eval begin
+        $fn(::Type{$g}, x::Py)::$g = PythonCall.pyconvert_return($g())
+        $fn(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction($g(), [pyconvert(Int, x.control), pyconvert(Int, x.target)]))
+    end
+end
+for (g, fn) in ((:BitFlip, :jl_convert_bitflip),
+                (:PhaseFlip, :jl_convert_phaseflip),
+                (:Depolarizing, :jl_convert_depo),
+               )
+    @eval begin
+        $fn(::Type{$g}, x::Py)::$g = PythonCall.pyconvert_return($g(x.probability))
+        $fn(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction($g(pyconvert(Float64, x.probability)), pyconvert(Int, x.target)))
+    end
+end
+for (g, fn) in ((:AmplitudeDamping, :jl_convert_amplitudedamp),
+                (:PhaseDamping, :jl_convert_phasedamp),
+               )
+    @eval begin
+        $fn(::Type{$g}, x::Py)::$g = PythonCall.pyconvert_return($g(x.gamma))
+        $fn(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction($g(pyconvert(Float64, x.gamma)), pyconvert(Int, x.target)))
+    end
+end
+for (g, fn) in ((:TwoQubitDepolarizing, :jl_convert_twoqubitdepo),
+                (:TwoQubitDephasing, :jl_convert_twoqubitdeph),
+               )
+    @eval begin
+        $fn(::Type{$g}, x::Py)::$g = PythonCall.pyconvert_return($g(x.probability))
+        $fn(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction($g(pyconvert(Float64, x.probability)), [pyconvert(Int, t) for t in x.targets]))
+    end
+end
+for (g, fn) in ((:I, :jl_convert_i),
+                (:X, :jl_convert_x),
+                (:Y, :jl_convert_y),
+                (:Z, :jl_convert_z),
+                (:H, :jl_convert_h),
+                (:V, :jl_convert_v),
+                (:Vi, :jl_convert_vi),
+                (:T, :jl_convert_t),
+                (:Ti, :jl_convert_ti),
+                (:S, :jl_convert_s),
+                (:Si, :jl_convert_si)
+               )
+    @eval begin
+        $fn(::Type{$g}, x::Py)::$g = PythonCall.pyconvert_return($g())
+        $fn(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction($g(), pyconvert(Int, x.target)))
+    end
+end
+for (g, fn) in ((:Rx, :jl_convert_rx),
+                (:Ry, :jl_convert_ry),
+                (:Rz, :jl_convert_rz),
+                (:PhaseShift, :jl_convert_phaseshift),
+               )
+    @eval begin
+        $fn(::Type{$g}, x::Py)::$g = PythonCall.pyconvert_return($g(x.angle))
+        $fn(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction($g(pyconvert(Float64, x.angle)), pyconvert(Int, x.target)))
+    end
+end
+
+for (g, fn) in ((:ECR, :jl_convert_ecr),
+                (:Swap, :jl_convert_swap),
+                (:ISwap, :jl_convert_iswap),
+               )
+    @eval begin
+        $fn(::Type{$g}, x::Py)::$g = PythonCall.pyconvert_return($g())
+        $fn(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction($g(), [pyconvert(Int, t) for t in x.targets]))
+    end
+end
+
+for (g, fn) in ((:XX, :jl_convert_xx),
+                (:XY, :jl_convert_xy),
+                (:YY, :jl_convert_yy),
+                (:ZZ, :jl_convert_zz),
+                (:PSwap, :jl_convert_pswap),
+               )
+    @eval begin
+        $fn(::Type{$g}, x::Py)::$g = PythonCall.pyconvert_return($g(x.angle))
+        $fn(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction($g(pyconvert(Float64, x.angle)), [pyconvert(Int, t) for t in x.targets]))
+    end
+end
+
+for (g, fn) in ((:StartVerbatimBox, :jl_convert_startverbatim),
+                (:EndVerbatimBox, :jl_convert_endverbatim),
+               )
+    @eval begin
+        $fn(::Type{$g}, x::Py)::$g = PythonCall.pyconvert_return($g())
+        $fn(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction($g(), Int[]))
+    end
+end
+
+for (g, fn) in ((:CPhaseShift, :jl_convert_cphaseshift),
+                (:CPhaseShift00, :jl_convert_cphaseshift00),
+                (:CPhaseShift10, :jl_convert_cphaseshift10),
+                (:CPhaseShift01, :jl_convert_cphaseshift01),
+               )
+    @eval begin
+        $fn(::Type{$g}, x::Py)::$g = PythonCall.pyconvert_return($g(pyconvert(Float64, x.angle)))
+        $fn(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction($g(pyconvert(Float64, x.angle)), [pyconvert(Int, x.control), pyconvert(Int, x.target)]))
+    end
+end
+
+
+function jl_convert_ix(::Type{Instruction}, x::Py)::Instruction
     # extract targets
     full_targets = QubitSet()
     for attr ∈ ("control", "target") # single-qubit
@@ -98,43 +240,12 @@ function jl_convert(::Type{Instruction}, x::Py)
     PythonCall.pyconvert_return(ix)
 end
 
-function jl_convert(::Type{Braket.braketSchemaHeader}, x::Py)
+function jl_convert_bsh(::Type{Braket.braketSchemaHeader}, x::Py)
     name    = pyconvert(String, x.name)
     version = pyconvert(String, x.version)
     PythonCall.pyconvert_return(Braket.braketSchemaHeader(name, version))
 end
 
-function jl_convert(::Type{T}, x::Py) where {T<:AbstractIR}
-    fts = fieldtypes(T)[1:end-1]
-    fns = fieldnames(T)[1:end-1]
-    args = Any[]
-    for (n, t) in zip(fns, fts)
-        attr = pygetattr(x, string(n))
-        arg = jl_convert_attr(n, t, attr)
-        push!(args, arg)
-    end
-    PythonCall.pyconvert_return(T(args..., pyconvert(String, pygetattr(x, "type"))))
-end
-function jl_convert(::Type{Braket.IR.AbstractProgramResult}, x::Py)
-    r_typ = pyconvert(String, x.type)
-    if r_typ == "amplitude"
-        return pyconvert(Braket.IR.Amplitude, x)
-    elseif r_typ == "sample"
-        return pyconvert(Braket.IR.Sample, x)
-    elseif r_typ == "expectation"
-        return pyconvert(Braket.IR.Expectation, x)
-    elseif r_typ == "variance"
-        return pyconvert(Braket.IR.Variance, x)
-    elseif r_typ == "probability"
-        return pyconvert(Braket.IR.Probability, x)
-    elseif r_typ == "densitymatrix"
-        return pyconvert(Braket.IR.DensityMatrix, x)
-    elseif r_typ == "statevector"
-        return pyconvert(Braket.IR.StateVector, x)
-    elseif r_typ == "adjoint_gradient"
-        return pyconvert(Braket.IR.AdjointGradient, x)
-    end
-end
 function jl_convert_circuit(::Type{Braket.IR.Program}, x)
     x_jaqcd      = x._to_jaqcd()
     instructions = [pyconvert(Instruction, ix) for ix in x_jaqcd.instructions]

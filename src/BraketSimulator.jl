@@ -19,14 +19,16 @@ import Braket:
     AbstractBraketSimulator,
     Program,
     OpenQasmProgram,
+    ir_typ,
     apply_gate!,
     apply_noise!,
     qubit_count,
     I,
+    simulate,
     device_id,
     bind_value!
 
-export StateVector, StateVectorSimulator, DensityMatrixSimulator, evolve!, classical_shadow
+export StateVector, StateVectorSimulator, DensityMatrixSimulator, evolve!, classical_shadow, simulate
 
 const StateVector{T} = Vector{T}
 const DensityMatrix{T} = Matrix{T}
@@ -53,7 +55,7 @@ function parse_program(d::D, program::OpenQasmProgram, shots::Int) where {D<:Abs
     else
         parsed_prog      = OpenQASM3.parse(program.source)
     end
-    interpreted_circ = interpret(parsed_prog, extern_lookup=program.inputs)
+    interpreted_circ = interpret(parsed_prog, program.inputs)
     if shots > 0
         Braket.validate_circuit_and_shots(interpreted_circ, shots)
         Braket.basis_rotation_instructions!(interpreted_circ)
@@ -285,7 +287,8 @@ function _compute_exact_results(d::AbstractSimulator, program::Program, qc::Int,
     end
 end
 
-function (d::AbstractSimulator)(
+function simulate(
+    d::AbstractSimulator,
     circuit_ir::OpenQasmProgram;
     shots::Int = 0,
     kwargs...,
@@ -301,7 +304,7 @@ function (d::AbstractSimulator)(
     end
     inputs        = isnothing(circuit_ir.inputs) ? Dict{String, Float64}() : Dict{String, Float64}(k=>v for (k,v) in circuit_ir.inputs)
     symbol_inputs = Dict{Symbol,Number}(Symbol(k) => v for (k, v) in inputs)
-    operations    = [bind_value!(Instruction(op), symbol_inputs) for op in operations]
+    operations    = [Braket.bind_value!(op, symbol_inputs) for op in operations]
     _validate_operation_qubits(operations)
     reinit!(d, qc, shots)
     stats = @timed begin
@@ -315,7 +318,8 @@ function (d::AbstractSimulator)(
     return res
 end
 
-function (d::AbstractSimulator)(
+function simulate(
+    d::AbstractSimulator,
     circuit_ir::Program,
     qc::Int;
     shots::Int = 0,
@@ -356,286 +360,31 @@ include("sv_simulator.jl")
 include("dm_simulator.jl")
 
 function __init__()
-    Braket._simulator_devices[]["braket_dm"] =
+    Braket._simulator_devices[]["braket_jl_dm"] =
         DensityMatrixSimulator{ComplexF64,DensityMatrix{ComplexF64}}
-    Braket._simulator_devices[]["braket_sv"] =
+    Braket._simulator_devices[]["braket_jl_sv"] =
         StateVectorSimulator{ComplexF64,StateVector{ComplexF64}}
     Braket._simulator_devices[]["default"] =
         StateVectorSimulator{ComplexF64,StateVector{ComplexF64}}
 end
 
+
 @setup_workload begin
     @compile_workload begin
-        for (instructions, qubit_count, state_vector, probability_amplitudes) in [
-            ([Instruction(H(), [0])], 1, [0.70710678, 0.70710678], [0.5, 0.5]),
-            ([Instruction(X(), [0])], 1, [0, 1], [0, 1]),
-            ([Instruction(X(), [0])], 2, [0, 0, 1, 0], [0, 0, 1, 0]),
-            ([Instruction(Y(), [0])], 1, [0, im], [0, 1]),
-            ([Instruction(X(), [0]), Instruction(X(), [1])], 2, [0, 0, 0, 1], [0, 0, 0, 1]),
-            ([Instruction(X(), [0]), Instruction(Z(), [0])], 1, [0, -1], [0, 1]),
-            (
-                [Instruction(X(), [0]), Instruction(CNot(), [0, 1])],
-                2,
-                [0, 0, 0, 1],
-                [0, 0, 0, 1],
-            ),
-            (
-                [Instruction(X(), [0]), Instruction(CY(), [0, 1])],
-                2,
-                [0, 0, 0, im],
-                [0, 0, 0, 1],
-            ),
-            (
-                [Instruction(X(), [0]), Instruction(CZ(), [0, 1])],
-                2,
-                [0, 0, 1, 0],
-                [0, 0, 1, 0],
-            ),
-            (
-                [Instruction(X(), [0]), Instruction(Swap(), [0, 1])],
-                2,
-                [0, 1, 0, 0],
-                [0, 1, 0, 0],
-            ),
-            (
-                [Instruction(X(), [0]), Instruction(ISwap(), [0, 1])],
-                2,
-                [0, im, 0, 0],
-                [0, 1, 0, 0],
-            ),
-            (
-                [Instruction(X(), [0]), Instruction(Swap(), [0, 2])],
-                3,
-                [0, 1, 0, 0, 0, 0, 0, 0],
-                [0, 1, 0, 0, 0, 0, 0, 0],
-            ),
-            ([Instruction(X(), [0]), Instruction(S(), [0])], 1, [0, im], [0, 1]),
-            ([Instruction(X(), [0]), Instruction(Si(), [0])], 1, [0, -im], [0, 1]),
-            (
-                [Instruction(X(), [0]), Instruction(T(), [0])],
-                1,
-                [0, 0.70710678 + 0.70710678 * im],
-                [0, 1],
-            ),
-            (
-                [Instruction(X(), [0]), Instruction(Ti(), [0])],
-                1,
-                [0, 0.70710678 - 0.70710678 * im],
-                [0, 1],
-            ),
-            ([Instruction(V(), [0])], 1, [0.5 + 0.5 * im, 0.5 - 0.5 * im], [0.5, 0.5]),
-            ([Instruction(Vi(), [0])], 1, [0.5 - 0.5 * im, 0.5 + 0.5 * im], [0.5, 0.5]),
-            ([Instruction(I(), [0])], 1, [1, 0], [1, 0]),
-            ([Instruction(Unitary([0 1; 1 0]), [0])], 1, [0, 1], [0, 1]),
-            (
-                [Instruction(X(), [0]), Instruction(PhaseShift(0.15), [0])],
-                1,
-                [0, 0.98877108 + 0.14943813 * im],
-                [0, 1],
-            ),
-            (
-                [
-                    Instruction(X(), [0]),
-                    Instruction(X(), [1]),
-                    Instruction(CPhaseShift(0.15), [0, 1]),
-                ],
-                2,
-                [0, 0, 0, 0.98877108 + 0.14943813 * im],
-                [0, 0, 0, 1],
-            ),
-            (
-                [Instruction(CPhaseShift00(0.15), [0, 1])],
-                2,
-                [0.98877108 + 0.14943813 * im, 0, 0, 0],
-                [1, 0, 0, 0],
-            ),
-            (
-                [Instruction(X(), [1]), Instruction(CPhaseShift01(0.15), [0, 1])],
-                2,
-                [0, 0.98877108 + 0.14943813 * im, 0, 0],
-                [0, 1, 0, 0],
-            ),
-            (
-                [Instruction(X(), [0]), Instruction(CPhaseShift10(0.15), [0, 1])],
-                2,
-                [0, 0, 0.98877108 + 0.14943813 * im, 0],
-                [0, 0, 1, 0],
-            ),
-            (
-                [Instruction(Rx(0.15), [0])],
-                1,
-                [0.99718882, -0.07492971 * im],
-                [0.99438554, 0.00561446],
-            ),
-            (
-                [Instruction(X(), [0]), Instruction(Ry(0.15), [0])],
-                1,
-                [-0.07492971, 0.99718882],
-                [0.00561446, 0.99438554],
-            ),
-            (
-                [Instruction(H(), [0]), Instruction(Rz(0.15), [0])],
-                1,
-                [0.70511898 - 0.0529833 * im, 0.70511898 + 0.0529833 * im],
-                [0.5, 0.5],
-            ),
-            (
-                [Instruction(X(), [0]), Instruction(PSwap(0.15), [0, 1])],
-                2,
-                [0, 0.98877108 + 0.14943813 * im, 0, 0],
-                [0, 1, 0, 0],
-            ),
-            (
-                [Instruction(X(), [0]), Instruction(XY(0.15), [0, 1])],
-                2,
-                [0, 0.07492971 * im, 0.99718882, 0],
-                [0, 0.00561446, 0.99438554, 0],
-            ),
-            (
-                [Instruction(XX(0.3), [0, 1])],
-                2,
-                [0.98877108, 0, 0, -0.14943813 * im],
-                [0.97766824, 0, 0, 0.02233176],
-            ),
-            (
-                [Instruction(YY(0.3), [0, 1])],
-                2,
-                [0.98877108, 0, 0, 0.14943813 * im],
-                [0.97766824, 0, 0, 0.02233176],
-            ),
-            (
-                [Instruction(ZZ(0.15), [0, 1])],
-                2,
-                [0.99718882 - 0.07492971 * im, 0, 0, 0],
-                [1, 0, 0, 0],
-            ),
-            (
-                [Instruction(BraketSimulator.MultiRZ(0.15), [0, 1, 2])],
-                3,
-                [0.99718882 - 0.07492971 * im, 0, 0, 0, 0, 0, 0, 0],
-                [1, 0, 0, 0, 0, 0, 0, 0],
-            ),
-            (
-                [
-                    Instruction(X(), [0]),
-                    Instruction(X(), [1]),
-                    Instruction(CCNot(), [0, 1, 2]),
-                ],
-                3,
-                [0, 0, 0, 0, 0, 0, 0, 1],
-                [0, 0, 0, 0, 0, 0, 0, 1],
-            ),
-            (
-                [
-                    Instruction(X(), [0]),
-                    Instruction(X(), [1]),
-                    Instruction(CSwap(), [0, 1, 2]),
-                ],
-                3,
-                [0, 0, 0, 0, 0, 1, 0, 0],
-                [0, 0, 0, 0, 0, 1, 0, 0],
-            ),
-        ]
-            simulation = StateVectorSimulator(qubit_count, 0)
-            simulation = evolve!(simulation, instructions)
+        function ghz_circuit(qubit_count::Int)
+           ghz_circ = Braket.Circuit()
+           Braket.H(ghz_circ, 0)
+           for target_qubit = 1:qubit_count-1
+               Braket.CNot(ghz_circ, 0, target_qubit)
+           end
+           return ghz_circ
         end
-        for (obs, equivalent_gates, qubit_count) in [
-            ([(Braket.Observables.X(), [0])], [Instruction(H(), [0])], 1),
-            ([(Braket.Observables.Z(), [0])], Instruction[], 1),
-            ([(Braket.Observables.I(), [0])], Instruction[], 1),
-            (
-                [
-                    (Braket.Observables.X(), [0]),
-                    (Braket.Observables.Z(), [3]),
-                    (Braket.Observables.H(), [2]),
-                ],
-                [Instruction(H(), [0]), Instruction(Ry(-π / 4), [2])],
-                5,
-            ),
-            (
-                [(
-                    Braket.Observables.TensorProduct([
-                        Braket.Observables.X(),
-                        Braket.Observables.Z(),
-                        Braket.Observables.H(),
-                        Braket.Observables.I(),
-                    ]),
-                    (0, 3, 2, 1),
-                )],
-                [Instruction(H(), [0]), Instruction(Ry(-π / 4), [2])],
-                5,
-            ),
-            (
-                [(Braket.Observables.X(), [0, 1])],
-                [Instruction(H(), [0]), Instruction(H(), [1])],
-                2,
-            ),
-            ([(Braket.Observables.Z(), [0, 1])], Instruction[], 2),
-            ([(Braket.Observables.I(), [0, 1])], Instruction[], 2),
-            (
-                [(
-                    Braket.Observables.TensorProduct([
-                        Braket.Observables.I(),
-                        Braket.Observables.Z(),
-                    ]),
-                    (2, 0),
-                )],
-                Instruction[],
-                3,
-            ),
-            (
-                [(
-                    Braket.Observables.TensorProduct([
-                        Braket.Observables.X(),
-                        Braket.Observables.Z(),
-                    ]),
-                    (2, 0),
-                )],
-                [Instruction(H(), [2])],
-                3,
-            ),
-        ]
-            sim_observables = StateVectorSimulator(qubit_count, 0)
-            sim_observables = BraketSimulator.apply_observables!(sim_observables, obs)
-            sim_gates = StateVectorSimulator(qubit_count, 0)
-            sim_gates = BraketSimulator.evolve!(sim_gates, equivalent_gates)
-        end
-
-        function qft_circuit_operations(qubit_count::Int)
-            qft_ops = Instruction[]
-            for target_qubit = 0:qubit_count-1
-                angle = π / 2
-                push!(qft_ops, Instruction(H(), [target_qubit]))
-                for control_qubit = target_qubit+1:qubit_count-1
-                    push!(
-                        qft_ops,
-                        Instruction(CPhaseShift(angle), [control_qubit, target_qubit]),
-                    )
-                    angle /= 2
-                end
-            end
-            return qft_ops
-        end
-
-        qubit_count = 16
-        simulation = StateVectorSimulator(qubit_count, 0)
-        operations = qft_circuit_operations(qubit_count)
-        simulation = BraketSimulator.evolve!(simulation, operations)
-        simulation = StateVectorSimulator(2, 10000)
-        simulation = BraketSimulator.evolve!(
-            simulation,
-            [Instruction(H(), [0]), Instruction(CNot(), [0, 1])],
-        )
-        samples = BraketSimulator.samples(simulation)
-
-        for N = 1:16
-            pe = Braket.PauliEigenvalues(Val(N))
-            for i = 1:2^N
-                pe[i]
-            end
-        end
+        n_qubits = 10
+        svs = StateVectorSimulator(n_qubits, 0)
+        oq3_src = "OPENQASM 3.0;\nbit[10] b;\nqubit[10] q;\nh q[0];\ncnot q[0], q[1];\ncnot q[0], q[2];\ncnot q[0], q[3];\ncnot q[0], q[4];\ncnot q[0], q[5];\ncnot q[0], q[6];\ncnot q[0], q[7];\ncnot q[0], q[8];\ncnot q[0], q[9];\nb[0] = measure q[0];\nb[1] = measure q[1];\nb[2] = measure q[2];\nb[3] = measure q[3];\nb[4] = measure q[4];\nb[5] = measure q[5];\nb[6] = measure q[6];\nb[7] = measure q[7];\nb[8] = measure q[8];\nb[9] = measure q[9];"
+        simulate(svs, Braket.OpenQasmProgram(Braket.header_dict[Braket.OpenQasmProgram], oq3_src, nothing); shots=10)
     end
 end
-
+#include("precompile.jl")
 
 end # module BraketCircuitSimulator

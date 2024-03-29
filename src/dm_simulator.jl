@@ -133,8 +133,8 @@ end
 
 function evolve!(
     dms::DensityMatrixSimulator{T,S},
-    operations::Vector{Instruction},
-) where {T<:Complex,S<:AbstractDensityMatrix{T}}
+    operations,
+)::DensityMatrixSimulator{T,S} where {T<:Complex,S<:AbstractDensityMatrix{T}}
     for op in operations
         # use this to dispatch on Gates vs Noises
         _evolve_op!(dms, op.operator, op.target...)

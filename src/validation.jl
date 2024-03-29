@@ -153,7 +153,7 @@ function _validate_result_types_qubits_exist(result_types::Vector, qubit_count::
     return
 end
 
-function _validate_operation_qubits(operations::Vector{Instruction})
+function _validate_operation_qubits(operations::Vector{<:Instruction})
     targs = (ix.target for ix in operations)
     unique_qs = Set{Int}()
     max_qc = 0

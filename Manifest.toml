@@ -2,7 +2,7 @@
 
 julia_version = "1.9.4"
 manifest_format = "2.0"
-project_hash = "fbb6bb3b808301caffd8dc8c6665e219f496462e"
+project_hash = "013428ab791092ad08067e2c8bc45fc1ffb25577"
 
 [[deps.AWS]]
 deps = ["Base64", "Compat", "Dates", "Downloads", "GitHub", "HTTP", "IniFile", "JSON", "MbedTLS", "Mocking", "OrderedCollections", "Random", "SHA", "Sockets", "URIs", "UUIDs", "XMLDict"]
@@ -17,8 +17,8 @@ uuid = "1c724243-ef5b-51ab-93f4-b0a88ac62a95"
 version = "0.11.2"
 
 [[deps.Antlr4Runtime]]
-deps = ["EnumX"]
-git-tree-sha1 = "1ac598418c1dfc5a0762be631efc3a30435b86a7"
+deps = ["EnumX", "Setfield"]
+path = "/Users/hyatkath/.julia/dev/Antlr4Runtime"
 uuid = "780548eb-20d3-4d14-b715-e70121e066d1"
 version = "0.1.2"
 
@@ -57,9 +57,7 @@ version = "0.1.8"
 
 [[deps.Braket]]
 deps = ["AWS", "AWSS3", "AxisArrays", "Base64", "CSV", "CodeTracking", "Compat", "DataStructures", "Dates", "DecFP", "Distributed", "Downloads", "Graphs", "HTTP", "InteractiveUtils", "JLD2", "JSON3", "LinearAlgebra", "Logging", "NamedTupleTools", "OrderedCollections", "Random", "StaticArrays", "Statistics", "StructTypes", "Tar", "UUIDs"]
-git-tree-sha1 = "455246deb9abed9799e19ace1b2354f5c7494b42"
-repo-rev = "ksh/oq3"
-repo-url = "git@ssh.gitlab.aws.dev:braket-science/braket.jl.git"
+path = "/Users/hyatkath/.julia/dev/Braket"
 uuid = "19504a0f-b47d-4348-9127-acc6cc69ef67"
 version = "0.8.2"
 
@@ -106,6 +104,17 @@ deps = ["Serialization", "Sockets"]
 git-tree-sha1 = "6cbbd4d241d7e6579ab354737f4dd95ca43946e1"
 uuid = "f0e56b4a-5159-44fe-b623-3e5288b988bb"
 version = "2.4.1"
+
+[[deps.ConstructionBase]]
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "260fd2400ed2dab602a7c15cf10c1933c59930a2"
+uuid = "187b0558-2788-49d3-abe0-74a17ed4e7c9"
+version = "1.5.5"
+weakdeps = ["IntervalSets", "StaticArrays"]
+
+    [deps.ConstructionBase.extensions]
+    ConstructionBaseIntervalSetsExt = "IntervalSets"
+    ConstructionBaseStaticArraysExt = "StaticArrays"
 
 [[deps.DataAPI]]
 git-tree-sha1 = "abe83f3a2f1b857aac70ef8b269080af17764bbe"
@@ -409,9 +418,7 @@ version = "0.8.1+0"
 
 [[deps.OpenQASM3]]
 deps = ["Antlr4Runtime", "EnumX"]
-git-tree-sha1 = "1ab3a80de9a831fb90ee14111fbb74971f22fa2e"
-repo-rev = "jcjaskula-aws/parameters"
-repo-url = "git@ssh.gitlab.aws.dev:braket-science/openqasm3.jl.git"
+path = "/Users/hyatkath/.julia/dev/OpenQASM3"
 uuid = "791dba98-90c7-4903-ae5f-ea3dc22ea9ce"
 version = "0.5.0"
 
@@ -512,6 +519,12 @@ version = "1.4.1"
 
 [[deps.Serialization]]
 uuid = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
+
+[[deps.Setfield]]
+deps = ["ConstructionBase", "Future", "MacroTools", "StaticArraysCore"]
+git-tree-sha1 = "e2cc6d8c88613c05e1defb55170bf5ff211fbeac"
+uuid = "efcf1570-3423-57d1-acb7-fd33fddbac46"
+version = "1.1.1"
 
 [[deps.SharedArrays]]
 deps = ["Distributed", "Mmap", "Random", "Serialization"]

@@ -165,7 +165,6 @@ function apply_gate!(
         lower_ix = pad_bit(my_amps[1], endian_qubit) + 1
         higher_ix = lower_ix + flipper
         for task_amp = 0:length(my_amps)-1
-            #@show task_amp, flipper, typeof(task_amp), typeof(flipper)
             if is_small_target && div(task_amp, flipper) > 0 && mod(task_amp, flipper) == 0
                 lower_ix = higher_ix
                 higher_ix = lower_ix + flipper

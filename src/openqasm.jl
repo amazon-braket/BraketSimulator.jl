@@ -6,24 +6,30 @@ function _check_annotations(node::OpenQASM3.Statement)
 end
 _check_annotations(node) = nothing
 
+value(exp::OpenQASM3.NothingExpression) = 1
+value(exp) = exp.value
+
 struct WalkerOutput
-    ixs::Vector{Instruction}
+    ixs::Vector
     results::Vector{Braket.Result}
-    WalkerOutput() = new(Instruction[], Braket.AbstractProgramResult[])
+    WalkerOutput() = new([], Braket.AbstractProgramResult[])
 end
 
 abstract type AbstractQASMContext end
-
+struct NothingContext <: AbstractQASMContext end
 const ExternDef = OpenQASM3.ExternDeclaration
 
 # We use `ConstOnlyVis` to prevent subroutines and defcals seeing non-const global QASM variables
 @enum OpenQASMGlobalVisibility DefaultVis ConstOnlyVis
-@enum ClassicalVarKind ClassicalVar ClassicalConst ClassicalInput
+abstract type ClassicalVarKind end
+struct ClassicalVar <: ClassicalVarKind end
+struct ClassicalConst <: ClassicalVarKind end
+struct ClassicalInput <: ClassicalVarKind end
 
-mutable struct ClassicalDef{T, S}
+mutable struct ClassicalDef{T, S, K}
     value::T
     valtype::S
-    kind::ClassicalVarKind
+    kind::K
 end
 
 mutable struct SubroutineDef{T, S, F, C}
@@ -42,15 +48,16 @@ end
 Braket.qubit_count(gd::GateDef) = length(gd.qubits)
 function (gd::GateDef)(arg_vals...)
     for (arg, val) in zip(gd.args, arg_vals)
-        gd.ctx.definitions[arg] = ClassicalDef(val, typeof(val), ClassicalVar)
+        gd.ctx.definitions[arg] = ClassicalDef(val, typeof(val), ClassicalVar())
     end
     return gd.body_gen()
 end
 Base.show(io::IO, gd::GateDef) = print(io, "GateDef on qubits $(gd.qubits)")
 
-struct QubitDef{T <: Union{Int, Nothing}}
-    size::T
+struct QubitDef
+    size::Int
 end
+QubitDef(::Nothing) = QubitDef(1)
 const QASMDefinition = Union{ClassicalDef, GateDef, QubitDef, ExternDef, SubroutineDef}
 
 Base.length(def::QubitDef) = def.size
@@ -73,7 +80,7 @@ See also [`QASMBlockContext`](@ref).
 """
 mutable struct QASMGlobalContext{W, F} <: AbstractQASMContext
     definitions::Dict{String, QASMDefinition}
-    qubit_mapping::Dict{Union{String, Tuple{String, Int}}, Union{Int, Vector{Int}}}
+    qubit_mapping::Dict{Union{String, Tuple{String, Int}}, Vector{Int}}
     n_qubits::Int
     ext_lookup::F
     visiblity::OpenQASMGlobalVisibility
@@ -83,7 +90,7 @@ end
 function QASMGlobalContext{W}(ext_lookup::F=Dict{String,Any}()) where {W, F}
     ctx = QASMGlobalContext{W, F}(
         Dict{String, QASMDefinition}(),
-        Dict{Union{String, Tuple{String, Int}}, Union{Int, Vector{Int}}}(),
+        Dict{Union{String, Tuple{String, Int}}, Vector{Int}}(),
         0,
         ext_lookup,
         DefaultVis,
@@ -102,7 +109,7 @@ See also [`QASMGlobalContext`](@ref).
 """
 struct QASMBlockContext{P <: AbstractQASMContext} <: AbstractQASMContext
     parent::P
-    qubit_mapping::Dict{Union{String, Tuple{String, Int}}, Union{Int, Vector{Int}}}
+    qubit_mapping::Dict{Union{String, Tuple{String, Int}}, Vector{Int}}
     definitions::Dict{String, QASMDefinition}
     function QASMBlockContext(parent::P) where {P <: AbstractQASMContext}
         return new{P}(parent, parent.qubit_mapping, Dict{String, QASMDefinition}())
@@ -118,7 +125,7 @@ See also [`QASMGlobalContext`](@ref).
 """
 mutable struct QASMSubroutineContext{P <: AbstractQASMContext} <: AbstractQASMContext
     parent::P
-    qubit_mapping::Dict{Union{String, Tuple{String, Int}}, Union{Int, Vector{Int}}}
+    qubit_mapping::Dict{Union{String, Tuple{String, Int}}, Vector{Int}}
     definitions::Dict{String, QASMDefinition}
     function QASMSubroutineContext(parent::P) where {P <: AbstractQASMContext}
         return new{P}(parent, Dict{String, Int}(), Dict{String, QASMDefinition}())
@@ -134,7 +141,7 @@ See also [`QASMGlobalContext`](@ref).
 """
 mutable struct QASMGateDefContext{P <: AbstractQASMContext} <: AbstractQASMContext
     parent::P
-    qubit_mapping::Dict{Union{String, Tuple{String, Int}}, Union{Int, Vector{Int}}}
+    qubit_mapping::Dict{Union{String, Tuple{String, Int}}, Vector{Int}}
     n_qubits::Int
     definitions::Dict{String, QASMDefinition}
     output::WalkerOutput
@@ -143,7 +150,7 @@ mutable struct QASMGateDefContext{P <: AbstractQASMContext} <: AbstractQASMConte
     end
 end
 
-Base.push!(ctx::AbstractQASMContext, ix::Braket.Instruction) = push!(output(ctx).ixs, ix)
+Base.push!(ctx::AbstractQASMContext, ix::Braket.Instruction{O}) where {O<:Braket.Operator} = push!(output(ctx).ixs, ix)
 Base.push!(ctx::AbstractQASMContext, rt::Braket.Result)      = push!(output(ctx).results, rt)
 
 output(ctx::QASMGlobalContext)     = ctx.output
@@ -151,7 +158,7 @@ output(ctx::QASMGateDefContext)    = ctx.output
 output(ctx::AbstractQASMContext)   = output(parent(ctx))
 
 Base.parent(ctx::AbstractQASMContext) = ctx.parent
-Base.parent(::QASMGlobalContext)      = nothing
+Base.parent(::QASMGlobalContext)      = NothingContext() 
 
 const NumberLiteral = Union{OpenQASM3.IntegerLiteral, OpenQASM3.FloatLiteral, OpenQASM3.BooleanLiteral, OpenQASM3.BitstringLiteral}
 
@@ -163,6 +170,8 @@ Base.convert(::Type{Float16}, v::OpenQASM3.FloatLiteral) = Float16(v.value)
 
 is_defined(name::String, ctx::AbstractQASMContext; local_only=false) = return haskey(ctx.definitions, name) || (!local_only && is_defined(name, parent(ctx)))
 is_defined(name::String, ::Nothing; kwargs...) = false
+is_defined(name::String, ::NothingContext; kwargs...) = false
+is_defined(name, ctx::AbstractQASMContext; kwargs...) = false
 
 function interpret!(output::WalkerOutput, node::T) where {T}
     @error "Unsupported instruction at $(node.span): $T"
@@ -183,14 +192,16 @@ function lookup_def(::Type{T}, name::String, def::D, ctx::QASMGlobalContext; spa
     return _check_type(T, def, name, span)
 end
 lookup_def(::Type{T}, name::String, def::D, ctx::AbstractQASMContext; span=()) where {T, D<:QASMDefinition} = return _check_type(T, def, name, span)
-function lookup_def(::Type{GateDef}, name::String, ctx::AbstractQASMContext; span=())
+function lookup_def(::Type{GateDef}, name::String, ctx::AbstractQASMContext; span=())::GateDef
     haskey(ctx.definitions, name) && return _check_type(GateDef, ctx.definitions[name], name, span)
-    haskey(BuiltinGates, Symbol(lowercase(name))) && return BuiltinGates[Symbol(lowercase(name))]
-    return lookup_def(GateDef, name, nothing, ctx; span=span)
+    return lookup_def(GateDef, name, parent(ctx); span=span)
 end
-lookup_def(::Type{T}, name::String, ctx::AbstractQASMContext; span=()) where {T} = lookup_def(T, name, get(ctx.definitions, name, nothing), ctx, span=span)
-lookup_def(::Type{T}, name::String, def::Nothing, ctx::AbstractQASMContext; span=()) where {T} = lookup_def(T, name, parent(ctx); span=span)
-lookup_def(::Type,    name::String, ::Nothing; span=()) = nothing
+function lookup_def(::Type{T}, name::String, ctx::AbstractQASMContext; span=()) where {T}
+    def = haskey(ctx.definitions, name) ? ctx.definitions[name] : lookup_def(T, name, parent(ctx); span=span)
+    lookup_def(T, name, def, ctx, span=span)
+end
+lookup_def(::Type{T}, name::String, def::Nothing, ctx::AbstractQASMContext; span=()) where {T} = throw("definition $name of type $T not found in global context!")
+lookup_def(::Type{T}, name::String, ctx::NothingContext; span=()) where {T} = throw("definition $name of type $T not found in global context!")
 
 id(node::OpenQASM3.Identifier)            = node.name
 id(node::OpenQASM3.QASMNode)              = id(node.name)
@@ -209,10 +220,10 @@ id(node::Tuple{String, <:Any})            = node[1]
 id(node::String)                          = node
 
 (ctx::AbstractQASMContext)(node::T) where {T<:NumberLiteral} = node.value
-(ctx::AbstractQASMContext)(node::T) where {T<:Number} = node
-(ctx::AbstractQASMContext)(node::BitVector)           = node
-_check_def_value(def::Nothing, name::String, span) = error("'$name' referenced in $span, but not defined.")
-_check_def_value(def, name::String, span) = ismissing(def.value) ? error("Uninitialized variable `$name` used in $span.") : nothing
+(ctx::AbstractQASMContext)(node::T) where {T<:Number}        = node
+(ctx::AbstractQASMContext)(node::BitVector)                  = node
+_check_def_value(def::Nothing, name::String, span)           = error("'$name' referenced in $span, but not defined.")
+_check_def_value(def, name::String, span)                    = isnothing(def.value) ? error("Uninitialized variable `$name` used in $span.") : nothing
 
 (ctx::AbstractQASMContext)(::Nothing) = nothing
 function (ctx::AbstractQASMContext)(node::OpenQASM3.BitstringLiteral)
@@ -243,8 +254,8 @@ function (ctx::AbstractQASMContext)(node::OpenQASM3.Identifier)
     end
 end
 (ctx::AbstractQASMContext)(node::OpenQASM3.Identifier, len::Int) = ctx(node)
-(ctx::AbstractQASMContext)(node::OpenQASM3.ArrayLiteral) = map(ctx, node.values)
-(ctx::AbstractQASMContext)(node::OpenQASM3.DiscreteSet)  = map(ctx, node.values)
+(ctx::AbstractQASMContext)(node::OpenQASM3.ArrayLiteral) = [ctx(v) for v in node.values]
+(ctx::AbstractQASMContext)(node::OpenQASM3.DiscreteSet)  = [ctx(v) for v in node.values]
 
 function (ctx::AbstractQASMContext)(node::OpenQASM3.RangeDefinition)
     start = ctx(node.start)
@@ -278,7 +289,7 @@ _lookup_name(node, ctx) = id(node)
 _index_val(val, inds, typ) = val[inds .+ 1]
 function _index_val(val::T, inds, typ) where {T<:Integer}
     width = sizeof(T)
-    v_digits = digits(val, base=2, pad=typ.size.value)
+    v_digits = digits(val, base=2, pad=OpenQASM3.value(typ.size))
     vals = reverse(v_digits)[inds .+ 1]
     return vals
 end
@@ -499,7 +510,7 @@ function (ctx::AbstractQASMContext)(::Val{:pragma}, ::Val{:qubits}, body::Abstra
     else
         qubits = map(split(body, ",")) do q_name
             clean_name = String(replace(q_name, " "=>""))
-            return [ctx.qubit_mapping[q] for q in resolve_qubit(clean_name, ctx)]
+            return collect(Iterators.flatten(ctx.qubit_mapping[q] for q in resolve_qubit(clean_name, ctx)))
         end
     end
     targets    = collect(Iterators.flatten(qubits))
@@ -549,11 +560,12 @@ function (ctx::AbstractQASMContext)(::Val{:noise}, body::String)
     if raw_op == "kraus"
         noise_arg = get_noise_arg(Val(:kraus), arg)
         op        = Kraus(noise_arg)
+        push!(ctx, Instruction{Kraus}(op, collect(Iterators.flatten(targets))))
     else
         args = get_noise_arg(Val(:noise), arg)
         op   = noise_type(args...)
+        push!(ctx, Instruction{noise_type}(op, collect(Iterators.flatten(targets))))
     end
-    push!(ctx, Instruction(op, targets))
     return
 end
 
@@ -566,7 +578,7 @@ function (ctx::AbstractQASMContext)(::Val{:unitary}, body::String)
     raw_arg            = eval(Meta.parse(cleaned_arg))
     gate_arg           = reduce(hcat, raw_arg)
     op                 = Unitary(gate_arg)
-    push!(output(ctx).ixs, Instruction(op, targets))
+    push!(ctx, Instruction{Unitary}(op, targets))
     return
 end
 
@@ -631,17 +643,13 @@ function (ctx::AbstractQASMContext)(node::OpenQASM3.QuantumPhase)
     if isempty(node.qubits)
         gate_qubits = collect(0:ctx.n_qubits-1)
     else
-        resolved_qubits = [resolve_qubit(q, ctx) for q in node.qubits]
-        gate_qubits     = _get_qubits_from_mapping(Iterators.flatten(resolved_qubits), ctx)
+        gate_qubits = collect(Iterators.flatten(_get_qubits_from_mapping(node.qubits, ctx)))
     end
-    gate_mods        = reverse(node.modifiers)
     gate_arg         = convert(Float64, ctx(node.argument))
     braket_gate_type = MultiQubitPhaseShift{length(gate_qubits)}
     braket_gate      = braket_gate_type(gate_arg...)
-    for mod in gate_mods
-        braket_gate = ctx(mod, braket_gate)
-    end
-    push!(ctx, Instruction(braket_gate, gate_qubits))
+    modified_gate    = ctx(node.modifiers, braket_gate)
+    push!(ctx, Instruction(modified_gate, gate_qubits))
     return
 end
 
@@ -651,113 +659,151 @@ function (ctx::AbstractQASMContext)(node::OpenQASM3.QuantumGateDefinition, name:
     for (q_ix, q) in enumerate(node.qubits)
         q_name = id(q)
         gate_ctx.definitions[q_name] = QubitDef(1)
-        gate_ctx.qubit_mapping[q_name] = q_ix - 1
+        gate_ctx.qubit_mapping[q_name] = [q_ix - 1]
+        gate_ctx.qubit_mapping[(q_name, 0)] = [q_ix - 1]
         gate_ctx.n_qubits += 1
     end
     for statement in node.body
         gate_ctx(statement)
     end
-    body_fn() = deepcopy(gate_ctx.output.ixs)
+    body_fn() = [Instruction(ix.operator, ix.target) for ix in gate_ctx.output.ixs]
     ctx.definitions[name] = GateDef(args, id.(node.qubits), body_fn, gate_ctx) 
     return
 end
 
-(ctx::AbstractQASMContext)(node::QuantumGateModifier{OpenQASM3.Inv}, g::G) where {G<:Braket.Gate} = inv(g)
-(ctx::AbstractQASMContext)(node::QuantumGateModifier{OpenQASM3.Pow}, g::G) where {G<:Braket.Gate} = g ^ ctx(node.argument)
-function (ctx::AbstractQASMContext)(node::QuantumGateModifier{OpenQASM3.Ctrl}, g::G) where {G<:Braket.Gate}
-    arg     = ctx(node.argument)
-    n_arg   = isnothing(arg) ? 1 : arg
-    bit_tup = ntuple(i->1, n_arg)
-    return Control(g, bit_tup)
-end
-function (ctx::AbstractQASMContext)(node::QuantumGateModifier{OpenQASM3.NegCtrl}, g::G) where {G<:Braket.Gate}
-    arg     = ctx(node.argument)
-    n_arg   = isnothing(arg) ? 1 : arg
-    bit_tup = ntuple(i->0, n_arg)
-    return Control(g, bit_tup)
-end
-
 pad_qubits(op::Control, qc_diff::Int, target) = vcat(collect(0:qc_diff-1), target .+ qc_diff)
 pad_qubits(op, qc_diff::Int, target) = target
-# GateDef
-function (ctx::AbstractQASMContext)(mod::QuantumGateModifier{OpenQASM3.Inv}, braket_gate::Vector{Instruction})
+n_arg(::Nothing) = 1
+n_arg(arg)       = arg
+(ctx::AbstractQASMContext)(node::QuantumGateModifier{OpenQASM3.Ctrl, E}, argument, n_arg::Int, g::G) where {G<:Braket.Gate, E<:OpenQASM3.Expression} = Control(g, ntuple(i->1, n_arg))
+(ctx::AbstractQASMContext)(node::QuantumGateModifier{OpenQASM3.NegCtrl, E}, argument, n_arg::Int, g::G) where {G<:Braket.Gate, E<:OpenQASM3.Expression} = Control(g, ntuple(i->0, n_arg))
+function (ctx::AbstractQASMContext)(mod::QuantumGateModifier{T, E}, argument, braket_gate::Vector{Instruction{O}}) where {T<:Union{OpenQASM3.Ctrl, OpenQASM3.NegCtrl}, O<:Braket.Operator, E<:OpenQASM3.Expression}
+    braket_gate = map(braket_gate) do ix
+        old_qc  = qubit_count(ix.operator)
+        new_op  = ctx(mod, n_arg(argument), ix.operator)
+        new_qc  = qubit_count(new_op)
+        qc_diff = new_qc - old_qc
+        new_ix  = Instruction(new_op, pad_qubits(new_op, qc_diff, ix.target))
+    end
+    return braket_gate
+end
+(ctx::AbstractQASMContext)(mod::QuantumGateModifier{T, E}, argument, braket_gate::G) where {T<:Union{OpenQASM3.Ctrl, OpenQASM3.NegCtrl}, G<:Braket.Gate, E<:OpenQASM3.Expression} = ctx(mod, argument, n_arg(argument), braket_gate) 
+function (ctx::AbstractQASMContext)(mod::QuantumGateModifier{OpenQASM3.Inv, E}, argument, braket_gate::Vector{<:Instruction}) where {E<:OpenQASM3.Expression}
     to_map = reverse(braket_gate)
     braket_gate = map(to_map) do ix
         old_qc  = qubit_count(ix.operator)
-        new_op  = ctx(mod, ix.operator)
+        new_op  = inv(ix.operator)
         new_qc  = qubit_count(new_op)
         qc_diff = new_qc - old_qc
         new_ix  = Instruction(new_op, pad_qubits(new_op, qc_diff, ix.target))
     end
     return braket_gate
 end
-function (ctx::AbstractQASMContext)(mod::QuantumGateModifier{T}, braket_gate::Vector{Instruction}) where {T<:OpenQASM3.GateModifierName}
+function (ctx::AbstractQASMContext)(mod::QuantumGateModifier{OpenQASM3.Pow, E}, argument, braket_gate::Vector{<:Instruction}) where {E<:OpenQASM3.Expression}
     braket_gate = map(braket_gate) do ix
-        old_qc  = qubit_count(ix.operator)
-        new_op  = ctx(mod, ix.operator)
-        new_qc  = qubit_count(new_op)
-        qc_diff = new_qc - old_qc
-        new_ix  = Instruction(new_op, pad_qubits(new_op, qc_diff, ix.target))
+        qc      = qubit_count(ix.operator)
+        new_op  = ix.operator ^ argument
+        new_ix  = Instruction(new_op, ix.target)
     end
     return braket_gate
 end
-function (ctx::AbstractQASMContext)(mods::Vector{<:OpenQASM3.QuantumGateModifier}, braket_gate)
-    for mod in mods
-        braket_gate = ctx(mod, braket_gate)
+(ctx::AbstractQASMContext)(mod::QuantumGateModifier{OpenQASM3.Inv, E}, argument, braket_gate::G) where {G<:Braket.Gate, E<:OpenQASM3.Expression} = inv(braket_gate)
+(ctx::AbstractQASMContext)(mod::QuantumGateModifier{OpenQASM3.Pow, E}, argument, braket_gate::G) where {G<:Braket.Gate, E<:OpenQASM3.Expression} = braket_gate ^ argument
+(ctx::AbstractQASMContext)(mod::QuantumGateModifier{OpenQASM3.NothingMod, OpenQASM3.NothingExpression}, argument, braket_gate) = braket_gate
+function (ctx::AbstractQASMContext)(mods::Vector{M}, braket_gate) where {M<:OpenQASM3.QuantumGateModifier}
+    for mod in Iterators.reverse(mods)
+        braket_gate = ctx(mod, ctx(mod.argument), braket_gate)
     end
     return braket_gate
+end
+(ctx::AbstractQASMContext)(mods::Vector{QuantumGateModifier{OpenQASM3.NothingMod, OpenQASM3.NothingExpression}}, braket_gate) = braket_gate
+
+_to_instructions(ix::Instruction{O}) where {O<:Braket.Operator} = [ix]
+_to_instructions(ixs::Vector{<:Instruction}) = ixs
+_lookup_gate(gate_name::String, gate_args::Vector{Float64}) = BuiltinGates[Symbol(gate_name)](gate_args...)
+function _construct_raw_gate(ctx::AbstractQASMContext, gate_name::String, gate_args::Vector{Float64})
+    sym_name = Symbol()
+    try
+        gd = lookup_def(GateDef, gate_name, ctx)
+        return _to_instructions(gd(gate_args...))
+    catch e
+        return _lookup_gate(lowercase(gate_name), gate_args)
+    end
 end
 
-_to_instructions(ix::Instruction) = [ix]
-_to_instructions(ixs::Vector{Instruction}) = ixs
-_to_instructions(g::Gate) = [Instruction(g, collect(0:qubit_count(g)-1))]
-function (ctx::AbstractQASMContext)(node::OpenQASM3.QuantumGate, gate_name::String)
-    resolved_qubits  = [resolve_qubit(q, ctx) for q in node.qubits]
-    gate_mods        = reverse(node.modifiers)
-    gate_args        = (convert(Float64, a) for a in Iterators.map(ctx, node.arguments))
-    braket_gate_type = lookup_def(GateDef, gate_name, ctx)
-    braket_gate = _to_instructions(braket_gate_type(gate_args...))
-    braket_gate = ctx(gate_mods, braket_gate)
+function _splat_qubits(gate_qubits, qc::Int)
+    max_length   = maximum(length, gate_qubits)
+    final_qubits = Vector{Int}[Vector{Int}(undef, qc) for ix in 1:max_length]
+    if !all(length(qubits) == max_length for qubits in gate_qubits)
+        for r_ix in filter(r_ix->(length(gate_qubits[r_ix]) == 1), 1:length(gate_qubits))
+            gate_qubits[r_ix] = [gate_qubits[r_ix][1] for _ in 1:max_length]
+        end
+    end
+    for ii in 1:max_length, q in 1:qc
+        final_qubits[ii][q] = gate_qubits[q][ii]
+    end
+    return final_qubits
+end
+
+function _attach_gate_to_qubits(ctx::AbstractQASMContext, braket_gate::Vector{<:Instruction}, qubits::Vector{I}) where {I<:OpenQASM3.AbstractIdentifier}
     qc          = qubit_count(braket_gate)
+    gate_qubits = _get_qubits_from_mapping(qubits, ctx)
     if qc == 1
-        gate_qubits = _get_qubits_from_mapping(Iterators.flatten(resolved_qubits), ctx)
         for q in gate_qubits, ix in braket_gate
             push!(ctx, Instruction(ix.operator, q))
         end
     else
-        length(resolved_qubits) == qc || error("Gate of type $braket_gate_type has qubit count $qc but $resolved_qubits were provided.")
+        length(gate_qubits) == qc || error("Gate def has qubit count $qc but $(length(gate_qubits)) were provided.")
         # handle splatting
-        if !all(length(qubits) == length(resolved_qubits[1]) for qubits in resolved_qubits)
-            max_length = maximum(length, resolved_qubits)
-            for r_ix in filter(r_ix->(length(resolved_qubits[r_ix]) == 1), 1:length(resolved_qubits))
-                resolved_qubits[r_ix] = [resolved_qubits[r_ix][1] for _ in 1:max_length]
-            end
-        end
-        for splatted_qubits in zip(resolved_qubits...)
-            gate_qubits = _get_qubits_from_mapping(splatted_qubits, ctx)
-            qubit_mapper = Dict(zip(collect(0:qc-1), gate_qubits))
-            for ix in braket_gate
-                push!(ctx, Instruction(ix.operator, [qubit_mapper[t] for t in ix.target]))
-            end
+        for qubits in _splat_qubits(gate_qubits, qc), ix in braket_gate
+            push!(ctx, Instruction(ix.operator, qubits))
         end
     end
+    return nothing
+end
+
+function _attach_gate_to_qubits(ctx::AbstractQASMContext, braket_gate::G, qubits::Vector{I}) where {I<:OpenQASM3.AbstractIdentifier, G<:Braket.Gate}
+    qc          = qubit_count(braket_gate)
+    gate_qubits = _get_qubits_from_mapping(qubits, ctx)
+    if qc == 1
+        for q in Iterators.flatten(gate_qubits)
+            push!(ctx, Instruction{G}(braket_gate, q))
+        end
+    else
+        length(gate_qubits) == qc || error("Gate of type $G has qubit count $qc but $(length(gate_qubits)) were provided.")
+        # handle splatting
+        for qubits in _splat_qubits(gate_qubits, qc) 
+            push!(ctx, Instruction{G}(braket_gate, qubits))
+        end
+    end
+    return nothing
+end
+
+function (ctx::AbstractQASMContext)(node::OpenQASM3.QuantumGate{I, M, E}, gate_name::String) where {I, M, E}
+    gate_args     = Float64[convert(Float64, ctx(a)) for a in node.arguments]
+    gate          = _construct_raw_gate(ctx, gate_name, gate_args)
+    modified_gate = ctx(node.modifiers, gate)
+    _attach_gate_to_qubits(ctx, modified_gate, node.qubits)
     return
 end
 
 function (ctx::QASMSubroutineContext)(node::QuantumArgument, name::String, ix::Int)
     n_qubits = isnothing(node.size) ? 1 : ctx(node.size)
     ctx.definitions[name]   = QubitDef(n_qubits)
-    ctx.qubit_mapping[name] = n_qubits == 1 ? ix : collect(ix:ix+n_qubits-1)
-    ix += n_qubits
+    ctx.qubit_mapping[name] = n_qubits == 1 ? [ix] : collect(ix:ix+n_qubits-1)
+    for q_ix in 0:n_qubits - 1
+        ctx.qubit_mapping[(name, q_ix)] = [ix]
+        ix += 1
+    end
     return ix
 end
 
 function (ctx::QASMSubroutineContext)(node::ClassicalArgument{T, AT}, name::String, ix::Int) where {T, AT}
-    ctx.definitions[name] = ClassicalDef(undef, T, ClassicalVar) 
+    ctx.definitions[name] = ClassicalDef(undef, T, ClassicalVar()) 
     return ix
 end
 
-function _map_arguments_back(arg_passed::IndexExpression, arg_defined::OpenQASM3.ClassicalArgument{T, OpenQASM3.mutable}, fn_ctx) where {T}
+function _map_arguments_back(arg_passed::IE, arg_defined::OpenQASM3.ClassicalArgument{T, OpenQASM3.mutable}, fn_ctx) where {T, IE<:IndexExpression}
     outer_id   = id(arg_passed)
     inner_id   = id(arg_defined)
     ctx        = parent(fn_ctx)
@@ -781,7 +827,7 @@ _map_arguments_back(arg_passed, arg_defined, fn_ctx) = return
 function _map_arguments_forward(arg_passed, arg_defined::OpenQASM3.ClassicalArgument{T, AT}, qubit_alias::Dict, fn_ctx) where {T, AT}
     ctx       = parent(fn_ctx)
     arg_value = ctx(arg_passed)
-    fn_ctx.definitions[id(arg_defined)] = ClassicalDef(arg_value, T, ClassicalVar)
+    fn_ctx.definitions[id(arg_defined)] = ClassicalDef(arg_value, T, ClassicalVar())
     return
 end
 
@@ -792,6 +838,7 @@ function _map_arguments_forward(arg_passed, arg_defined::OpenQASM3.QuantumArgume
     arg_name  = id(arg_defined)
     arg_val   = _lookup_name(arg_passed, ctx)
     qubit_alias[arg_name] = _get_alias_value(arg_val)
+    qubit_alias[(arg_name, 0)] = _get_alias_value(arg_val)
     return
 end
 
@@ -858,7 +905,7 @@ function (ctx::AbstractQASMContext)(node::OpenQASM3.ForInLoop)
     block_ctx     = _new_inner_scope(ctx)
     for i in loop_set
         scalar_matches_type(node.type, i, "Loop variable type error: $i is not a ")
-        block_ctx.definitions[loopvar_name] = ClassicalDef(i, node.type, ClassicalVar)
+        block_ctx.definitions[loopvar_name] = ClassicalDef(i, node.type, ClassicalVar())
         for subnode in node.block
             maybe_break_or_continue = block_ctx(subnode)
             if maybe_break_or_continue isa OpenQASM3.BreakStatement
@@ -921,35 +968,50 @@ _check_undefined(node::ClassicalDeclaration, name, ctx; local_only=true) = retur
 _check_undefined(node::IndexedIdentifier, name, ctx; local_only=true) = return
 _check_undefined(node::QuantumGate, name, ctx; local_only=true) = return
 
-isbreakorcontinue(node::OpenQASM3.BreakStatement) = true
+isbreakorcontinue(node::OpenQASM3.BreakStatement)    = true
 isbreakorcontinue(node::OpenQASM3.ContinueStatement) = true
-isbreakorcontinue(node) = false
+isbreakorcontinue(node::Nothing) = false
+isbreakorcontinue(node)          = false
 
 _is_hardware_qubit(qname::AbstractString) = !isnothing(match(r"\$[0-9]+", qname))
 _is_hardware_qubit(qname::OpenQASM3.Identifier) = _is_hardware_qubit(id(qname))
 _is_hardware_qubit(qname) = false
 resolve_qubit(q::Tuple{String, Int}, q_name::String, def::QubitDef, ctx::AbstractQASMContext)   = [q]
-resolve_qubit(q::String, q_name::String, def::QubitDef, ctx::AbstractQASMContext)               = length(def) == 1 ? [q] : [(q, ix) for ix in 0:def.size-1]
+resolve_qubit(q::String, q_name::String, def::QubitDef, ctx::AbstractQASMContext)               = [(q, ix) for ix in 0:def.size-1]
 resolve_qubit(q::OpenQASM3.Identifier, q_name::String, def::QubitDef, ctx::AbstractQASMContext) = resolve_qubit(q_name, q_name, def, ctx) 
 resolve_qubit(q::Tuple{String, T}, q_name::String, def::QubitDef, ctx::AbstractQASMContext) where {T} = [(q_name, ix) for ix in Iterators.flatten(q[2])]
-function resolve_qubit(node::OpenQASM3.IndexedIdentifier, q_name::String, def::QubitDef, ctx::AbstractQASMContext)
-    ix  = map(ctx, node.indices)[1]
-    ixs = ix isa Int ? [ix] : ix
+_get_indices(ix::Int)::Vector{Int} = [ix]
+_get_indices(ix::Vector{Int})::Vector{Int} = ix
+_get_indices(ix::Vector{Vector{Int}})::Vector{Int} = ix[1]
+function resolve_qubit(node::OpenQASM3.IndexedIdentifier{IT}, q_name::String, def::QubitDef, ctx::AbstractQASMContext) where {IT<:OpenQASM3.IndexElement}
+    ixs = _get_indices(ctx(node.indices))
     return resolve_qubit((q_name, ixs), q_name, def, ctx) 
 end
-function resolve_qubit(q, ctx::AbstractQASMContext, span=())
-    _is_hardware_qubit(q) && return [id(q)]
-    q_name = id(q)
+function resolve_qubit(q, q_name::String, ctx::AbstractQASMContext, span=())
+    _is_hardware_qubit(q_name) && return [id(q_name)]
     def = lookup_def(QubitDef, q_name, ctx; span=span)
-    isnothing(def) && error("Qubit $q_name not defined at $span.")
     return resolve_qubit(q, q_name, def, ctx) 
 end
+resolve_qubit(q::String, ctx::AbstractQASMContext, span=()) = _is_hardware_qubit(q) ? [id(q)] : resolve_qubit(q, id(q), ctx, span)
+resolve_qubit(q, ctx::AbstractQASMContext, span=()) = resolve_qubit(q, id(q), ctx, span)
 
-_get_qubits_from_mapping(q, ctx::AbstractQASMContext) = map(q) do qubit
-    _is_hardware_qubit(qubit) ? tryparse(Int, replace(qubit, "\$"=>"")) : ctx.qubit_mapping[qubit]
-    #qubit isa Tuple && return [ctx.qubit_mapping[(qubit[1], t)] for t in qubit[2]]
+function _get_qubits_from_mapping(q::Vector{I}, ctx::AbstractQASMContext) where {I}
+    qubits = Vector{Vector{Int}}(undef, length(q))
+    for (i, qubit) in enumerate(q)
+        qubits[i] = Int[]
+        resolved_q = resolve_qubit(qubit, ctx)
+        for rq in resolved_q
+            if _is_hardware_qubit(rq)
+                push!(qubits[i], tryparse(Int, replace(rq, "\$"=>"")))
+                continue
+            else
+                append!(qubits[i], Iterators.flatten(ctx.qubit_mapping[rq]))
+            end
+        end
+    end
+    return qubits
 end
-
+_get_qubits_from_mapping(q::Tuple{String, Int}, ctx::AbstractQASMContext) = ctx.qubit_mapping[q]
 # does nothing for now
 function (ctx::AbstractQASMContext)(node::Union{OpenQASM3.QuantumMeasurement, OpenQASM3.QuantumMeasurementStatement})
     _check_annotations(node)
@@ -961,19 +1023,31 @@ function (ctx::QASMSubroutineContext)(node::OpenQASM3.ReturnStatement)
     return ctx(node.expression)
 end
 
-_process_init_expression(::Nothing, type::T, name::String, ctx::AbstractQASMContext) where {T} = nothing
+_process_init_expression(::Nothing, type::T, name::String, ctx::AbstractQASMContext) where {T} = nothing 
 _process_init_expression(::OpenQASM3.NothingExpression, type::T, name::String, ctx::AbstractQASMContext) where {T} = nothing
 _process_init_expression(expr::OpenQASM3.Expression, type::T, name::String, ctx::AbstractQASMContext) where {T} = ctx(expr)
-
-function (ctx::AbstractQASMContext)(node::OpenQASM3.ClassicalDeclaration{T}, name::String) where {T}
-    val  = _process_init_expression(node.init_expression, T, name, ctx)
-    ctx.definitions[name] = ClassicalDef(val, T, ClassicalVar)
+for T in (:(OpenQASM3.FloatType), :(OpenQASM3.ComplexType), :(OpenQASM3.IntType), :(OpenQASM3.UintType), :(OpenQASM3.BoolType), :(OpenQASM3.BitType))
+    @eval begin
+        value_type(::Type{$T}, ::OpenQASM3.NothingExpression) = Nothing
+    end
+end
+value_type(::Type{OpenQASM3.FloatType}, exp::OpenQASM3.Expression) = Float64
+value_type(::Type{OpenQASM3.ComplexType}, exp::OpenQASM3.Expression) = ComplexF64
+value_type(::Type{OpenQASM3.IntType}, exp::OpenQASM3.Expression) = Int
+value_type(::Type{OpenQASM3.UintType}, exp::OpenQASM3.Expression) = Int
+value_type(::Type{OpenQASM3.BoolType}, exp::OpenQASM3.Expression) = Bool
+value_type(::Type{OpenQASM3.BitType}, exp::OpenQASM3.Expression) = BitVector
+value_type(::Type{OpenQASM3.ArrayType{T}}, exp::OpenQASM3.Expression) where {T} = Vector{value_type(T, exp)}
+function (ctx::AbstractQASMContext)(node::OpenQASM3.ClassicalDeclaration{T, IE}, name::String) where {T<:ClassicalType, IE}
+    val_T = value_type(T, node.init_expression)
+    val   = _process_init_expression(node.init_expression, node.type, name, ctx)
+    ctx.definitions[name] = ClassicalDef{val_T, T, ClassicalVar}(val, node.type, ClassicalVar())
     return nothing
 end
 
 function (ctx::AbstractQASMContext)(node::OpenQASM3.ConstantDeclaration{T}, name::String) where {T}
     val  = _process_init_expression(node.init_expression, T, name, ctx)
-    ctx.definitions[name] = ClassicalDef(val, T, ClassicalConst)
+    ctx.definitions[name] = ClassicalDef(val, T, ClassicalConst())
     return nothing
 end
 
@@ -1008,22 +1082,25 @@ _assign_lvalue(lvalue, r_val, d_value::Nothing, op, ctx::AbstractQASMContext) = 
 function (ctx::AbstractQASMContext)(node::OpenQASM3.ClassicalAssignment{O}, name::String) where {O}
     _check_lval(node.lvalue) 
     def  = lookup_def(ClassicalDef, name, ctx; span=node.span)
-    def.kind == ClassicalVar || error("Variable `$name` cannot be assigned to.")
+    def.kind isa ClassicalVar || error("Variable `$name` cannot be assigned to.")
     val   = _assign_lvalue(node.lvalue, ctx(node.rvalue), def.value, O(), ctx)
     ctx.definitions[name] = ClassicalDef(val, def.valtype, def.kind)
     return
 end
 
-function (ctx::QASMGlobalContext)(node::OpenQASM3.QubitDeclaration, qname::String)
-    num_qubits               = isnothing(node.size) ? 1 : node.size.value
-    ctx.definitions[qname]   = QubitDef(num_qubits)
-    ctx.qubit_mapping[qname] = num_qubits == 1 ? ctx.n_qubits : collect(ctx.n_qubits:(ctx.n_qubits + num_qubits - 1))
-    if num_qubits > 1
-        for q_ix in 0:num_qubits - 1
-            ctx.qubit_mapping[(qname, q_ix)] = ctx.n_qubits + q_ix
-        end
+function _add_to_qubit_mapping(ctx::QASMGlobalContext, num_qubits::Int, qname::String)
+    ctx.qubit_mapping[qname] = collect(ctx.n_qubits:(ctx.n_qubits + num_qubits - 1))
+    for q_ix in 0:num_qubits - 1
+        ctx.qubit_mapping[(qname, q_ix)] = [ctx.n_qubits + q_ix]
     end
     ctx.n_qubits += num_qubits
+    return
+end
+_add_to_qubit_mapping(ctx::QASMGlobalContext, ::Nothing, qname::String) = _add_to_qubit_mapping(ctx, 1, qname)
+function (ctx::QASMGlobalContext)(node::OpenQASM3.QubitDeclaration, qname::String)
+    num_qubits               = value(node.size)
+    ctx.definitions[qname]   = QubitDef(num_qubits)
+    _add_to_qubit_mapping(ctx, num_qubits, qname)
     return nothing
 end
 
@@ -1049,9 +1126,10 @@ function Base.collect(ctx::QASMGlobalContext)
     end
     return c
 end
-function interpret(program::OpenQASM3.Program; extern_lookup=Dict{String,Float64}())
+function interpret(program::OpenQASM3.Program, extern_lookup::Dict{String, <:Any}=Dict{String,Float64}())
     global_ctx = QASMGlobalContext{Braket.Operator}(extern_lookup)
     # walk the nodes recursively
     global_ctx(program)
     return collect(global_ctx)
 end
+interpret(program::OpenQASM3.Program, ::Nothing) = interpret(program, Dict{String,Float64}())
