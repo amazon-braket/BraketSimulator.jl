@@ -278,7 +278,11 @@ end
 
 _get_indices(node::OpenQASM3.RangeDefinition{R, S, T}, name::AbstractString, ctx::AbstractQASMContext) where {R, S, T} = ctx(node, length(lookup_def(QASMDefinition, name, ctx)))
 _get_indices(node::Vector{OpenQASM3.RangeDefinition{R, S, T}}, name::AbstractString, ctx::AbstractQASMContext) where {R, S, T} = _get_indices(node[1], name, ctx)
-_get_indices(node::T, name::AbstractString, ctx::AbstractQASMContext) where {T} = ctx(node)
+_get_indices(node, name::AbstractString, ctx::AbstractQASMContext) = ctx(node)
+_indices(ix::Int)::Vector{Int} = [ix]
+_indices(ix::Vector{Int})::Vector{Int} = ix
+_indices(ix::Vector{Vector{Int}})::Vector{Int} = ix[1]
+_indices(ix::Vector{Vector{T}}) where {T} = collect(Iterators.flatten(ix[1]))
 function _lookup_name(node::OpenQASM3.IndexExpression, ctx::AbstractQASMContext)
     name    = id(node)
     indices = _get_indices(node.index, name, ctx)
@@ -756,7 +760,7 @@ function _attach_gate_to_qubits(ctx::AbstractQASMContext, braket_gate::Vector{<:
         length(gate_qubits) == qc || error("Gate def has qubit count $qc but $(length(gate_qubits)) were provided.")
         # handle splatting
         for qubits in _splat_qubits(gate_qubits, qc), ix in braket_gate
-            push!(ctx, Instruction(ix.operator, qubits))
+            push!(ctx, Instruction(ix.operator, [qubits[t+1] for t in ix.target]))
         end
     end
     return nothing
@@ -980,11 +984,8 @@ resolve_qubit(q::Tuple{String, Int}, q_name::String, def::QubitDef, ctx::Abstrac
 resolve_qubit(q::String, q_name::String, def::QubitDef, ctx::AbstractQASMContext)               = [(q, ix) for ix in 0:def.size-1]
 resolve_qubit(q::OpenQASM3.Identifier, q_name::String, def::QubitDef, ctx::AbstractQASMContext) = resolve_qubit(q_name, q_name, def, ctx) 
 resolve_qubit(q::Tuple{String, T}, q_name::String, def::QubitDef, ctx::AbstractQASMContext) where {T} = [(q_name, ix) for ix in Iterators.flatten(q[2])]
-_get_indices(ix::Int)::Vector{Int} = [ix]
-_get_indices(ix::Vector{Int})::Vector{Int} = ix
-_get_indices(ix::Vector{Vector{Int}})::Vector{Int} = ix[1]
 function resolve_qubit(node::OpenQASM3.IndexedIdentifier{IT}, q_name::String, def::QubitDef, ctx::AbstractQASMContext) where {IT<:OpenQASM3.IndexElement}
-    ixs = _get_indices(ctx(node.indices))
+    ixs = _indices(ctx(node.indices))
     return resolve_qubit((q_name, ixs), q_name, def, ctx) 
 end
 function resolve_qubit(q, q_name::String, ctx::AbstractQASMContext, span=())
