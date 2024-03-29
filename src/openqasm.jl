@@ -289,7 +289,7 @@ _lookup_name(node, ctx) = id(node)
 _index_val(val, inds, typ) = val[inds .+ 1]
 function _index_val(val::T, inds, typ) where {T<:Integer}
     width = sizeof(T)
-    v_digits = digits(val, base=2, pad=OpenQASM3.value(typ.size))
+    v_digits = digits(val, base=2, pad=value(typ.size))
     vals = reverse(v_digits)[inds .+ 1]
     return vals
 end

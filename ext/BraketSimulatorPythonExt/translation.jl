@@ -1,13 +1,17 @@
-function convert_ir_matrix(m)
-    raw_mats = [[m__[0]+im*m__[1] for m__ in m_] for m_ in m]
-    return hcat(raw_mats...)
-end
+convert_ir_matrix(m) = [[[pyconvert(Float64, m__[0]), pyconvert(Float64, m__[1])] for m__ in m_] for m_ in m]
 
 function convert_ir_obs(o)
     if pyisinstance(o, pybuiltins.str)
         return pyconvert(String, o)
-    elseif pyisinstance(o, pybuiltins.list) && pyisinstance(o[0], pybuiltins.str)
-        return [pyconvert(String, o_) for o_ in o]
+    elseif pyisinstance(o, pybuiltins.list)
+        jl_o = map(o) do o_
+            if pyisinstance(o_, pybuiltins.str)
+                return pyconvert(String, o_)
+            else
+                return convert_ir_matrix(o_)
+            end
+        end
+        return convert(Vector{Union{String, Vector{Vector{Vector{Float64}}}}}, jl_o)
     else
         return convert_ir_matrix(o)
     end
@@ -23,13 +27,13 @@ for (rt, fn) in ((:(Braket.IR.Sample), :jl_convert_sample),
     @eval begin
         function $fn(::Type{$rt}, x::Py)
             jl_obs = convert_ir_obs(x.observable)
-            jl_ts = convert_ir_target(x.target)
-            jl_rt = $rt(jl_obs, jl_ts, pyconvert(String, x.type))
+            jl_ts  = convert_ir_target(x.targets)
+            jl_rt  = $rt(jl_obs, jl_ts, pyconvert(String, x.type))
             PythonCall.pyconvert_return(jl_rt)
         end
         function $fn(::Type{AbstractProgramResult}, x::Py)
             jl_obs = convert_ir_obs(x.observable)
-            jl_ts = convert_ir_target(x.target)
+            jl_ts = convert_ir_target(x.targets)
             jl_rt = $rt(jl_obs, jl_ts, pyconvert(String, x.type))
             PythonCall.pyconvert_return(jl_rt)
         end
@@ -41,7 +45,7 @@ for (rt, fn) in ((:(Braket.IR.Probability), :jl_convert_probability),
                 )
     @eval begin
         function $fn(::Type{$rt}, x::Py)
-            jl_ts = convert_ir_target(x.target)
+            jl_ts = convert_ir_target(x.targets)
             jl_rt = $rt(jl_ts, pyconvert(String, x.type))
             PythonCall.pyconvert_return(jl_rt)
         end
@@ -53,10 +57,23 @@ for (rt, fn) in ((:(Braket.IR.Probability), :jl_convert_probability),
     end
 end
 
+function inputs_to_jl(x)
+    if pyis(x, pybuiltins.None)
+        return nothing
+    else
+        jl_inputs = map(x.items()) do x_
+            k, v = x_
+            jl_k = pyconvert(String, k)
+            jl_v = pyisinstance(v, pybuiltins.int) ? pyconvert(Int, v) : pyconvert(Float64, v)
+            return jl_k=>jl_v
+        end
+        return Dict(jl_inputs)
+    end
+end
 function jl_convert_oqprogram(::Type{OpenQasmProgram}, x::Py)
     bsh = pyconvert(Braket.braketSchemaHeader, x.braketSchemaHeader)
     source = pyconvert(String, x.source)
-    inputs = pyis(x.inputs, pybuiltins.None) ? nothing : Dict(pyconvert(String, k)=>pyconvert(Float64, v) for (k,v) in x.inputs)
+    inputs = inputs_to_jl(x.inputs) 
     PythonCall.pyconvert_return(OpenQasmProgram(bsh, source, inputs))
 end
 
