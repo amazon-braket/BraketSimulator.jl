@@ -893,6 +893,6 @@ get_tol(shots::Int) = return (
         circuit     = BraketSimulator.interpret(parsed_qasm)
         program     = Braket.Program(circuit)
         simulation  = BraketSimulator.StateVectorSimulator(2, 0)
-        @test_throws BraketSimulator.ValidationError simulation(program, 2)
+        @test_throws BraketSimulator.ValidationError simulate(simulation, program, 2)
     end
 end
