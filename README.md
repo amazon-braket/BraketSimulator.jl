@@ -31,6 +31,7 @@ To use `BraketSimulatorPythonExt`, you will need to install [`PythonCall.jl`](ht
 ```julia
 using PythonCall, BraketSimulator
 ```
+`PythonCall.jl` will try to install the necessary **Python** dependencies using the `CondaPkg.toml` present in top-level package folder. If you already have all the necessary Python dependencies installed, you can set the environment variable `JULIA_CONDAPKG_BACKEND="Null"` to have `CondaPkg.jl` use your system Python and its installed packages.
 
 To use `BraketSimulatorCuStateVecExt`, you will need to install `cuStateVec.jl`, which is a subpackage of [`CUDA.jl`](https://github.com/JuliaGPU/CUDA.jl), and then load it before `BraketSimulator.jl` like so:
 ```julia
