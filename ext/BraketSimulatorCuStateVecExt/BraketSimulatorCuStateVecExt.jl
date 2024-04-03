@@ -16,7 +16,6 @@ import BraketSimulator.Braket: I, Instruction
 
 import BraketSimulator:
     AbstractSimulator,
-    classical_shadow,
     AbstractStateVector,
     AbstractDensityMatrix,
     StateVectorSimulator,
