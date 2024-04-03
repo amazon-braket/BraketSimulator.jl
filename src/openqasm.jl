@@ -713,14 +713,14 @@ function (ctx::AbstractQASMContext)(mod::QuantumGateModifier{OpenQASM3.Pow, E}, 
 end
 (ctx::AbstractQASMContext)(mod::QuantumGateModifier{OpenQASM3.Inv, E}, argument, braket_gate::G) where {G<:Braket.Gate, E<:OpenQASM3.Expression} = inv(braket_gate)
 (ctx::AbstractQASMContext)(mod::QuantumGateModifier{OpenQASM3.Pow, E}, argument, braket_gate::G) where {G<:Braket.Gate, E<:OpenQASM3.Expression} = braket_gate ^ argument
-(ctx::AbstractQASMContext)(mod::QuantumGateModifier{OpenQASM3.NothingMod, OpenQASM3.NothingExpression}, argument, braket_gate) = braket_gate
+(ctx::AbstractQASMContext)(mod::QuantumGateModifier{OpenQASM3.NothingGateModifier, OpenQASM3.NothingExpression}, argument, braket_gate) = braket_gate
 function (ctx::AbstractQASMContext)(mods::Vector{M}, braket_gate) where {M<:OpenQASM3.QuantumGateModifier}
     for mod in Iterators.reverse(mods)
         braket_gate = ctx(mod, ctx(mod.argument), braket_gate)
     end
     return braket_gate
 end
-(ctx::AbstractQASMContext)(mods::Vector{QuantumGateModifier{OpenQASM3.NothingMod, OpenQASM3.NothingExpression}}, braket_gate) = braket_gate
+(ctx::AbstractQASMContext)(mods::Vector{QuantumGateModifier{OpenQASM3.NothingGateModifier, OpenQASM3.NothingExpression}}, braket_gate) = braket_gate
 
 _to_instructions(ix::Instruction{O}) where {O<:Braket.Operator} = [ix]
 _to_instructions(ixs::Vector{<:Instruction}) = ixs
