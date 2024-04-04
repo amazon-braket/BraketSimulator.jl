@@ -110,21 +110,21 @@ function jl_convert_adjointgradient(::Type{AbstractProgramResult}, x::Py)
 end
 
 jl_convert_kraus(::Type{Kraus}, x::Py)::Kraus = PythonCall.pyconvert_return(Kraus([convert_ir_matrix(m) for m in x.matrices]))
-jl_convert_kraus(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction(Kraus([convert_ir_matrix(m) for m in x.matrices]), [t for t in x.targets]))
+jl_convert_kraus(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction(Kraus([convert_ir_matrix(m) for m in x.matrices]), [pyconvert(Int, t) for t in x.targets]))
 
 jl_convert_unitary(::Type{Unitary}, x::Py)::Unitary = PythonCall.pyconvert_return(Unitary(convert_ir_matrix(x.matrix)))
-jl_convert_unitary(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction(Unitary(convert_ir_matrix(x.matrix)), [t for t in x.targets]))
+jl_convert_unitary(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction(Unitary(convert_ir_matrix(x.matrix)), [pyconvert(Int, t) for t in x.targets]))
 
 jl_convert_cswap(::Type{CSwap}, x::Py)::CSwap = PythonCall.pyconvert_return(CSwap())
-jl_convert_cswap(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction(CSwap(), [t for t in x.targets]))
+jl_convert_cswap(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction(CSwap(), vcat(pyconvert(Int, x.control), [pyconvert(Int, t) for t in x.targets])))
 jl_convert_ccnot(::Type{CCNot}, x::Py)::CCNot = PythonCall.pyconvert_return(CCNot())
-jl_convert_ccnot(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction(CCNot(), vcat([c for c in x.controls], x.target)))
+jl_convert_ccnot(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction(CCNot(), vcat([pyconvert(Int, c) for c in x.controls], pyconvert(Int, x.target))))
 
-jl_convert_paulichannel(::Type{PauliChannel}, x::Py)::PauliChannel = PythonCall.pyconvert_return(PauliChannel(x.probX, x.probY, x.probZ))
-jl_convert_paulichannel(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction(PauliChannel(x.probX, x.probY, x.probZ), x.target))
+jl_convert_paulichannel(::Type{PauliChannel}, x::Py)::PauliChannel = PythonCall.pyconvert_return(PauliChannel(pyconvert(Float64, x.probX), pyconvert(Float64, x.probY), pyconvert(Float64, x.probZ)))
+jl_convert_paulichannel(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction(PauliChannel(pyconvert(Float64, x.probX), pyconvert(Float64, x.probY), pyconvert(Float64, x.probZ)), pyconvert(Int, x.target)))
 
-jl_convert_generalizedampdamp(::Type{GeneralizedAmplitudeDamping}, x::Py)::GeneralizedAmplitudeDamping = PythonCall.pyconvert_return(GeneralizedAmplitudeDamping(x.probability, x.gamma))
-jl_convert_generalizedampdamp(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction(GeneralizedAmplitudeDamping(x.probability, x.gamma), x.target))
+jl_convert_generalizedampdamp(::Type{GeneralizedAmplitudeDamping}, x::Py)::GeneralizedAmplitudeDamping = PythonCall.pyconvert_return(GeneralizedAmplitudeDamping(pyconvert(Float64, x.probability), pyconvert(Float64, x.gamma)))
+jl_convert_generalizedampdamp(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction(GeneralizedAmplitudeDamping(pyconvert(Float64, x.probability), pyconvert(Float64, x.gamma)), pyconvert(Int, x.target)))
 
 jl_convert_multi_qubit_pauli_channel(::Type{MultiQubitPauliChannel}, x::Py)::MultiQubitPauliChannel = PythonCall.pyconvert_return(MultiQubitPauliChannel(Dict(pyconvert(String, k)=>pyconvert(Float64, v) for (k,v) in x.probabilities)))
 jl_convert_multi_qubit_pauli_channel(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction(MultiQubitPauliChannel(Dict(pyconvert(String, k)=>pyconvert(Float64, v) for (k,v) in x.probabilities)), x.target))
@@ -143,24 +143,24 @@ for (g, fn) in ((:BitFlip, :jl_convert_bitflip),
                 (:Depolarizing, :jl_convert_depo),
                )
     @eval begin
-        $fn(::Type{$g}, x::Py)::$g = PythonCall.pyconvert_return($g(x.probability))
-        $fn(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction($g(pyconvert(Float64, x.probability)), pyconvert(Int, x.target)))
+        $fn(::Type{$g}, x::Py)::$g = PythonCall.pyconvert_return($g(pyconvert(Union{Float64,FreeParameter}, x.probability)))
+        $fn(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction($g(pyconvert(Union{Float64,FreeParameter}, x.probability)), pyconvert(Int, x.target)))
     end
 end
 for (g, fn) in ((:AmplitudeDamping, :jl_convert_amplitudedamp),
                 (:PhaseDamping, :jl_convert_phasedamp),
                )
     @eval begin
-        $fn(::Type{$g}, x::Py)::$g = PythonCall.pyconvert_return($g(x.gamma))
-        $fn(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction($g(pyconvert(Float64, x.gamma)), pyconvert(Int, x.target)))
+        $fn(::Type{$g}, x::Py)::$g = PythonCall.pyconvert_return($g(pyconvert(Union{Float64,FreeParameter}, x.gamma)))
+        $fn(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction($g(pyconvert(Union{Float64, FreeParameter}, x.gamma)), pyconvert(Int, x.target)))
     end
 end
 for (g, fn) in ((:TwoQubitDepolarizing, :jl_convert_twoqubitdepo),
                 (:TwoQubitDephasing, :jl_convert_twoqubitdeph),
                )
     @eval begin
-        $fn(::Type{$g}, x::Py)::$g = PythonCall.pyconvert_return($g(x.probability))
-        $fn(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction($g(pyconvert(Float64, x.probability)), [pyconvert(Int, t) for t in x.targets]))
+        $fn(::Type{$g}, x::Py)::$g = PythonCall.pyconvert_return($g(pyconvert(Union{Float64,FreeParameter}, x.probability)))
+        $fn(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction($g(pyconvert(Union{Float64, FreeParameter}, x.probability)), [pyconvert(Int, t) for t in x.targets]))
     end
 end
 for (g, fn) in ((:I, :jl_convert_i),
@@ -187,7 +187,7 @@ for (g, fn) in ((:Rx, :jl_convert_rx),
                )
     @eval begin
         $fn(::Type{$g}, x::Py)::$g = PythonCall.pyconvert_return($g(x.angle))
-        $fn(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction($g(pyconvert(Float64, x.angle)), pyconvert(Int, x.target)))
+        $fn(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction($g(pyconvert(Union{Float64, FreeParameter}, x.angle)), pyconvert(Int, x.target)))
     end
 end
 
@@ -209,7 +209,7 @@ for (g, fn) in ((:XX, :jl_convert_xx),
                )
     @eval begin
         $fn(::Type{$g}, x::Py)::$g = PythonCall.pyconvert_return($g(x.angle))
-        $fn(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction($g(pyconvert(Float64, x.angle)), [pyconvert(Int, t) for t in x.targets]))
+        $fn(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction($g(pyconvert(Union{FreeParameter, Float64}, x.angle)), [pyconvert(Int, t) for t in x.targets]))
     end
 end
 
@@ -228,8 +228,8 @@ for (g, fn) in ((:CPhaseShift, :jl_convert_cphaseshift),
                 (:CPhaseShift01, :jl_convert_cphaseshift01),
                )
     @eval begin
-        $fn(::Type{$g}, x::Py)::$g = PythonCall.pyconvert_return($g(pyconvert(Float64, x.angle)))
-        $fn(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction($g(pyconvert(Float64, x.angle)), [pyconvert(Int, x.control), pyconvert(Int, x.target)]))
+        $fn(::Type{$g}, x::Py)::$g = PythonCall.pyconvert_return($g(pyconvert(Union{Float64, FreeParameter}, x.angle)))
+        $fn(::Type{Instruction}, x::Py)::Instruction = PythonCall.pyconvert_return(Instruction($g(pyconvert(Union{Float64, FreeParameter}, x.angle)), [pyconvert(Int, x.control), pyconvert(Int, x.target)]))
     end
 end
 

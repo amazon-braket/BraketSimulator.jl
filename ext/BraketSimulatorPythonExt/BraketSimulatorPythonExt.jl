@@ -2,19 +2,16 @@ module BraketSimulatorPythonExt
 
 using PrecompileTools: @setup_workload, @compile_workload, @recompile_invalidations
 
-using BraketSimulator, BraketSimulator.Braket, BraketSimulator.Braket.JSON3, PythonCall, BraketSimulator.Dates
+using BraketSimulator, BraketSimulator.Braket, PythonCall, BraketSimulator.Dates
 
 import BraketSimulator.Braket:
     LocalSimulator,
     qubit_count,
-    _run_internal,
     Instruction,
     Observables,
     AbstractProgramResult,
     ResultTypeValue,
     format_result,
-    LocalQuantumTask,
-    LocalQuantumTaskBatch,
     GateModelQuantumTaskResult,
     GateModelTaskResult,
     Program,
@@ -26,13 +23,7 @@ import BraketSimulator.Braket:
 import BraketSimulator:
     AbstractSimulator,
     classical_shadow,
-    AbstractStateVector,
-    apply_gate!,
-    get_amps_and_qubits,
-    pad_bits,
     simulate,
-    flip_bits,
-    flip_bit,
     DoubleExcitation,
     SingleExcitation,
     MultiRZ
@@ -507,31 +498,26 @@ function simulate(
     return py_r
 end
 
-function Py(r::Braket.IR.Sample)
-    py_targets = isnothing(r.targets) ? PythonCall.pybuiltins.None : pylist(r.targets)
-    raw_obs = map(r.observable) do o
+py_obs(o::String) = pylist([pystr(o)])
+function py_obs(obs::Vector)
+    raw_obs = map(obs) do o
         o isa String ? pystr(o) : pylist(pylist(pylist(o__) for o__ in o_) for o_ in o)
     end
-    py_obs = pylist(raw_obs)
-    return braket[].ir.jaqcd.results.Sample(targets=py_targets, observable=py_obs, type=pystr("sample"))
+    return pylist(raw_obs)
+end
+function Py(r::Braket.IR.Sample)
+    py_targets = isnothing(r.targets) ? PythonCall.pybuiltins.None : pylist(r.targets)
+    return braket[].ir.jaqcd.results.Sample(targets=py_targets, observable=py_obs(r.observable), type=pystr("sample"))
 end
 
 function Py(r::Braket.IR.Expectation)
     py_targets = isnothing(r.targets) ? PythonCall.pybuiltins.None : pylist(r.targets)
-    raw_obs = map(r.observable) do o
-        o isa String ? pystr(o) : pylist(pylist(pylist(o__) for o__ in o_) for o_ in o)
-    end
-    py_obs = pylist(raw_obs)
-    return braket[].ir.jaqcd.results.Expectation(targets=py_targets, observable=py_obs, type=pystr("expectation"))
+    return braket[].ir.jaqcd.results.Expectation(targets=py_targets, observable=py_obs(r.observable), type=pystr("expectation"))
 end
 
 function Py(r::Braket.IR.Variance)
     py_targets = isnothing(r.targets) ? PythonCall.pybuiltins.None : pylist(r.targets)
-    raw_obs = map(r.observable) do o
-        o isa String ? pystr(o) : pylist(pylist(pylist(o__) for o__ in o_) for o_ in o)
-    end
-    py_obs = pylist(raw_obs)
-    return braket[].ir.jaqcd.results.Variance(targets=py_targets, observable=py_obs, type=pystr("variance"))
+    return braket[].ir.jaqcd.results.Variance(observable=py_obs(r.observable), targets=py_targets, type=pystr("variance"))
 end
 
 function Py(r::Braket.IR.Amplitude)
@@ -585,10 +571,10 @@ Py(op::Braket.Vi, targets) = braket[].ir.jaqcd.instructions.Vi(target=targets[1]
 Py(op::Braket.Rx, targets) = braket[].ir.jaqcd.instructions.Rx(target=targets[1], angle=op.angle[1], type=pystr("rx"))
 Py(op::Braket.Ry, targets) = braket[].ir.jaqcd.instructions.Ry(target=targets[1], angle=op.angle[1], type=pystr("ry"))
 Py(op::Braket.Rz, targets) = braket[].ir.jaqcd.instructions.Rz(target=targets[1], angle=op.angle[1], type=pystr("rz"))
-Py(op::Braket.XX, targets) = braket[].ir.jaqcd.instructions.XX(target=pylist(targets), angle=op.angle[1], type=pystr("xx"))
-Py(op::Braket.YY, targets) = braket[].ir.jaqcd.instructions.YY(target=pylist(targets), angle=op.angle[1], type=pystr("yy"))
-Py(op::Braket.ZZ, targets) = braket[].ir.jaqcd.instructions.ZZ(target=pylist(targets), angle=op.angle[1], type=pystr("zz"))
-Py(op::Braket.XY, targets) = braket[].ir.jaqcd.instructions.XY(target=pylist(targets), angle=op.angle[1], type=pystr("xy"))
+Py(op::Braket.XX, targets) = braket[].ir.jaqcd.instructions.XX(targets=pylist(targets), angle=op.angle[1], type=pystr("xx"))
+Py(op::Braket.YY, targets) = braket[].ir.jaqcd.instructions.YY(targets=pylist(targets), angle=op.angle[1], type=pystr("yy"))
+Py(op::Braket.ZZ, targets) = braket[].ir.jaqcd.instructions.ZZ(targets=pylist(targets), angle=op.angle[1], type=pystr("zz"))
+Py(op::Braket.XY, targets) = braket[].ir.jaqcd.instructions.XY(targets=pylist(targets), angle=op.angle[1], type=pystr("xy"))
 Py(op::Braket.Swap, targets) = braket[].ir.jaqcd.instructions.Swap(targets=pylist(targets), type=pystr("swap"))
 Py(op::Braket.ISwap, targets) = braket[].ir.jaqcd.instructions.ISwap(targets=pylist(targets), type=pystr("iswap"))
 Py(op::Braket.PSwap, targets) = braket[].ir.jaqcd.instructions.PSwap(targets=pylist(targets), angle=op.angle[1], type=pystr("pswap"))
@@ -601,16 +587,16 @@ Py(op::Braket.CCNot, targets) = braket[].ir.jaqcd.instructions.CCNot(controls=py
 Py(op::Braket.PhaseShift, targets) = braket[].ir.jaqcd.instructions.PhaseShift(target=targets[1], angle=op.angle[1], type=pystr("phaseshift"))
 Py(op::Braket.CPhaseShift, targets) = braket[].ir.jaqcd.instructions.CPhaseShift(control=targets[1], target=targets[2], angle=op.angle[1], type=pystr("cphaseshift"))
 Py(op::Braket.CPhaseShift00, targets) = braket[].ir.jaqcd.instructions.CPhaseShift00(control=targets[1], target=targets[2], angle=op.angle[1], type=pystr("cphaseshift00"))
-Py(op::Braket.CPhaseShift01, targets) = braket[].ir.jaqcd.instructions.CPhaseShift00(control=targets[1], target=targets[2], angle=op.angle[1], type=pystr("cphaseshift01"))
-Py(op::Braket.CPhaseShift10, targets) = braket[].ir.jaqcd.instructions.CPhaseShift00(control=targets[1], target=targets[2], angle=op.angle[1], type=pystr("cphaseshift10"))
+Py(op::Braket.CPhaseShift01, targets) = braket[].ir.jaqcd.instructions.CPhaseShift01(control=targets[1], target=targets[2], angle=op.angle[1], type=pystr("cphaseshift01"))
+Py(op::Braket.CPhaseShift10, targets) = braket[].ir.jaqcd.instructions.CPhaseShift10(control=targets[1], target=targets[2], angle=op.angle[1], type=pystr("cphaseshift10"))
 Py(op::Braket.ECR, targets) = braket[].ir.jaqcd.instructions.ECR(targets=pylist(targets), type=pystr("ecr"))
 Py(op::Braket.BitFlip, targets) = braket[].ir.jaqcd.instructions.BitFlip(target=targets[1], probability=op.probability, type=pystr("bit_flip"))
 Py(op::Braket.PhaseFlip, targets) = braket[].ir.jaqcd.instructions.PhaseFlip(target=targets[1], probability=op.probability, type=pystr("phase_flip"))
 Py(op::Braket.PauliChannel, targets) = braket[].ir.jaqcd.instructions.PauliChannel(target=targets[1], probX=op.probX, probY=op.probY, probZ=op.probZ, type=pystr("pauli_channel"))
 Py(op::Braket.MultiQubitPauliChannel, targets) = braket[].ir.jaqcd.instructions.MultiQubitPauliChannel(target=pylist(targets), probabilities=pydict(op.probabilities), type=pystr("multi_qubit_pauli_channel"))
 Py(op::Braket.Depolarizing, targets) = braket[].ir.jaqcd.instructions.Depolarizing(target=targets[1], probability=op.probability, type=pystr("depolarizing"))
-Py(op::Braket.TwoQubitDepolarizing, targets) = braket[].ir.jaqcd.instructions.TwoQubitDepolarizing(target1=targets[1], target2=targets[2], probability=op.probability, type=pystr("two_qubit_depolarizing"))
-Py(op::Braket.TwoQubitDephasing, targets) = braket[].ir.jaqcd.instructions.TwoQubitDephasing(target1=targets[1], target2=targets[2], probability=op.probability, type=pystr("two_qubit_dephasing"))
+Py(op::Braket.TwoQubitDepolarizing, targets) = braket[].ir.jaqcd.instructions.TwoQubitDepolarizing(targets=pylist(targets), probability=op.probability, type=pystr("two_qubit_depolarizing"))
+Py(op::Braket.TwoQubitDephasing, targets) = braket[].ir.jaqcd.instructions.TwoQubitDephasing(targets=pylist(targets), probability=op.probability, type=pystr("two_qubit_dephasing"))
 Py(op::Braket.AmplitudeDamping, targets) = braket[].ir.jaqcd.instructions.AmplitudeDamping(target=targets[1], gamma=op.gamma, type=pystr("amplitude_damping"))
 Py(op::Braket.PhaseDamping, targets) = braket[].ir.jaqcd.instructions.PhaseDamping(target=targets[1], gamma=op.gamma, type=pystr("phase_damping"))
 Py(op::Braket.GeneralizedAmplitudeDamping, targets) = braket[].ir.jaqcd.instructions.GeneralizedAmplitudeDamping(target=targets[1], gamma=op.gamma, probability=op.probability, type=pystr("generalized_amplitude_damping"))
@@ -624,7 +610,7 @@ end
 function Py(op::Braket.Kraus, targets)
     raw_mats = map(Braket.complex_matrix_to_ir, op.matrices)
     py_mat = pylist(pylist(pylist(pylist(v__) for v__ in v_) for v_ in raw_mat) for raw_mat in raw_mats)
-    return braket[].ir.jaqcd.instructions.Kraus(targets=pylist(targets), matrices=py_mats, type=pystr("kraus"))
+    return braket[].ir.jaqcd.instructions.Kraus(targets=pylist(targets), matrices=py_mat, type=pystr("kraus"))
 end
 
 Py(ix::Instruction) = Py(ix.operator, ix.target)

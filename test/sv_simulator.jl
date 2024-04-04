@@ -1,6 +1,8 @@
-using Test, CUDA, cuStateVec, Braket, BraketSimulator, DataStructures
+using Test, CUDA, cuStateVec, Logging, Braket, BraketSimulator, DataStructures
 
 import Braket: I, Instruction
+
+Logging.disable_logging(Logging.Warn)
 
 LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
 funcs = CUDA.functional() ? (identity, cu) : (identity,)
