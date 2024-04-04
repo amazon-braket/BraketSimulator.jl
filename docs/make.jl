@@ -1,7 +1,7 @@
-using BraketSimulator
+using Braket, BraketSimulator
 using Documenter
 
-DocMeta.setdocmeta!(BraketSimulator, :DocTestSetup, :(using BraketSimulator); recursive=true)
+DocMeta.setdocmeta!(BraketSimulator, :DocTestSetup, :(using Braket, BraketSimulator); recursive=true)
 
 makedocs(;
     modules=[BraketSimulator],
@@ -16,10 +16,13 @@ makedocs(;
     ),
     pages=[
         "Home" => "index.md",
+        "Simulators" => "sims.md",
+        "OpenQASM3 Parsing" => "parsing.md",
     ],
 )
 
-deploydocs(;
+# TODO UNCOMMENT ME WHEN PUBLIC
+#=deploydocs(;
     repo="github.com/amazon-braket/BraketSimulator.jl",
     devbranch="main",
-)
+)=#

@@ -1,3 +1,8 @@
+"""
+    DensityMatrixSimulator{T, S<:AbstractMatrix{T}} <: AbstractSimulator
+
+Simulator representing evolution of a density matrix of type `S`, with element type `T`. Density matrix simulators should be used to simulate circuits with noise.
+"""
 mutable struct DensityMatrixSimulator{T,S} <:
                AbstractSimulator where {T,S<:AbstractDensityMatrix{T}}
     density_matrix::S
@@ -49,11 +54,21 @@ function DensityMatrixSimulator{T,S}(
     dm = init(DensityMatrixSimulator{T,S}, qubit_count)
     return DensityMatrixSimulator{T,S}(dm, qubit_count, shots)
 end
+"""
+    DensityMatrixSimulator([::T], qubit_count::Int, shots::Int) -> DensityMatrixSimulator{T, Matrix{T}}
+
+Create a `DensityMatrixSimulator` with `2^qubit_count x 2^qubit_count` elements and `shots` shots to be measured. The default element type is `ComplexF64`.
+"""
 DensityMatrixSimulator(::Type{T}, qubit_count::Int, shots::Int) where {T<:Number} =
     DensityMatrixSimulator{T,DensityMatrix{T}}(qubit_count, shots)
 DensityMatrixSimulator(qubit_count::Int, shots::Int) =
     DensityMatrixSimulator(ComplexF64, qubit_count, shots)
 Braket.qubit_count(dms::DensityMatrixSimulator) = dms.qubit_count
+"""
+    properties(svs::DensityMatrixSimulator) -> GateModelSimulatorDeviceCapabilities
+
+Query the properties and capabilities of a `DensityMatrixSimulator`, including which gates and result types are supported and the minimum and maximum shot and qubit counts.
+"""
 Braket.properties(d::DensityMatrixSimulator) = dm_props
 supported_operations(d::DensityMatrixSimulator) =
     dm_props.action["braket.ir.openqasm.program"].supportedOperations
@@ -131,6 +146,17 @@ function _evolve_op!(
     apply_noise!(op, dms.density_matrix, target...)
 end
 
+"""
+    evolve!(dms::DensityMatrixSimulator{T, S<:AbstractMatrix{T}}, operations::Vector{Instruction}) -> DensityMatrixSimulator{T, S}
+
+Apply each operation of `operations` in-place to the density matrix contained in `dms`.
+
+Effectively, perform the operation:
+
+`` \\hat{\\rho} \\to \\hat{A}^\\dag \\hat{\\rho} \\hat{A} ``
+
+for each operation ``\\hat{A}`` in `operations`.
+"""
 function evolve!(
     dms::DensityMatrixSimulator{T,S},
     operations,
@@ -228,6 +254,14 @@ function apply_observables!(dms::DensityMatrixSimulator, observables)
     return dms
 end
 
+"""
+    expectation(dms::DensityMatrixSimulator, observable::Observables.Observable, targets::Int...) -> Float64
+
+Compute the exact (`shots=0`) expectation value of `observable` applied to `targets`
+given the evolved density matrix in `dms`. In other words, compute
+
+``\\mathrm{Tr}\\left(\\hat{O}\\hat{\\rho}\\right)``.
+"""
 function expectation(
     dms::DensityMatrixSimulator,
     observable::Observables.Observable,

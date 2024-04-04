@@ -1,7 +1,7 @@
 """
     StateVectorSimulator{T, S<:AbstractVector{T}} <: AbstractSimulator
 
-Simulator representing a pure state evolution of a statevector of type S, with element type T.
+Simulator representing a pure state evolution of a statevector of type `S`, with element type `T`. State vector simulators should be used to simulate circuits without noise.
 """
 mutable struct StateVectorSimulator{T,S<:AbstractVector{T}} <: AbstractSimulator
     state_vector::S
@@ -60,7 +60,7 @@ end
 """
     StateVectorSimulator([::T], qubit_count::Int, shots::Int) -> StateVectorSimulator{T, Vector{T}}
 
-Create a StateVectorSimulator with `2^qubit_count` elements and `shots` shots to be measured. The default element type is `ComplexF64`.
+Create a `StateVectorSimulator` with `2^qubit_count` elements and `shots` shots to be measured. The default element type is `ComplexF64`.
 """
 StateVectorSimulator(::Type{T}, qubit_count::Int, shots::Int) where {T<:Number} =
     StateVectorSimulator{T,StateVector{T}}(qubit_count, shots)
@@ -127,9 +127,15 @@ function reinit!(
 end
 
 """
-    evolve!(svs::StateVectorSimulator{T, S<:AbstractVector{T}}, operations::Vector{Instruction})
+    evolve!(svs::StateVectorSimulator{T, S<:AbstractVector{T}}, operations::Vector{Instruction}) -> StateVectorSimulator{T, S}
 
-Apply each operation of `operations` to the state vector contained in `svs`.
+Apply each operation of `operations` in-place to the state vector contained in `svs`.
+
+Effectively, perform the operation:
+
+`` \\left| \\psi \\right\\rangle \\to \\hat{A} \\left| \\psi \\right\\rangle ``
+
+for each operation ``\\hat{A}`` in `operations`.
 """
 function evolve!(
     svs::StateVectorSimulator{T,S},
@@ -251,6 +257,7 @@ end
 
 Compute the exact (`shots=0`) expectation value of `observable` applied to `targets`
 given the evolved state vector in `svs`. In other words, compute
+
 ``\\langle \\psi | \\hat{O} | \\psi \\rangle``.
 """
 function expectation(
