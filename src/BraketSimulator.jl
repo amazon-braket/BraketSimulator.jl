@@ -287,6 +287,16 @@ function _compute_exact_results(d::AbstractSimulator, program::Program, qc::Int,
     end
 end
 
+"""
+    simulate(d::AbstractSimulator, circuit_ir; shots::Int = 0, kwargs...) -> GateModelTaskResult
+
+Simulate the evolution of a statevector or density matrix using the simulator `d`.
+The instructions to apply (gates and noise channels) and measurements to make are
+encoded in `circuit_ir`. Supported IR formats are `OpenQASMProgram` (OpenQASM3)
+and `Program` (JAQCD). Returns a `GateModelTaskResult` containing the individual shot
+measurements (if `shots > 0`), final calculated results, circuit IR, and metadata
+about the task.
+"""
 function simulate(
     d::AbstractSimulator,
     circuit_ir::OpenQasmProgram;
@@ -371,20 +381,11 @@ end
 
 @setup_workload begin
     @compile_workload begin
-        function ghz_circuit(qubit_count::Int)
-           ghz_circ = Braket.Circuit()
-           Braket.H(ghz_circ, 0)
-           for target_qubit = 1:qubit_count-1
-               Braket.CNot(ghz_circ, 0, target_qubit)
-           end
-           return ghz_circ
-        end
         n_qubits = 10
         svs = StateVectorSimulator(n_qubits, 0)
         oq3_src = "OPENQASM 3.0;\nbit[10] b;\nqubit[10] q;\nh q[0];\ncnot q[0], q[1];\ncnot q[0], q[2];\ncnot q[0], q[3];\ncnot q[0], q[4];\ncnot q[0], q[5];\ncnot q[0], q[6];\ncnot q[0], q[7];\ncnot q[0], q[8];\ncnot q[0], q[9];\nb[0] = measure q[0];\nb[1] = measure q[1];\nb[2] = measure q[2];\nb[3] = measure q[3];\nb[4] = measure q[4];\nb[5] = measure q[5];\nb[6] = measure q[6];\nb[7] = measure q[7];\nb[8] = measure q[8];\nb[9] = measure q[9];"
         simulate(svs, Braket.OpenQasmProgram(Braket.header_dict[Braket.OpenQasmProgram], oq3_src, nothing); shots=10)
     end
 end
-#include("precompile.jl")
 
-end # module BraketCircuitSimulator
+end # module BraketSimulator
