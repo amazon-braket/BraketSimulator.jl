@@ -2,7 +2,7 @@
 
 julia_version = "1.9.4"
 manifest_format = "2.0"
-project_hash = "013428ab791092ad08067e2c8bc45fc1ffb25577"
+project_hash = "3730adb14f630d1373addb807f36fae3608e2d42"
 
 [[deps.AWS]]
 deps = ["Base64", "Compat", "Dates", "Downloads", "GitHub", "HTTP", "IniFile", "JSON", "MbedTLS", "Mocking", "OrderedCollections", "Random", "SHA", "Sockets", "URIs", "UUIDs", "XMLDict"]
@@ -18,7 +18,9 @@ version = "0.11.2"
 
 [[deps.Antlr4Runtime]]
 deps = ["EnumX", "Setfield"]
-path = "/Users/hyatkath/.julia/dev/Antlr4Runtime"
+git-tree-sha1 = "cbdbcc7ee51a38b965911936671c815aab906b2f"
+repo-rev = "main"
+repo-url = "git@ssh.gitlab.aws.dev:braket-science/antlr4runtime.git"
 uuid = "780548eb-20d3-4d14-b715-e70121e066d1"
 version = "0.1.2"
 
@@ -57,7 +59,9 @@ version = "0.1.8"
 
 [[deps.Braket]]
 deps = ["AWS", "AWSS3", "AxisArrays", "Base64", "CSV", "CodeTracking", "Compat", "DataStructures", "Dates", "DecFP", "Distributed", "Downloads", "Graphs", "HTTP", "InteractiveUtils", "JLD2", "JSON3", "LinearAlgebra", "Logging", "NamedTupleTools", "OrderedCollections", "Random", "StaticArrays", "Statistics", "StructTypes", "Tar", "UUIDs"]
-path = "/Users/hyatkath/.julia/dev/Braket"
+git-tree-sha1 = "13b4efaace055069aa90b275aca286c0c2dab80d"
+repo-rev = "ksh/oq3"
+repo-url = "git@ssh.gitlab.aws.dev:braket-science/braket.jl.git"
 uuid = "19504a0f-b47d-4348-9127-acc6cc69ef67"
 version = "0.8.2"
 
@@ -418,7 +422,9 @@ version = "0.8.1+0"
 
 [[deps.OpenQASM3]]
 deps = ["Antlr4Runtime", "EnumX"]
-path = "/Users/hyatkath/.julia/dev/OpenQASM3"
+git-tree-sha1 = "59618ac71d0e1ae50e2d032f9c963481f2d24383"
+repo-rev = "ksh/parameters_update"
+repo-url = "git@ssh.gitlab.aws.dev:braket-science/openqasm3.jl.git"
 uuid = "791dba98-90c7-4903-ae5f-ea3dc22ea9ce"
 version = "0.5.0"
 
@@ -430,9 +436,9 @@ version = "1.4.2"
 
 [[deps.OpenSSL_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "60e3045590bd104a16fefb12836c00c0ef8c7f8c"
+git-tree-sha1 = "3da7367955dcc5c54c1ba4d402ccdc09a1a3e046"
 uuid = "458c3c95-2e84-50aa-8efc-19380b2a3a95"
-version = "3.0.13+0"
+version = "3.0.13+1"
 
 [[deps.OpenSpecFun_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "Pkg"]
@@ -652,9 +658,9 @@ deps = ["InteractiveUtils", "Logging", "Random", "Serialization"]
 uuid = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [[deps.TranscodingStreams]]
-git-tree-sha1 = "a09c933bebed12501890d8e92946bbab6a1690f1"
+git-tree-sha1 = "71509f04d045ec714c4748c785a59045c3736349"
 uuid = "3bb67fe8-82b1-5028-8e26-92a6c54297fa"
-version = "0.10.5"
+version = "0.10.7"
 weakdeps = ["Random", "Test"]
 
     [deps.TranscodingStreams.extensions]
@@ -685,9 +691,9 @@ version = "1.6.1"
 
 [[deps.XML2_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Libiconv_jll", "Zlib_jll"]
-git-tree-sha1 = "07e470dabc5a6a4254ffebc29a1b3fc01464e105"
+git-tree-sha1 = "532e22cf7be8462035d092ff21fada7527e2c488"
 uuid = "02c8fc9c-b97f-50b9-bbe4-9be30ff0a78a"
-version = "2.12.5+0"
+version = "2.12.6+0"
 
 [[deps.XMLDict]]
 deps = ["EzXML", "IterTools", "OrderedCollections"]
