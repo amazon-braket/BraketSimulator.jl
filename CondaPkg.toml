@@ -5,3 +5,5 @@ channels = ["conda-forge"]
 python = ">=3.9,<4"
 amazon-braket-sdk = ">=1.76"
 amazon-braket-schemas = ">=1.21"
+amazon-braket-default-simulator = ">=1.21"
+sympy = ">=1.12"

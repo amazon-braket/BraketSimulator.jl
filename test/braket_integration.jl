@@ -10,8 +10,8 @@ using Braket: I, name
 
 @testset "Basic integration of local simulators with Braket.jl" begin
     @testset "Simulator $sim_type" for (sim_type, rt) in (
-        ("braket_jl_sv", Braket.StateVector),
-        ("braket_jl_dm", Braket.DensityMatrix),
+        ("braket_sv_v2", Braket.StateVector),
+        ("braket_dm_v2", Braket.DensityMatrix),
     )
         d = LocalSimulator(sim_type)
         @test d.backend == sim_type
@@ -19,7 +19,7 @@ using Braket: I, name
         H(c, 0, 1, 2)
         Rx(c, 0, 1, 2, 0.5)
         rt(c)
-        if sim_type == "braket_sv"
+        if sim_type == "braket_sv_v2"
             Amplitude(c, ["000", "111"])
         end
         r = d(c, shots = 0)
@@ -28,8 +28,8 @@ end
 
 @testset "Correctness" begin
     Braket.IRType[] = :JAQCD
-    PURE_DEVICE = LocalSimulator("braket_jl_sv")
-    NOISE_DEVICE = LocalSimulator("braket_jl_dm")
+    PURE_DEVICE = LocalSimulator("braket_sv_v2")
+    NOISE_DEVICE = LocalSimulator("braket_dm_v2")
     ALL_DEVICES = [PURE_DEVICE, NOISE_DEVICE]
     PURE_DEVICES = [PURE_DEVICE]
     NOISE_DEVICES = [NOISE_DEVICE]
@@ -104,8 +104,8 @@ end
     @testset "Local Braket Simulator" begin
         @testset for (backend, device_name) in [
             ("default", "StateVectorSimulator"),
-            ("braket_jl_sv", "StateVectorSimulator"),
-            ("braket_jl_dm", "DensityMatrixSimulator"),
+            ("braket_sv_v2", "StateVectorSimulator"),
+            ("braket_dm_v2", "DensityMatrixSimulator"),
         ]
             local_simulator_device = LocalSimulator(backend)
             @test name(local_simulator_device) == device_name

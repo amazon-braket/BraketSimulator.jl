@@ -74,7 +74,7 @@ supported_operations(d::DensityMatrixSimulator) =
     dm_props.action["braket.ir.openqasm.program"].supportedOperations
 supported_result_types(d::DensityMatrixSimulator) =
     dm_props.action["braket.ir.openqasm.program"].supportedResultTypes
-Braket.device_id(dms::DensityMatrixSimulator) = "braket_jl_dm"
+Braket.device_id(dms::DensityMatrixSimulator) = "braket_dm_v2"
 Braket.name(dms::DensityMatrixSimulator) = "DensityMatrixSimulator"
 Base.show(io::IO, dms::DensityMatrixSimulator) =
     print(io, "DensityMatrixSimulator(qubit_count=$(qubit_count(dms)), shots=$(dms.shots))")
