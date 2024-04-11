@@ -143,7 +143,7 @@ get_tol(shots::Int) = return (
         eigsz   = eigvals(kron(z_array, ho_mat))
         eigsh   = [-70.90875406, -31.04969387, 0, 3.26468993, 38.693758]
         eigsii  = eigvals(kron(i_array, kron(i_array, ho_mat3)))
-        d       = LocalSimulator("braket_jl_sv")
+        d       = LocalSimulator("braket_sv_v2")
         @testset "Obs $obs" for (obs, expected_mean, expected_var, expected_eigs) in
                                 [
             (Observables.I() * ho, meani, vari, eigsi),

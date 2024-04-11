@@ -77,7 +77,7 @@ supported_operations(svs::StateVectorSimulator) =
     sv_props.action["braket.ir.openqasm.program"].supportedOperations
 supported_result_types(svs::StateVectorSimulator) =
     sv_props.action["braket.ir.openqasm.program"].supportedResultTypes
-Braket.device_id(svs::StateVectorSimulator) = "braket_jl_sv"
+Braket.device_id(svs::StateVectorSimulator) = "braket_sv_v2"
 Braket.name(svs::StateVectorSimulator) = "StateVectorSimulator"
 Base.show(io::IO, svs::StateVectorSimulator) =
     print(io, "StateVectorSimulator(qubit_count=$(qubit_count(svs)), shots=$(svs.shots))")

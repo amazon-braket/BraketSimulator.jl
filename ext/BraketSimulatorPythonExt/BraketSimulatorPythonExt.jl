@@ -22,14 +22,16 @@ import BraketSimulator.Braket:
     IRObservable
 import BraketSimulator:
     AbstractSimulator,
-    classical_shadow,
     simulate,
     DoubleExcitation,
     SingleExcitation,
+    Control,
+    MultiQubitPhaseShift,
     MultiRZ
 
 const numpy     = Ref{Py}()
 const braket    = Ref{Py}()
+const sympy     = Ref{Py}()
 
 include("translation.jl")
 
@@ -37,10 +39,92 @@ function __init__()
     # must set these when this code is actually loaded
     braket[]    = pyimport("braket")
     numpy[]     = pyimport("numpy")
+    sympy[]     = pyimport("sympy")
+    PythonCall.pyconvert_add_rule("sympy.core.mul:Mul", Union{Float64, Braket.FreeParameter}, jl_convert_sympy_Mul)
+    PythonCall.pyconvert_add_rule("sympy.core.numbers:Pi", Float64, jl_convert_sympy_Pi)
+    PythonCall.pyconvert_add_rule("sympy.core.numbers:Exp1", Float64, jl_convert_sympy_E)
     PythonCall.pyconvert_add_rule("braket.schema_common.schema_header:BraketSchemaHeader", Braket.braketSchemaHeader, jl_convert_bsh)
     PythonCall.pyconvert_add_rule("braket.circuits.circuit:Circuit", BraketSimulator.Braket.IR.Program, jl_convert_circuit)
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.program_v1:Program", BraketSimulator.Braket.IR.Program, jl_convert_program)
     PythonCall.pyconvert_add_rule("braket.circuits.instruction:Instruction", Instruction, jl_convert_ix)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.openqasm.circuit:Circuit", Circuit, jl_convert_sim_circuit)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:Identity", Instruction, jl_convert_sim_identity)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:Hadamard", Instruction, jl_convert_sim_hadamard)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:PauliX", Instruction, jl_convert_sim_paulix)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:PauliY", Instruction, jl_convert_sim_pauliy)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:PauliZ", Instruction, jl_convert_sim_pauliz)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:CV", Instruction, jl_convert_sim_cv)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:CX", Instruction, jl_convert_sim_cx)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:CY", Instruction, jl_convert_sim_cy)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:CZ", Instruction, jl_convert_sim_cz)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:ECR", Instruction, jl_convert_sim_ecr)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:MS", Instruction, jl_convert_sim_ms)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:GPi", Instruction, jl_convert_sim_gpi)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:GPi2", Instruction, jl_convert_sim_gpi2)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:S", Instruction, jl_convert_sim_s)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:Si", Instruction, jl_convert_sim_si)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:V", Instruction, jl_convert_sim_v)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:Vi", Instruction, jl_convert_sim_vi)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:T", Instruction, jl_convert_sim_t)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:Ti", Instruction, jl_convert_sim_ti)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:PhaseShift", Instruction, jl_convert_sim_phaseshift)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:CPhaseShift", Instruction, jl_convert_sim_cphaseshift)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:CPhaseShift00", Instruction, jl_convert_sim_cphaseshift00)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:CPhaseShift01", Instruction, jl_convert_sim_cphaseshift01)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:CPhaseShift10", Instruction, jl_convert_sim_cphaseshift10)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:RotX", Instruction, jl_convert_sim_rx)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:RotY", Instruction, jl_convert_sim_ry)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:RotZ", Instruction, jl_convert_sim_rz)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:Swap", Instruction, jl_convert_sim_swap)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:ISwap", Instruction, jl_convert_sim_iswap)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:PSwap", Instruction, jl_convert_sim_pswap)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:CSwap", Instruction, jl_convert_sim_cswap)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:XY", Instruction, jl_convert_sim_xy)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:XX", Instruction, jl_convert_sim_xx)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:YY", Instruction, jl_convert_sim_yy)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:ZZ", Instruction, jl_convert_sim_zz)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:CCNot", Instruction, jl_convert_sim_ccnot)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:Unitary", Instruction, jl_convert_sim_unitary)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:U", Instruction, jl_convert_sim_u)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.gate_operations:GPhase", Instruction, jl_convert_sim_gphase)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.noise_operations:BitFlip", Instruction, jl_convert_sim_bitflip)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.noise_operations:PhaseFlip", Instruction, jl_convert_sim_phaseflip)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.noise_operations:PauliChannel", Instruction, jl_convert_sim_paulichannel)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.noise_operations:Depolarizing", Instruction, jl_convert_sim_depolarizing)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.noise_operations:TwoQubitDepolarizing", Instruction, jl_convert_sim_twoqubitdepolarizing)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.noise_operations:TwoQubitDephasing", Instruction, jl_convert_sim_twoqubitdephasing)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.noise_operations:AmplitudeDamping", Instruction, jl_convert_sim_amplitudedamping)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.noise_operations:GeneralizedAmplitudeDamping", Instruction, jl_convert_sim_generalizedamplitudedamping)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.noise_operations:PhaseDamping", Instruction, jl_convert_sim_phasedamping)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.noise_operations:Kraus", Instruction, jl_convert_sim_kraus)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.result_types:Expectation", Braket.Expectation, jl_convert_sim_expectation)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.result_types:Variance", Braket.Variance, jl_convert_sim_variance)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.result_types:Probability", Braket.Probability, jl_convert_sim_probability)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.result_types:StateVector", Braket.StateVector, jl_convert_sim_statevector)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.result_types:DensityMatrix", Braket.DensityMatrix, jl_convert_sim_densitymatrix)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.result_types:Amplitude", Braket.Amplitude, jl_convert_sim_amplitude)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.result_types:Amplitude", Braket.Result, jl_convert_sim_amplitude)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.result_types:Expectation", Braket.Result, jl_convert_sim_expectation)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.result_types:Probability", Braket.Result, jl_convert_sim_probability)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.result_types:StateVector", Braket.Result, jl_convert_sim_statevector)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.result_types:DensityMatrix", Braket.Result, jl_convert_sim_densitymatrix)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.result_types:Variance", Braket.Result, jl_convert_sim_variance)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.result_types:AdjointGradient", Braket.Result, jl_convert_sim_adjointgradient)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.result_types:AdjointGradient", Braket.AdjointGradient, jl_convert_sim_adjointgradient)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.observables:Identity", Braket.Observables.I, jl_convert_sim_identity)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.observables:Identity", Braket.Observables.Observable, jl_convert_sim_identity)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.observables:Hadamard", Braket.Observables.H, jl_convert_sim_hadamard)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.observables:Hadamard", Braket.Observables.Observable, jl_convert_sim_hadamard)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.observables:PauliX", Braket.Observables.X, jl_convert_sim_paulix)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.observables:PauliX", Braket.Observables.Observable, jl_convert_sim_paulix)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.observables:PauliY", Braket.Observables.Y, jl_convert_sim_pauliy)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.observables:PauliY", Braket.Observables.Observable, jl_convert_sim_pauliy)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.observables:PauliZ", Braket.Observables.Z, jl_convert_sim_pauliz)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.observables:PauliZ", Braket.Observables.Observable, jl_convert_sim_pauliz)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.observables:Hermitian", Braket.Observables.HermitianObservable, jl_convert_sim_hermitian)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.observables:Hermitian", Braket.Observables.Observable, jl_convert_sim_hermitian)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.observables:TensorProduct", Braket.Observables.TensorProduct, jl_convert_sim_tensorproduct)
+    PythonCall.pyconvert_add_rule("braket.default_simulator.observables:TensorProduct", Braket.Observables.Observable, jl_convert_sim_tensorproduct)
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.instructions:CNot", Instruction, jl_convert_cnot)
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.instructions:Kraus", Instruction, jl_convert_kraus)
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.instructions:TwoQubitDephasing", Instruction, jl_convert_twoqubitdeph)
@@ -151,6 +235,14 @@ function __init__()
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.results:Variance", AbstractProgramResult, jl_convert_variance)
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.results:AdjointGradient", AbstractProgramResult, jl_convert_adjointgradient)
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.results:AdjointGradient", AdjointGradient, jl_convert_adjointgradient)
+    PythonCall.pyconvert_add_rule("braket.ir.jaqcd.results:Amplitude", Braket.Result, jl_convert_amplitude)
+    PythonCall.pyconvert_add_rule("braket.ir.jaqcd.results:Expectation", Braket.Result, jl_convert_expectation)
+    PythonCall.pyconvert_add_rule("braket.ir.jaqcd.results:Probability", Braket.Result, jl_convert_probability)
+    PythonCall.pyconvert_add_rule("braket.ir.jaqcd.results:Sample", Braket.Result, jl_convert_sample)
+    PythonCall.pyconvert_add_rule("braket.ir.jaqcd.results:StateVector", Braket.Result, jl_convert_statevector)
+    PythonCall.pyconvert_add_rule("braket.ir.jaqcd.results:DensityMatrix", Braket.Result, jl_convert_densitymatrix)
+    PythonCall.pyconvert_add_rule("braket.ir.jaqcd.results:Variance", Braket.Result, jl_convert_variance)
+    PythonCall.pyconvert_add_rule("braket.ir.jaqcd.results:AdjointGradient", Braket.Result, jl_convert_adjointgradient)
     PythonCall.pyconvert_add_rule("braket.ir.openqasm.program_v1:Program", OpenQasmProgram, jl_convert_oqprogram)
 end
 
@@ -181,10 +273,14 @@ function simulate(
             push!(jl_specs, jl_prog)
             s_ix += 1
         end
-        #task_specs = nothing
         input = nothing
     end
     @debug "Time for conversion of specs and inputs: $(stats.time)."
+    if haskey(kwargs, :measured_qubits)
+        jl_mqs = [pyconvert(Int, q) for q in kwargs[:measured_qubits]]
+        kwargs = merge(Dict(kwargs...), Dict(:measured_qubits=>jl_mqs))
+    end
+
     PythonCall.GC.disable()
     if length(jl_specs) == 1
         r = simulate(d, jl_specs[1], args[1:end-1]...; inputs = jl_inputs, shots=shots, kwargs...)
@@ -328,10 +424,10 @@ end
 function Py(r::GateModelTaskResult, act)
     py_measurements  = isempty(r.measurements) ? PythonCall.pybuiltins.None : pylist(pylist(meas) for meas in r.measurements)
     py_probabilities = !isnothing(r.measurementProbabilities) ? pydict(Dict(pystr(k)=>v for (k,v) in r.measurementProbabilities)) : PythonCall.pybuiltins.None
-    py_qubits = !isnothing(r.measuredQubits) ? pylist(r.measuredQubits) : PythonCall.pybuiltins.None
-    py_results = pylist(r.resultTypes)
-    py_task_mtd = braket[].task_result.task_metadata_v1.TaskMetadata(id=pystr(r.taskMetadata.id), shots=Py(r.taskMetadata.shots), deviceId=pystr(r.taskMetadata.deviceId))
-    py_addl_mtd = braket[].task_result.additional_metadata.AdditionalMetadata(action=act)
+    py_qubits        = !isnothing(r.measuredQubits) ? pylist(r.measuredQubits) : PythonCall.pybuiltins.None
+    py_results       = pylist(Py(rtv) for rtv in r.resultTypes)
+    py_task_mtd      = braket[].task_result.task_metadata_v1.TaskMetadata(id=pystr(r.taskMetadata.id), shots=Py(r.taskMetadata.shots), deviceId=pystr(r.taskMetadata.deviceId))
+    py_addl_mtd      = braket[].task_result.additional_metadata.AdditionalMetadata(action=braket[].ir.openqasm.program_v1.Program(source=""))
     return braket[].task_result.GateModelTaskResult(measurements=py_measurements, measurementProbabilities=py_probabilities, resultTypes=py_results, measuredQubits=py_qubits, taskMetadata=py_task_mtd, additionalMetadata=py_addl_mtd)
 end
 

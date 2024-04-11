@@ -28,7 +28,7 @@ import Braket:
     device_id,
     bind_value!
 
-export StateVector, StateVectorSimulator, DensityMatrixSimulator, evolve!, simulate
+export StateVector, StateVectorSimulator, DensityMatrixSimulator, evolve!, simulate, U, MultiQubitPhaseShift, MultiRZ
 
 const StateVector{T} = Vector{T}
 const DensityMatrix{T} = Matrix{T}
@@ -72,18 +72,18 @@ function index_to_endian_bits(ix::Int, qc::Int)
     return bits
 end
 
-function _formatted_measurements(d::D) where {D<:AbstractSimulator}
+function _formatted_measurements(d::D, measured_qubits::Vector{Int}=collect(0:qubit_count(d)-1)) where {D<:AbstractSimulator}
     sim_samples = samples(d)
     qc          = qubit_count(d)
-    formatted   = [index_to_endian_bits(sample, qc) for sample in sim_samples]
+    formatted   = [index_to_endian_bits(sample, qc)[measured_qubits .+ 1] for sample in sim_samples]
     return formatted
 end
 
-_get_measured_qubits(qc::Int) = collect(0:qc-1)
 function _bundle_results(
     results::Vector{Braket.ResultTypeValue},
     circuit_ir::Program,
-    d::D,
+    d::D;
+    measured_qubits::Vector{Int} = collect(0:qubit_count(d)-1)
 ) where {D<:AbstractSimulator}
     task_mtd = Braket.TaskMetadata(
         Braket.header_dict[Braket.TaskMetadata],
@@ -106,8 +106,7 @@ function _bundle_results(
         nothing,
         nothing,
     )
-    formatted_samples = d.shots > 0 ? _formatted_measurements(d) : Vector{Int}[]
-    measured_qubits   = collect(0:qubit_count(d)-1)
+    formatted_samples = d.shots > 0 ? _formatted_measurements(d, measured_qubits) : Vector{Int}[]
     return Braket.GateModelTaskResult(
         Braket.header_dict[Braket.GateModelTaskResult],
         formatted_samples,
@@ -122,7 +121,8 @@ end
 function _bundle_results(
     results::Vector{Braket.ResultTypeValue},
     circuit_ir::OpenQasmProgram,
-    d::D,
+    d::D;
+    measured_qubits::Vector{Int} = collect(0:qubit_count(d)-1)
 ) where {D<:AbstractSimulator}
     task_mtd = Braket.TaskMetadata(
         Braket.header_dict[Braket.TaskMetadata],
@@ -145,8 +145,7 @@ function _bundle_results(
         nothing,
         nothing,
     )
-    formatted_samples = d.shots > 0 ? _formatted_measurements(d) : Vector{Int}[]
-    measured_qubits   = collect(0:qubit_count(d)-1)
+    formatted_samples = d.shots > 0 ? _formatted_measurements(d, measured_qubits) : Vector{Int}[]
     return Braket.GateModelTaskResult(
         Braket.header_dict[Braket.GateModelTaskResult],
         formatted_samples,
@@ -243,7 +242,9 @@ function simulate(
     end
     @debug "Time for evolution: $(stats.time)"
     results = shots == 0 && !isempty(program.results) ? _compute_exact_results(d, program, qc, inputs) : [Braket.ResultTypeValue(rt, 0.0) for rt in program.results]
-    stats   = @timed _bundle_results(results, circuit_ir, d)
+    mqs     = get(kwargs, :measured_qubits, collect(0:qc-1))
+    isempty(mqs) && (mqs = collect(0:qc-1))
+    stats   = @timed _bundle_results(results, circuit_ir, d; measured_qubits=mqs)
     @debug "Time for results bundling: $(stats.time)"
     res = stats.value
     return res
@@ -273,7 +274,9 @@ function simulate(
     end
     @debug "Time for evolution: $(stats.time)"
     results = shots == 0 && !isempty(circuit_ir.results) ? _compute_exact_results(d, circuit_ir, qc, inputs) : Braket.ResultTypeValue[]
-    stats = @timed _bundle_results(results, circuit_ir, d)
+    mqs     = get(kwargs, :measured_qubits, collect(0:qc-1))
+    isempty(mqs) && (mqs = collect(0:qc-1))
+    stats = @timed _bundle_results(results, circuit_ir, d; measured_qubits=mqs)
     @debug "Time for results bundling: $(stats.time)"
     res = stats.value
     return res
@@ -291,9 +294,9 @@ include("sv_simulator.jl")
 include("dm_simulator.jl")
 
 function __init__()
-    Braket._simulator_devices[]["braket_jl_dm"] =
+    Braket._simulator_devices[]["braket_dm_v2"] =
         DensityMatrixSimulator{ComplexF64,DensityMatrix{ComplexF64}}
-    Braket._simulator_devices[]["braket_jl_sv"] =
+    Braket._simulator_devices[]["braket_sv_v2"] =
         StateVectorSimulator{ComplexF64,StateVector{ComplexF64}}
     Braket._simulator_devices[]["default"] =
         StateVectorSimulator{ComplexF64,StateVector{ComplexF64}}
