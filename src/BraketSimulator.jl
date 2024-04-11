@@ -28,7 +28,7 @@ import Braket:
     device_id,
     bind_value!
 
-export StateVector, StateVectorSimulator, DensityMatrixSimulator, evolve!, classical_shadow, simulate
+export StateVector, StateVectorSimulator, DensityMatrixSimulator, evolve!, simulate
 
 const StateVector{T} = Vector{T}
 const DensityMatrix{T} = Matrix{T}
@@ -192,85 +192,6 @@ function _translate_result_types(
         is_ag ? [JSON3.read(r, Braket.AdjointGradient) for r in raw_results] :
         [JSON3.read(r, Braket.Result) for r in raw_results]
     return translated_results
-end
-
-function classical_shadow(
-    d::LocalSimulator,
-    obs_qubits::Vector{Int},
-    circuit::Program,
-    shots::Int,
-    seed::Int,
-)
-    n_qubits = length(obs_qubits)
-    n_snapshots = shots
-    recipes = rand(Xoshiro(seed), 0:2, (n_snapshots, n_qubits))
-    outcomes = compute_shadows(d._delegate, circuit, recipes, obs_qubits)
-    return outcomes, recipes
-end
-function classical_shadow(
-    d::LocalSimulator,
-    obs_qubits::Vector{Vector{Int}},
-    circuits::Vector{Program},
-    shots::Int,
-    seed::Vector{Int},
-)
-    all_outcomes =
-        [zeros(Float64, (shots, length(obs_qubits[ix]))) for ix = 1:length(circuits)]
-    all_recipes = [zeros(Int, (shots, length(obs_qubits[ix]))) for ix = 1:length(circuits)]
-    Threads.@threads for ix = 1:length(circuits)
-        start = time()
-        outcomes, recipes =
-            classical_shadow(d, obs_qubits[ix], circuits[ix], shots, seed[ix])
-        stop = time()
-        @views begin
-            all_outcomes[ix] .= outcomes
-            all_recipes[ix] .= recipes
-        end
-    end
-    return all_outcomes, all_recipes
-end
-
-function compute_shadows(
-    d::AbstractSimulator,
-    circuit_ir::Program,
-    recipes,
-    obs_qubits;
-    kwargs...,
-)
-    qc = qubit_count(circuit_ir)
-    _validate_ir_instructions_compatibility(d, circuit_ir, Val(:JAQCD))
-    operations = circuit_ir.instructions
-    operations = [Instruction(op) for op in operations]
-    _validate_operation_qubits(operations)
-
-    n_snapshots = size(recipes, 1)
-    n_qubits = size(recipes, 2)
-    reinit!(d, qc, n_snapshots)
-    d = evolve!(d, operations)
-    snapshot_d = similar(d, shots = 1)
-    qubit_inds =
-        [findfirst(q -> q == oq, 0:maximum(qubits(circuit_ir))) for oq in obs_qubits]
-    any(isnothing, qubit_inds) && throw(
-        ErrorException(
-            "one of obs_qubits ($obs_qubits) not present in circuit with qubits $(sort(collect(qubits(circuit_ir)))).",
-        ),
-    )
-    measurements = Matrix{Int}(undef, n_snapshots, n_qubits)
-    for s_ix = 1:n_snapshots
-        copyto!(snapshot_d, d)
-        snapshot_rotations = reduce(
-            vcat,
-            [
-                diagonalizing_gates(OBS_LIST[recipes[s_ix, wire_idx]+1], [wire]) for
-                (wire_idx, wire) in enumerate(obs_qubits)
-            ],
-        )
-        snapshot_d = evolve!(snapshot_d, snapshot_rotations)
-        @views begin
-            measurements[s_ix, :] .= _formatted_measurements(snapshot_d)[1][qubit_inds]
-        end
-    end
-    return measurements
 end
 
 function _compute_exact_results(d::AbstractSimulator, program::Program, qc::Int, inputs::Dict{String, Float64})
