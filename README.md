@@ -47,6 +47,27 @@ Launch Julia with the command line option `-t auto` to have Julia launch and man
 
 Keep in mind that the first qubit has index `0`, **not** index `1`.
 
+## Example
+
+In this example, we create a [Greenberger-Horne-Zeilinger (GHZ) state](https://en.wikipedia.org/wiki/Greenberger%E2%80%93Horne%E2%80%93Zeilinger_state) and simulate it:
+
+```julia
+using Braket, BraketSimulator
+
+function ghz_circuit(qubit_count::Int)
+    ghz_circ = Circuit()
+    H(ghz_circ, 0)
+    for target_qubit = 1:qubit_count-1
+        CNot(ghz_circ, 0, target_qubit)
+    end
+    return ghz_circ 
+end
+
+device = LocalSimulator("braket_sv_v2")
+n_qubits = 10
+task_result = simulate(device, ghz_circuit(n_qubits), shots=10)
+```
+
 ## Security
 
 See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
