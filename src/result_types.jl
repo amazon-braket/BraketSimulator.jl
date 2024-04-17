@@ -46,23 +46,6 @@ function make_alias_table!(
     nothing
 end
 
-function alg3!(rng, n, x, p)
-    idx = 1
-    cumProbSum = 0
-    curX = 0
-    for i ∈ n:-1:1
-        ## sample from Beta(1, i)
-        _p = rand(rng)
-        β = (1 - (1 - _p)^(1 / i))
-        curX = muladd(β, (1 - curX), curX)
-        while cumProbSum < curX
-            cumProbSum += p[idx]
-            idx += 1
-        end
-        x[n-i+1] = idx - 1
-    end
-end
-
 function samples(s::AbstractSimulator)
     p   = probabilities(s)
     wv  = Weights(p)

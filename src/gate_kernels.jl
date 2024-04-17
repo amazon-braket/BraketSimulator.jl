@@ -113,38 +113,6 @@ apply_gate!(::Val{false}, g::I, state_vec::StateVector{T}, qubit::Int) where {T<
 apply_gate!(::Val{true}, g::I, state_vec::StateVector{T}, qubit::Int) where {T<:Complex} =
     return
 
-for (G, g_mat) in (
-        (:X, matrix_rep(X())),
-        (:Y, matrix_rep(Y())),
-        (:Z, matrix_rep(Z())),
-        (:H, matrix_rep(H())),
-        (:V, matrix_rep(V())),
-        (:Vi, matrix_rep(Vi())),
-        (:S, matrix_rep(S())),
-        (:Si, matrix_rep(Si())),
-        (:T, matrix_rep(T())),
-        (:Ti, matrix_rep(Ti())),
-    ),
-    (is_conj, g00, g10, g01, g11) in ((false, g_mat...), (true, conj(g_mat)...))
-
-    @eval begin
-        @inline gate_kernel(
-            ::Val{$is_conj},
-            ::Val{:lower},
-            g::$G,
-            lower_amp::Tv,
-            higher_amp::Tv,
-        ) where {Tv<:Complex} = $g00 * lower_amp + $g01 * higher_amp
-        @inline gate_kernel(
-            ::Val{$is_conj},
-            ::Val{:higher},
-            g::$G,
-            lower_amp::Tv,
-            higher_amp::Tv,
-        ) where {Tv<:Complex} = $g10 * lower_amp + $g11 * higher_amp
-    end
-end
-
 function apply_gate!(
     g_mat::Union{SMatrix{2,2,T}, Diagonal{T,SVector{2,T}}},
     state_vec::StateVector{T},
