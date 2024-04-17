@@ -23,6 +23,7 @@ import BraketSimulator.Braket:
 import BraketSimulator:
     AbstractSimulator,
     simulate,
+    parse_program,
     DoubleExcitation,
     SingleExcitation,
     Control,
@@ -244,6 +245,19 @@ function __init__()
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.results:Variance", Braket.Result, jl_convert_variance)
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.results:AdjointGradient", Braket.Result, jl_convert_adjointgradient)
     PythonCall.pyconvert_add_rule("braket.ir.openqasm.program_v1:Program", OpenQasmProgram, jl_convert_oqprogram)
+end
+
+function BraketSimulator.parse_program(d::D, program::OpenQasmProgram, shots::Int) where {D<:AbstractSimulator}
+    pc = braket[].default_simulator.openqasm.program_context.ProgramContext()
+    interp = braket[].default_simulator.openqasm.interpreter.Interpreter(pc)
+    inputs = isnothing(program.inputs) ? pybuiltins.None : pydict(program.inputs)
+    py_circ = interp.build_circuit(source=pystr(program.source), inputs=inputs, is_file=endswith(program.source, ".qasm"))
+    if shots > 0
+        bris = py_circ.basis_rotation_instructions
+        py_circ.instructions += bris
+    end
+    program = ir(pyconvert(Circuit, py_circ), Val(:JAQCD))
+    return program 
 end
 
 function simulate(

@@ -9,7 +9,6 @@ using Braket,
     StaticArrays,
     StatsBase,
     Combinatorics,
-    OpenQASM3,
     UUIDs,
     JSON3,
     Random
@@ -40,28 +39,14 @@ Braket.name(s::AbstractSimulator) = device_id(s)
 ap_size(shots::Int, qubit_count::Int) = (shots > 0 && qubit_count < 30) ? 2^qubit_count : 0
 
 include("validation.jl")
-include("builtins.jl")
 include("custom_gates.jl")
-include("openqasm.jl")
 
 const BuiltinGates = merge(Braket.StructTypes.subtypes(Braket.Gate), custom_gates) 
 
 const OBS_LIST = (Observables.X(), Observables.Y(), Observables.Z())
 const CHUNK_SIZE = 2^10
 
-function parse_program(d::D, program::OpenQasmProgram, shots::Int) where {D<:AbstractSimulator}
-    if endswith(program.source, "qasm") && isfile(program.source)
-        parsed_prog      = OpenQASM3.parse(read(program.source, String))
-    else
-        parsed_prog      = OpenQASM3.parse(program.source)
-    end
-    interpreted_circ = interpret(parsed_prog, program.inputs)
-    if shots > 0
-        Braket.validate_circuit_and_shots(interpreted_circ, shots)
-        Braket.basis_rotation_instructions!(interpreted_circ)
-    end
-    return convert(Braket.Program, interpreted_circ)
-end
+parse_program(d, program, shots::Int) = throw(MethodError(parse_program, (d, program, shots)))
 
 function index_to_endian_bits(ix::Int, qc::Int)
     bits = Vector{Int}(undef, qc)
@@ -300,16 +285,6 @@ function __init__()
         StateVectorSimulator{ComplexF64,StateVector{ComplexF64}}
     Braket._simulator_devices[]["default"] =
         StateVectorSimulator{ComplexF64,StateVector{ComplexF64}}
-end
-
-
-@setup_workload begin
-    @compile_workload begin
-        n_qubits = 10
-        svs = StateVectorSimulator(n_qubits, 0)
-        oq3_src = "OPENQASM 3.0;\nbit[10] b;\nqubit[10] q;\nh q[0];\ncnot q[0], q[1];\ncnot q[0], q[2];\ncnot q[0], q[3];\ncnot q[0], q[4];\ncnot q[0], q[5];\ncnot q[0], q[6];\ncnot q[0], q[7];\ncnot q[0], q[8];\ncnot q[0], q[9];\nb[0] = measure q[0];\nb[1] = measure q[1];\nb[2] = measure q[2];\nb[3] = measure q[3];\nb[4] = measure q[4];\nb[5] = measure q[5];\nb[6] = measure q[6];\nb[7] = measure q[7];\nb[8] = measure q[8];\nb[9] = measure q[9];"
-        simulate(svs, Braket.OpenQasmProgram(Braket.header_dict[Braket.OpenQasmProgram], oq3_src, nothing); shots=10)
-    end
 end
 
 end # module BraketSimulator
