@@ -10,12 +10,12 @@ function matrix_rep(g::DoubleExcitation)
     cosϕ = cos(g.angle[1] / 2.0)
     sinϕ = sin(g.angle[1] / 2.0)
 
-    mat = diagm(ones(T, 16))
-    mat[4, 4] = cosϕ
+    mat = diagm(ones(ComplexF64, 16))
+    mat[4, 4]   = cosϕ
     mat[13, 13] = cosϕ
-    mat[4, 13] = -sinϕ
-    mat[13, 4] = sinϕ
-    return SMatrix{32,32,ComplexF64}(mat)
+    mat[4, 13]  = -sinϕ
+    mat[13, 4]  = sinϕ
+    return SMatrix{16,16,ComplexF64}(mat)
 end
 
 struct SingleExcitation <: AngledGate{1}
@@ -29,7 +29,7 @@ Base.inv(g::SingleExcitation) = SingleExcitation(-g.angle[1])
 function matrix_rep(g::SingleExcitation)
     cosϕ = cos(g.angle[1] / 2.0)
     sinϕ = sin(g.angle[1] / 2.0)
-    return SMatrix{4,4,ComplexF64}([1.0 0 0 0; 0 cosϕ -sinϕ 0; 0 sinϕ cosϕ 0; 0 0 0 1.0])
+    return SMatrix{4,4,ComplexF64}([1.0 0 0 0; 0 cosϕ sinϕ 0; 0 -sinϕ cosϕ 0; 0 0 0 1.0])
 end
 struct MultiRZ <: AngledGate{1}
     angle::NTuple{1,Union{Float64,FreeParameter}}
@@ -51,6 +51,7 @@ function matrix_rep(g::U)
 end
 Braket.chars(::Type{U}) = "U(ang)"
 Braket.qubit_count(g::U) = 1
+Base.inv(g::U) = U(-g.angle[1], -g.angle[3], -g.angle[2])
 
 struct MultiQubitPhaseShift{N} <: AngledGate{1}
     angle::NTuple{1,Union{Float64,FreeParameter}}
@@ -131,10 +132,11 @@ for V in (false, true)
             ordered_ts = sort(collect(endian_ts))
             cosϕ = cos(g.angle[1] / 2.0)
             sinϕ = sin(g.angle[1] / 2.0)
+            e_t1, e_t2, e_t3, e_t4 = endian_ts
             Threads.@threads for ix = 0:div(n_amps, 2^4)-1
                 padded_ix = pad_bits(ix, ordered_ts)
-                i0011 = flip_bits(padded_ix, (t3, t4)) + 1
-                i1100 = flip_bits(padded_ix, (t1, t2)) + 1
+                i0011 = flip_bits(padded_ix, (e_t3, e_t4)) + 1
+                i1100 = flip_bits(padded_ix, (e_t1, e_t2)) + 1
                 @inbounds begin
                     amp0011 = state_vec[i0011]
                     amp1100 = state_vec[i1100]
@@ -172,15 +174,15 @@ function matrix_rep(c::Control{G, B}) where {G<:Gate, B}
     return full_mat
 end
 function matrix_rep(c::Control{MultiQubitPhaseShift{N}, B}) where {N, B}
-    g_mat = matrix_rep(c.g)
-    qc    = N 
-    ctrl_ix   = 0
+    g_mat    = matrix_rep(c.g)
+    qc       = N 
+    ctrl_ix  = 0
     full_mat = ones(ComplexF64, 2^N)
     for (b_ix, b) in enumerate(c.bitvals)
         ctrl_ix += b << (b_ix - 1)
     end
     for inner_ix in 1:2^N
-        full_mat[inner_ix] = g_mat[inner_ix]
+        full_mat[inner_ix] = (inner_ix == ctrl_ix+1) ? g_mat[inner_ix, inner_ix] : one(ComplexF64)
     end
     return Diagonal(SVector{2^N, ComplexF64}(full_mat))
 end

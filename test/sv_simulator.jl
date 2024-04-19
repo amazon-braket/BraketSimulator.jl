@@ -306,4 +306,63 @@ funcs = CUDA.functional() ? (identity, cu) : (identity,)
             @test samples[0] + samples[3] == 10000
         end
     end
+    @testset "similar, copy and copyto!" begin
+        qubit_count = 10
+        orig = StateVectorSimulator(qubit_count, 0)
+        sim  = similar(orig, shots=100)
+        @test sim.shots  == 100
+        @test orig.shots == 0
+        sim.state_vector = 1/√2^qubit_count .* ones(ComplexF64, 2^qubit_count)
+        sim2 = copy(sim)
+        @test sim2.shots == 100
+        @test sim2.state_vector  == 1/√2^qubit_count .* ones(ComplexF64, 2^qubit_count)
+        sim.state_vector = 1/√2^qubit_count .* [exp(im*rand()) for ix in 1:2^qubit_count]
+        copyto!(sim2, sim)
+        @test sim2.state_vector ≈ sim.state_vector
+    end
+    @testset "supported operations and results" begin
+        qubit_count = 10
+        sim = StateVectorSimulator(qubit_count, 0)
+        @test BraketSimulator.supported_operations(sim) == [
+                "U",
+                "GPhase",
+                "ccnot",
+                "cnot",
+                "cphaseshift",
+                "cphaseshift00",
+                "cphaseshift01",
+                "cphaseshift10",
+                "cswap",
+                "cv",
+                "cy",
+                "cz",
+                "ecr",
+                "gpi",
+                "gpi2",
+                "h",
+                "i",
+                "iswap",
+                "ms",
+                "pswap",
+                "phaseshift",
+                "rx",
+                "ry",
+                "rz",
+                "s",
+                "si",
+                "swap",
+                "t",
+                "ti",
+                "unitary",
+                "v",
+                "vi",
+                "x",
+                "xx",
+                "xy",
+                "y",
+                "yy",
+                "z",
+                "zz",
+            ]
+    end
 end

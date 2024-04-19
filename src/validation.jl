@@ -74,13 +74,15 @@ function _validate_shots_and_ir_results(shots::Int, results, qubit_count::Int)
 end
 function _validate_input_provided(circuit)
     for instruction in circuit.instructions
-        possible_parameters = Symbol("_angle"), Symbol("_angle_1"), Symbol("_angle_2")
+        possible_parameters = (Symbol("_angle"), Symbol("_angle_1"), Symbol("_angle_2"), Symbol("angle"))
         for parameter_name in possible_parameters
-            if parameter_name ∈ propertynames(instruction.operator)
-                try
-                    Float64(param)
-                catch ex
-                    throw("Missing input variable '$param'.")
+            if hasproperty(instruction.operator, parameter_name)
+                for param in getproperty(instruction.operator, parameter_name)
+                    try
+                        Float64(param)
+                    catch ex
+                        throw(ErrorException("Missing input variable '$param'."))
+                    end
                 end
             end
         end
@@ -100,16 +102,15 @@ function _validate_ir_instructions_compatibility(
         if name in _NOISE_INSTRUCTIONS
             no_noise = false
             if name ∉ supported_instructions
-                throw("Noise instructions are not supported by the state vector simulator (by default). You need to use the density matrix simulator: LocalSimulator(\"braket_dm\").")
+                throw(ErrorException("Noise instructions are not supported by the state vector simulator (by default). You need to use the density matrix simulator: LocalSimulator(\"braket_dm_v2\")."))
             end
         end
-        if no_noise && !isempty(intersect(_NOISE_INSTRUCTIONS, supported_instructions))
-            @warn "You are running a noise-free circuit on the density matrix simulator. Consider running this circuit on the state vector simulator: LocalSimulator(\"default\") for a better user experience."
-        end
+    end
+    if no_noise && !isempty(intersect(_NOISE_INSTRUCTIONS, supported_instructions))
+        @warn "You are running a noise-free circuit on the density matrix simulator. Consider running this circuit on the state vector simulator: LocalSimulator(\"braket_sv_v2\") for a better user experience."
     end
     return
 end
-
         
 function _validate_ir_instructions_compatibility(
     d::D,
@@ -119,19 +120,16 @@ function _validate_ir_instructions_compatibility(
     circuit_instruction_names = [replace(lowercase(string(typeof(ix.operator))), "_"=>"") for ix in circuit.instructions] 
     supported_instructions    = Set(replace(lowercase(op), "_"=>"") for op in properties(d).action["braket.ir.openqasm.program"].supportedOperations)
     no_noise = true
-    println("circuit instruction names: $circuit_instruction_names")
-    println("supported_instructions: $supported_instructions")
-    flush(stdout)
     for name in circuit_instruction_names
         if name in _NOISE_INSTRUCTIONS
             no_noise = false
             if name ∉ supported_instructions
-                throw("Noise instructions are not supported by the state vector simulator (by default). You need to use the density matrix simulator: LocalSimulator(\"braket_dm\").")
+                throw(ErrorException("Noise instructions are not supported by the state vector simulator (by default). You need to use the density matrix simulator: LocalSimulator(\"braket_dm_v2\")."))
             end
         end
-        if no_noise && !isempty(intersect(_NOISE_INSTRUCTIONS, supported_instructions))
-            @warn "You are running a noise-free circuit on the density matrix simulator. Consider running this circuit on the state vector simulator: LocalSimulator(\"default\") for a better user experience."
-        end
+    end
+    if no_noise && !isempty(intersect(_NOISE_INSTRUCTIONS, supported_instructions))
+        @warn "You are running a noise-free circuit on the density matrix simulator. Consider running this circuit on the state vector simulator: LocalSimulator(\"braket_sv_v2\") for a better user experience."
     end
     return
 end

@@ -13,10 +13,10 @@ funcs = CUDA.functional() ? (identity, cu) : (identity,)
         si = ComplexF64[1 0; 0 1]
         matrix_1q = sx
         matrix_2q = kron(sx, si)
-        #matrix_2q = kron(si, sx)
         matrix_3q = kron(sx, kron(si, si))
         matrix_4q = kron(kron(sx, si), kron(si, si))
         matrix_5q = kron(sx, kron(kron(sx, si), kron(si, si)))
+        matrix_5qi = ones(ComplexF64, 32, 32)
         density_matrix_2q = zeros(ComplexF64, 4, 4)
         density_matrix_2q[3, 3] = 1.0
         density_matrix_3q = zeros(ComplexF64, 8, 8)
@@ -228,6 +228,41 @@ funcs = CUDA.functional() ? (identity, cu) : (identity,)
                     0.0,
                 ],
             ),
+            ([Instruction(Kraus([matrix_5q, 0.0 * matrix_5qi]), [0, 1, 2, 3, 4])], 5, density_matrix_5q, [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                ],
+            ),
         ]
             simulation = f(DensityMatrixSimulator(qubit_count, 0))
             simulation = evolve!(simulation, instructions)
@@ -350,5 +385,74 @@ funcs = CUDA.functional() ? (identity, cu) : (identity,)
             @test 0.4 < samples[3] / (samples[0] + samples[3]) < 0.6
             @test samples[0] + samples[3] == 10000
         end
+    end
+    @testset "similar, copy and copyto!" begin
+        qubit_count = 10
+        orig = DensityMatrixSimulator(qubit_count, 0)
+        sim  = similar(orig, shots=100)
+        @test sim.shots  == 100
+        @test orig.shots == 0
+        sim.density_matrix = Matrix(Diagonal(1/2^qubit_count .* ones(ComplexF64, 2^qubit_count)))
+        sim2 = copy(sim)
+        @test sim2.shots == 100
+        @test sim2.density_matrix == Matrix(Diagonal( 1/2^qubit_count .* ones(ComplexF64, 2^qubit_count)))
+        sim.density_matrix = Matrix(Diagonal(1/√2^qubit_count .* [exp(im*rand()) for ix in 1:2^qubit_count]))
+        copyto!(sim2, sim)
+        @test sim2.density_matrix ≈ sim.density_matrix
+    end
+    @testset "supported operations and results" begin
+        qubit_count = 10
+        sim = DensityMatrixSimulator(qubit_count, 0)
+        @test BraketSimulator.supported_operations(sim) == [
+                "U",
+                "GPhase",
+                "ccnot",
+                "cnot",
+                "cphaseshift",
+                "cphaseshift00",
+                "cphaseshift01",
+                "cphaseshift10",
+                "cswap",
+                "cv",
+                "cy",
+                "cz",
+                "ecr",
+                "gpi",
+                "gpi2",
+                "h",
+                "i",
+                "iswap",
+                "ms",
+                "pswap",
+                "phaseshift",
+                "rx",
+                "ry",
+                "rz",
+                "s",
+                "si",
+                "swap",
+                "t",
+                "ti",
+                "unitary",
+                "v",
+                "vi",
+                "x",
+                "xx",
+                "xy",
+                "y",
+                "yy",
+                "z",
+                "zz",
+                "bit_flip",
+                "phase_flip",
+                "pauli_channel",
+                "depolarizing",
+                "two_qubit_depolarizing",
+                "two_qubit_dephasing",
+                "amplitude_damping",
+                "generalized_amplitude_damping",
+                "phase_damping",
+                "kraus",
+            ]
     end
 end

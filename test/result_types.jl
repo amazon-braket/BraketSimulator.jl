@@ -208,10 +208,18 @@ funcs = CUDA.functional() ? (identity, cu) : (identity,)
             @test calculated ≈ from_diagonalization atol = 1e-12
         end
         @testset "Density matrix $qubit" for (qubit, mat) in dm_dict
-            dm = DensityMatrix(qubit)
+            dm  = DensityMatrix(qubit)
             sim = simulation(nothing, f, sim_type)
             calculated = BraketSimulator.calculate(dm, sim)
             @test collect(calculated) ≈ mat rtol = 1e-6
         end
+    end
+    @testset "Permutation of probability/density matrix" begin
+        sim = BraketSimulator.StateVectorSimulator(4, 0)
+        sim.state_vector = state_vector()
+        sv = BraketSimulator.calculate(Braket.Probability(reverse(0:3)), sim)
+        @test sv ≈ conj(state_vector()) .* state_vector()
+        dm = BraketSimulator.calculate(Braket.DensityMatrix(reverse(0:3)), sim)
+        @test dm ≈ kron(adjoint(state_vector()), state_vector())
     end
 end

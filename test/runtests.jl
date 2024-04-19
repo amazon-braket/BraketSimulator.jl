@@ -5,6 +5,9 @@ Aqua.test_all(BraketSimulator, ambiguities=false, piracies=false, persistent_tas
 @testset "BraketSimulator" begin
     for test in (
         "python_ext",
+        "validation",
+        "custom_gates",
+        "gate_operations",
         "sv_simulator",
         "dm_simulator",
         "utils",
