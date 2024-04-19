@@ -361,7 +361,7 @@ function Py(rt::Braket.ResultTypeValue)
     elseif rt.value isa Vector{Vector{Vector{Float64}}}
         pylist(pylist(pycomplex(v_...) for v_ in v) for v in rt.value)
     else
-        pylist(rt.value)
+        Py(rt.value).to_numpy()
     end
     return braket[].task_result.gate_model_task_result_v1.ResultTypeValue(type=py_typ, value=py_val)
 end
