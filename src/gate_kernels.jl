@@ -41,6 +41,12 @@ matrix_rep(g::Si) = SMatrix{2,2}([1.0 0.0; 0.0 -im])
 matrix_rep(g::T) = SMatrix{2,2}([1.0 0.0; 0.0 exp(im * π / 4.0)])
 matrix_rep(g::Ti) = SMatrix{2,2}([1.0 0.0; 0.0 exp(-im * π / 4.0)])
 
+matrix_rep(g::CNot) = SMatrix{4,4}(complex([1.0 0.0 0.0 0.0; 0.0 1.0 0.0 0.0; 0.0 0.0 0.0 1.0; 0.0 0.0 1.0 0.0]))
+matrix_rep(g::CY) = SMatrix{4,4}([1.0 0.0 0.0 0.0; 0.0 1.0 0.0 0.0; 0.0 0.0 0.0 -im; 0.0 0.0 im 0.0])
+matrix_rep(g::CZ) = SMatrix{4,4}(complex([1.0 0.0 0.0 0.0; 0.0 1.0 0.0 0.0; 0.0 0.0 1.0 0.0; 0.0 0.0 0.0 -1.0]))
+matrix_rep(g::CV) = SMatrix{4,4}([1.0 0.0 0.0 0.0; 0.0 1.0 0.0 0.0; 0.0 0.0 0.5+0.5im 0.5-0.5im; 0.0 0.0 0.5-0.5im 0.5+0.5im])
+matrix_rep(g::CCNot) = SMatrix{8,8}(complex([1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0; 0.0 1.0 0.0 0.0 0.0 0.0 0.0 0.0; 0.0 0.0 1.0 0.0 0.0 0.0 0.0 0.0; 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0; 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0; 0.0 0.0 0.0 0.0 0.0 1.0 0.0 0.0; 0.0 0.0 0.0 0.0 0.0 0.0 0.0 1.0; 0.0 0.0 0.0 0.0 0.0 0.0 1.0 0.0]))
+matrix_rep(g::CSwap) = SMatrix{8,8}(complex([1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0; 0.0 1.0 0.0 0.0 0.0 0.0 0.0 0.0; 0.0 0.0 1.0 0.0 0.0 0.0 0.0 0.0; 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0; 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0; 0.0 0.0 0.0 0.0 0.0 0.0 1.0 0.0; 0.0 0.0 0.0 0.0 0.0 1.0 0.0 0.0; 0.0 0.0 0.0 0.0 0.0 0.0 0.0 1.0]))
 matrix_rep(g::Rz) =
     SMatrix{2,2}([exp(-im * g.angle[1] / 2.0) 0.0; 0.0 exp(im * g.angle[1] / 2.0)])
 matrix_rep(g::Rx) = SMatrix{2,2}(
@@ -60,7 +66,7 @@ matrix_rep(g::Ry) = SMatrix{2,2}(
 matrix_rep(g::GPi) =
     SMatrix{2,2}(complex([0 exp(-im * g.angle[1]); exp(im * g.angle[1]) 0]))
 matrix_rep(g::GPi2) =
-    SMatrix{2,2}(complex([1.0 -im*exp(-im * g.angle[1]); -im*exp(im * g.angle[1]) 1.0]))
+    SMatrix{2,2}(1/√2 * complex([1.0 -im*exp(-im * g.angle[1]); -im*exp(im * g.angle[1]) 1.0]))
 matrix_rep(g::MS) = SMatrix{4,4}(
     complex(
         [
@@ -105,12 +111,12 @@ matrix_rep(g::ZZ) = SMatrix{4,4}(
     ]),
 )
 matrix_rep(g::ECR) =
-    SMatrix{4,4}([0.0 0.0 1.0 im; 0.0 0.0 im 1.0; 1.0 -im 0.0 0.0; -im 1.0 0.0 0.0])
+    SMatrix{4,4}(1/√2 * [0.0 0.0 1.0 im; 0.0 0.0 im 1.0; 1.0 -im 0.0 0.0; -im 1.0 0.0 0.0])
 matrix_rep(g::Unitary) = g.matrix
 
-apply_gate!(::Val{false}, g::I, state_vec::StateVector{T}, qubit::Int) where {T<:Complex} =
+apply_gate!(::Val{false}, g::I, state_vec::StateVector{T}, qubits::Int...) where {T<:Complex} =
     return
-apply_gate!(::Val{true}, g::I, state_vec::StateVector{T}, qubit::Int) where {T<:Complex} =
+apply_gate!(::Val{true}, g::I, state_vec::StateVector{T}, qubits::Int...) where {T<:Complex} =
     return
 
 function apply_gate!(

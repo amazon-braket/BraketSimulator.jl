@@ -171,25 +171,14 @@ function _translate_result_types(
             )
         end
     end
-    is_ag = results[1] isa Braket.IR.AdjointGradient
-    translated_results =
-        is_ag ? [JSON3.read(r, Braket.AdjointGradient) for r in raw_results] :
-        [JSON3.read(r, Braket.Result) for r in raw_results]
+    translated_results = [JSON3.read(r, Braket.Result) for r in raw_results]
     return translated_results
 end
 
 function _compute_exact_results(d::AbstractSimulator, program::Program, qc::Int, inputs::Dict{String, Float64})
     result_types = _translate_result_types(program.results, qc)
     _validate_result_types_qubits_exist(result_types, qc)
-    if program.results[1] isa Braket.IR.AdjointGradient
-        rt = result_types[1]
-        ev, grad =
-            calculate(rt, Vector{Instruction}(program.instructions), inputs, d)
-        result_val = Dict{String,Any}("expectation" => ev, "gradient" => grad)
-        return [Braket.ResultTypeValue(program.results[1], result_val)]
-    else
-        return _generate_results(program.results, result_types, d)
-    end
+    return _generate_results(program.results, result_types, d)
 end
 
 """
@@ -272,7 +261,6 @@ include("noise_kernels.jl")
 include("observables.jl")
 include("result_types.jl")
 include("properties.jl")
-include("derivative_gates.jl")
 include("inverted_gates.jl")
 include("pow_gates.jl")
 include("sv_simulator.jl")
