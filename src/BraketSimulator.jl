@@ -59,8 +59,8 @@ end
 
 function _formatted_measurements(simulator::D, measured_qubits::Vector{Int}=collect(0:qubit_count(simulator)-1)) where {D<:AbstractSimulator}
     sim_samples = samples(simulator)
-    qubit_count          = qubit_count(simulator)
-    formatted   = [_index_to_endian_bits(sample, qubit_count)[measured_qubits .+ 1] for sample in sim_samples]
+    n_qubits    = qubit_count(simulator)
+    formatted   = [_index_to_endian_bits(sample, n_qubits)[measured_qubits .+ 1] for sample in sim_samples]
     return formatted
 end
 
