@@ -1,6 +1,9 @@
 *.jl.*.cov
 *.jl.cov
 *.jl.mem
+lcov.info
+*.profraw
 /Manifest.toml
 /docs/Manifest.toml
 /docs/build/
+/.coverage
