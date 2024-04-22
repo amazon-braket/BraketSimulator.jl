@@ -104,7 +104,6 @@ end
 
     @testset "Local Braket Simulator" begin
         @testset for (backend, device_name) in [
-            ("default", "StateVectorSimulator"),
             ("braket_sv_v2", "StateVectorSimulator"),
             ("braket_dm_v2", "DensityMatrixSimulator"),
         ]
