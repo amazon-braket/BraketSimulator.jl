@@ -1,6 +1,4 @@
 using Test,
-    cuStateVec,
-    CUDA,
     Statistics,
     LinearAlgebra,
     PythonCall,
@@ -34,13 +32,6 @@ end
     ALL_DEVICES = [PURE_DEVICE, NOISE_DEVICE]
     PURE_DEVICES = [PURE_DEVICE]
     NOISE_DEVICES = [NOISE_DEVICE]
-    if CUDA.functional()
-        CU_PURE_DEVICE = LocalSimulator("braket_sv_custatevec")
-        CU_NOISE_DEVICE = LocalSimulator("braket_dm_custatevec")
-        append!(ALL_DEVICES, [CU_PURE_DEVICE, CU_NOISE_DEVICE])
-        push!(PURE_DEVICES, CU_PURE_DEVICE)
-        push!(NOISE_DEVICES, CU_NOISE_DEVICE)
-    end
     SHOT_LIST = (0, 8000)
 
     get_tol(shots::Int) = return (
