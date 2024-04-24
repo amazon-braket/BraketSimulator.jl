@@ -182,9 +182,7 @@ function apply_observable!(
         lower_ix  = pad_bit(ix, endian_qubit)
         higher_ix = flip_bit(lower_ix, endian_qubit)
         ix_pair   = [lower_ix + 1, higher_ix + 1]
-        @views begin
-            sv[ix_pair] = mat * sv[ix_pair]
-        end
+        @views @inbounds sv[ix_pair] = mat * sv[ix_pair]
     end
     return sv
 end
@@ -206,10 +204,8 @@ function apply_observable!(
         ix_10 = flip_bit(ix_00, endian_t2)
         ix_01 = flip_bit(ix_00, endian_t1)
         ix_11 = flip_bit(ix_10, endian_t1)
-        @views begin
-            ind_vec = SVector{4,Int}(ix_00 + 1, ix_10 + 1, ix_01 + 1, ix_11 + 1)
-            sv[ind_vec] = mat * sv[ind_vec]
-        end
+        ind_vec = SVector{4,Int}(ix_00 + 1, ix_10 + 1, ix_01 + 1, ix_11 + 1)
+        @views @inbounds sv[ind_vec] = mat * sv[ind_vec]
     end
     return sv
 end
@@ -236,9 +232,9 @@ function apply_observable!(
     Threads.@threads for ix = 0:div(n_amps, 2^n_targets)-1
         padded_ix = pad_bits(ix, ordered_ts)
         ixs = map(flip_list) do bits_to_flip
-            return flip_bits(padded_ix, bits_to_flip) + 1
+            flip_bits(padded_ix, bits_to_flip) + 1
         end
-        @views begin
+        @views @inbounds begin
             amps = sv[ixs[:]]
             sv[ixs[:]] = o_mat * amps
         end

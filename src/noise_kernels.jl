@@ -192,7 +192,7 @@ function apply_noise!(n::Kraus, dm::DensityMatrix{T}, ts::Int...) where {T}
             return flipped_ix + 1
         end
         ix_pairs = CartesianIndex.(collect(Iterators.product(ixs, ixs)))
-        @views begin
+        @views @inbounds begin
             ρ = dm[ix_pairs]
             k_ρ = k_mats[1] * ρ * k_mats_conj[1]
             for mat_ix = 2:length(k_mats)

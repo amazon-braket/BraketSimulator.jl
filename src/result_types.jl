@@ -14,8 +14,8 @@ function make_alias_table!(
     smalls::AbstractVector{Int},
 )
     n = length(weights)
-    length(a) == length(alias) == n ||
-        throw(DimensionMismatch("Inconsistent array lengths. length(a) = $(length(a)), length(alias) = $(length(alias)), n = $n"))
+    length(acceptance_probs) == length(alias) == n ||
+        throw(DimensionMismatch("Inconsistent array lengths. length(acceptance_probs) = $(length(acceptance_probs)), length(alias) = $(length(alias)), n = $n"))
 
     ac = n / wsum
     acceptance_probs .= weights .* ac
@@ -98,25 +98,16 @@ function marginal_probability(probs::Vector{T}, qubit_count::Int, targets) where
     endian_unused = qubit_count .- unused_qubits .- 1
     final_probs   = zeros(Float64, 2^length(targets))
     qubit_combos  = vcat([Int[]], collect(combinations(endian_unused)))
+    sorted_unused = sort(endian_unused)
     Threads.@threads for ix = 0:2^length(targets)-1
-        padded_ix = ix
-        for pad_q in sort(endian_unused)
-            padded_ix = pad_bit(padded_ix, pad_q)
-        end
+        padded_ix = pad_bits(ix, sorted_unused)
         # here we generate for the **output** ix all amplitude indices in the
         # **full** 1:2^n_qubits list that will go into the marginal sum
         flipped_inds = Vector{Int64}(undef, length(qubit_combos))
         for (c_ix, flipped_qubits) in enumerate(qubit_combos)
-            flipped_ix = padded_ix
-            for flip_qubit in flipped_qubits
-                flipped_ix = flip_bit(flipped_ix, flip_qubit)
-            end
-            flipped_inds[c_ix] = flipped_ix + 1
+            flipped_inds[c_ix] = flip_bits(padded_ix, flipped_qubits) + 1
         end
-        @views begin
-            @inbounds sum_val = sum(probs[flipped_inds])
-            final_probs[ix+1] = sum_val
-        end
+        @views @inbounds final_probs[ix+1] = sum(probs[flipped_inds])
     end
     return final_probs
 end

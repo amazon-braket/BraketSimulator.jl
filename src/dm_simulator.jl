@@ -182,11 +182,8 @@ for (gate, obs) in (
             dm::S,
             targets,
         ) where {T<:Complex,S<:AbstractDensityMatrix{T}}
-            n_qubits = Int(log2(size(dm, 1)))
             reshaped_dm = reshape(dm, length(dm))
-            for target in targets
-                apply_gate!($gate(), reshaped_dm, target)
-            end
+            foreach(target->apply_gate!($gate(), reshaped_dm, target), targets)
             return dm
         end
     end
@@ -214,12 +211,12 @@ function apply_observable!(
         padded_ix = pad_bits(ix, ordered_ts)
         padded_jx = pad_bits(jx, ordered_ts)
         ixs = map(flip_list) do bits_to_flip
-            return flip_bits(padded_ix, bits_to_flip) + 1
+            flip_bits(padded_ix, bits_to_flip) + 1
         end
         jxs = map(flip_list) do bits_to_flip 
-            return flip_bits(padded_jx, bits_to_flip) + 1
+            flip_bits(padded_jx, bits_to_flip) + 1
         end
-        @views begin
+        @views @inbounds begin
             elems = dm[jxs[:], ixs[:]]
             dm[jxs[:], ixs[:]] = o_mat * elems
         end
@@ -273,7 +270,7 @@ function swap_bits(ix::Int, qubit_map::Dict{Int,Int})
     # integer index
     for (in_q, out_q) in qubit_map
         if in_q < out_q # avoid flipping twice
-            in_val  = ((1 << in_q)  & ix) >> in_q
+            in_val  = ((1 << in_q) & ix) >> in_q
             out_val = ((1 << out_q) & ix) >> out_q
             if in_val != out_val
                 ix = flip_bits(ix, (in_q, out_q))
@@ -322,10 +319,7 @@ function partial_trace(
         # final indices of ρ to match the desired qubit mapping
         out_ix = needs_perm ? swap_bits(ix, output_qubit_mapping) : ix
         out_jx = needs_perm ? swap_bits(jx, output_qubit_mapping) : jx
-        @views begin
-            @inbounds trace_val = sum(ρ[flipped_inds])
-            final_ρ[out_ix+1, out_jx+1] = trace_val
-        end
+        @views @inbounds final_ρ[out_ix+1, out_jx+1] = sum(ρ[flipped_inds])
     end
     return final_ρ
 end
