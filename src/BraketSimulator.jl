@@ -1,7 +1,5 @@
 module BraketSimulator
 
-using PrecompileTools: @setup_workload, @compile_workload
-
 using Braket,
     Braket.Observables,
     Dates,
@@ -156,23 +154,35 @@ function _generate_results(
     ]
 end
 
+_translate_result_type(r::Braket.IR.Amplitude, qc::Int)     = Braket.Amplitude(r.states)
+_translate_result_type(r::Braket.IR.StateVector, qc::Int)   = Braket.StateVector()
+# The IR result types support `nothing` as a valid option for the `targets` field,
+# however `Braket.jl`'s `Result`s represent this with an empty `QubitSet` for type
+# stability reasons. Here we take a `nothing` value for `targets` and translate it
+# to apply to all qubits.
+_translate_result_type(r::Braket.IR.DensityMatrix, qc::Int) = isnothing(r.targets) ? Braket.DensityMatrix(collect(0:qc-1)) : Braket.DensityMatrix(r.targets)
+_translate_result_type(r::Braket.IR.Probability, qc::Int)   = isnothing(r.targets) ? Braket.Probability(collect(0:qc-1)) : Braket.Probability(r.targets)
+function _translate_result_type(r::Braket.IR.Expectation, qc::Int)
+    targets = isnothing(r.targets) ? collect(0:qc-1) : r.targets
+    obs     = Braket.StructTypes.constructfrom(Braket.Observables.Observable, r.observable)
+    Braket.Expectation(obs, QubitSet(targets))
+end
+function _translate_result_type(r::Braket.IR.Variance, qc::Int)
+    targets = isnothing(r.targets) ? collect(0:qc-1) : r.targets
+    obs     = Braket.StructTypes.constructfrom(Braket.Observables.Observable, r.observable)
+    Braket.Variance(obs, QubitSet(targets))
+end
+function _translate_result_type(r::Braket.IR.Sample, qc::Int)
+    targets = isnothing(r.targets) ? collect(0:qc-1) : r.targets
+    obs     = Braket.StructTypes.constructfrom(Braket.Observables.Observable, r.observable)
+    Braket.Sample(obs, QubitSet(targets))
+end
+
 function _translate_result_types(
     results::Vector{Braket.AbstractProgramResult},
     qubit_count::Int,
 )
-    # results are in IR format
-    raw_results = [JSON3.write(r) for r in results]
-    # fix missing targets - what is this? why does it happen?
-    for (ri, rr) in enumerate(raw_results)
-        if occursin("\"targets\":null", rr)
-            raw_results[ri] = replace(
-                rr,
-                "\"targets\":null" => "\"targets\":$(repr(collect(0:qubit_count-1)))",
-            )
-        end
-    end
-    translated_results = [JSON3.read(r, Braket.Result) for r in raw_results]
-    return translated_results
+    return [_translate_result_type(r, qubit_count) for r in results]
 end
 
 function _compute_exact_results(d::AbstractSimulator, program::Program, qc::Int, inputs::Dict{String, Float64})
@@ -234,7 +244,7 @@ function simulate(
     _validate_ir_results_compatibility(simulator, circuit_ir.results, Val(:JAQCD))
     _validate_ir_instructions_compatibility(simulator, circuit_ir, Val(:JAQCD))
     _validate_shots_and_ir_results(shots, circuit_ir.results, qubit_count)
-    operations = circuit_ir.instructions
+    operations::Vector{Instruction} = circuit_ir.instructions
     if shots > 0 && !isempty(circuit_ir.basis_rotation_instructions)
         operations = vcat(operations, circuit_ir.basis_rotation_instructions)
     end
@@ -265,6 +275,7 @@ include("inverted_gates.jl")
 include("pow_gates.jl")
 include("sv_simulator.jl")
 include("dm_simulator.jl")
+include("precompile.jl")
 
 function __init__()
     Braket._simulator_devices[]["braket_dm_v2"] =

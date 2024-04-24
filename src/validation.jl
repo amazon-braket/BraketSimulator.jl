@@ -134,22 +134,28 @@ function _validate_ir_instructions_compatibility(
     return
 end
 
-function _validate_result_types_qubits_exist(result_types::Vector, qubit_count::Int)
-    for rt in result_types
-        (!hasfield(typeof(rt), :targets) || isnothing(rt.targets) || isempty(rt.targets)) &&
-            continue
-        targets = rt.targets
-        if rt isa AdjointGradient
-            targets = reduce(vcat, targets)
-        end
-        !isempty(targets) &&
-            maximum(targets) > qubit_count &&
+
+_validate_result_type_qubits_exist(rt::Braket.StateVector, qubit_count::Int) = return
+_validate_result_type_qubits_exist(rt::Braket.Amplitude, qubit_count::Int) = return
+function _validate_result_type_qubits_exist(rt::AdjointGradient, qubit_count::Int)
+    isempty(rt.targets) && return
+    targets = reduce(vcat, targets)
+    maximum(targets) > qubit_count &&
             throw(
                 "Result type $rt references invalid qubits $targets. Maximum qubit number is $(qubit_count-1).",
             )
-    end
     return
 end
+# don't need to check for `isnothing` here as the `Braket.QubitSet` being empty covers this
+function _validate_result_type_qubits_exist(rt::RT, qubit_count::Int) where {RT<:Result}
+    isempty(rt.targets) && return
+    maximum(rt.targets) > qubit_count &&
+            throw(
+                  "Result type $rt references invalid qubits $(rt.targets). Maximum qubit number is $(qubit_count-1).",
+            )
+    return
+end
+_validate_result_types_qubits_exist(rts::Vector{RT}, qubit_count::Int) where {RT<:Result} = foreach(rt->_validate_result_type_qubits_exist(rt, qubit_count), rts)
 
 function _validate_operation_qubits(operations::Vector{<:Instruction})
     targs = (ix.target for ix in operations)

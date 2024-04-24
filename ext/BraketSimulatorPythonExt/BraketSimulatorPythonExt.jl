@@ -1,7 +1,5 @@
 module BraketSimulatorPythonExt
 
-using PrecompileTools: @setup_workload, @compile_workload, @recompile_invalidations
-
 using BraketSimulator, BraketSimulator.Braket, PythonCall, BraketSimulator.Dates
 
 import BraketSimulator.Braket:
