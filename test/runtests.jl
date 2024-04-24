@@ -5,11 +5,7 @@ Aqua.test_all(BraketSimulator, ambiguities=false, piracies=false, persistent_tas
 dir_list = filter(x-> startswith(x, "test_") && endswith(x, ".jl"), readdir(@__DIR__))
 
 @testset "BraketSimulator" begin
-    for test in dir_list
-        if startswith(test, "test_")
-            @testset "$test" begin
-                include(test)
-            end
-        end
+    @testset "$test" for test in dir_list
+        include(test)
     end
 end
