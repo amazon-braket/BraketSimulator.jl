@@ -1,4 +1,4 @@
-using Test, Logging, Braket, BraketSimulator, DataStructures
+using Test, Braket, BraketSimulator, DataStructures
 
 import Braket: I, Instruction
 
