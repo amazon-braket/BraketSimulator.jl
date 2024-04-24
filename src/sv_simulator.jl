@@ -174,14 +174,14 @@ function apply_observable!(
     sv::StateVector{T},
     target::Int,
 ) where {T<:Complex}
-    n_amps = length(sv)
-    mat = observable.matrix
-    nq = Int(log2(n_amps))
-    endian_qubit = nq - target - 1
+    n_amps   = length(sv)
+    mat      = observable.matrix
+    n_qubits = Int(log2(n_amps))
+    endian_qubit = n_qubits - target - 1
     Threads.@threads for ix = 0:div(n_amps, 2)-1
-        lower_ix = pad_bit(ix, endian_qubit)
+        lower_ix  = pad_bit(ix, endian_qubit)
         higher_ix = flip_bit(lower_ix, endian_qubit)
-        ix_pair = [lower_ix + 1, higher_ix + 1]
+        ix_pair   = [lower_ix + 1, higher_ix + 1]
         @views begin
             sv[ix_pair] = mat * sv[ix_pair]
         end
@@ -191,18 +191,18 @@ end
 function apply_observable!(
     observable::Braket.Observables.HermitianObservable,
     sv::StateVector{T},
-    t1::Int,
-    t2::Int,
+    target_1::Int,
+    target_2::Int,
 ) where {T<:Complex}
-    n_amps = length(sv)
-    nq = Int(log2(n_amps))
-    endian_t1 = nq - 1 - t1
-    endian_t2 = nq - 1 - t2
-    mat = observable.matrix
-    small_t, big_t = minmax(endian_t1, endian_t2)
+    n_amps    = length(sv)
+    n_qubits  = Int(log2(n_amps))
+    endian_t1 = n_qubits - 1 - target_1
+    endian_t2 = n_qubits - 1 - target_2
+    mat       = observable.matrix
+    small_target, big_target = minmax(endian_t1, endian_t2)
     Threads.@threads for ix = 0:div(n_amps, 4)-1
         # bit shift to get indices
-        ix_00 = pad_bit(pad_bit(ix, small_t), big_t)
+        ix_00 = pad_bits(ix, (small_target, big_target))
         ix_10 = flip_bit(ix_00, endian_t2)
         ix_01 = flip_bit(ix_00, endian_t1)
         ix_11 = flip_bit(ix_10, endian_t1)
@@ -217,32 +217,26 @@ end
 function apply_observable!(
     observable::Braket.Observables.HermitianObservable,
     sv::StateVector{T},
-    t1::Int,
-    t2::Int,
+    target_1::Int,
+    target_2::Int,
     targets::Int...,
 ) where {T<:Complex}
-    n_amps = length(sv)
-    nq = Int(log2(n_amps))
-    ts = [t1, t2, targets...]
-    endian_ts = nq - 1 .- ts
-    o_mat = observable.matrix
+    n_amps   = length(sv)
+    n_qubits = Int(log2(n_amps))
+    full_targets = [target_1, target_2, targets...]
+    endian_ts = n_qubits - 1 .- full_targets
+    o_mat     = observable.matrix
+    n_targets = length(full_targets)
 
     ordered_ts = sort(collect(endian_ts))
-    flip_list = map(0:2^length(ts)-1) do t
-        f_vals = Bool[(((1 << f_ix) & t) >> f_ix) for f_ix = 0:length(ts)-1]
-        return ordered_ts[f_vals]
+    flip_list  = map(0:2^n_targets-1) do target_amp
+        to_flip = Bool[(((1 << target_ix) & target_amp) >> target_ix) for target_ix = 0:n_targets-1]
+        return ordered_ts[to_flip]
     end
-    Threads.@threads for ix = 0:div(n_amps, 2^length(ts))-1
-        padded_ix = ix
-        for t in ordered_ts
-            padded_ix = pad_bit(padded_ix, t)
-        end
-        ixs = map(flip_list) do f
-            flipped_ix = padded_ix
-            for f_val in f
-                flipped_ix = flip_bit(flipped_ix, f_val)
-            end
-            return flipped_ix + 1
+    Threads.@threads for ix = 0:div(n_amps, 2^n_targets)-1
+        padded_ix = pad_bits(ix, ordered_ts)
+        ixs = map(flip_list) do bits_to_flip
+            return flip_bits(padded_ix, bits_to_flip) + 1
         end
         @views begin
             amps = sv[ixs[:]]
@@ -267,8 +261,8 @@ function expectation(
 )
     bra = svs.state_vector
     ket = apply_observable(observable, svs.state_vector, targets...)
-    ev = dot(bra, ket)
-    return real(ev)
+    expectation_value = dot(bra, ket)
+    return real(expectation_value)
 end
 
 function state_with_observables(svs::StateVectorSimulator)
@@ -282,8 +276,8 @@ function apply_observables!(svs::StateVectorSimulator, observables)
         error("observables have already been applied.")
     svs._state_vector_after_observables = deepcopy(svs.state_vector)
     operations = reduce(vcat, diagonalizing_gates(obs...) for obs in observables)
-    for op in operations
-        apply_gate!(op.operator, svs._state_vector_after_observables, op.target...)
+    for operation in operations
+        apply_gate!(operation.operator, svs._state_vector_after_observables, operation.target...)
     end
     return svs
 end

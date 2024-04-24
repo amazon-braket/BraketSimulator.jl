@@ -98,9 +98,9 @@ function reinit!(
     qubit_count::Int,
     shots::Int,
 ) where {T,S<:AbstractDensityMatrix{T}}
-    n = 2^qubit_count
-    if size(dms.density_matrix) != (n, n)
-        dms.density_matrix = S(undef, n, n)
+    n_amps = 2^qubit_count
+    if size(dms.density_matrix) != (n_amps, n_amps)
+        dms.density_matrix = S(undef, n_amps, n_amps)
         ap_len = ap_size(shots, qubit_count)
         resize!(dms._alias, ap_len)
         resize!(dms._ap, ap_len)
@@ -116,13 +116,13 @@ function reinit!(
         resize!(dms.shot_buffer, shots)
     end
     fill!(dms.density_matrix, zero(T))
-    dms._ap          .= zero(Float64)
-    dms._alias       .= zero(Int)
-    dms._larges      .= zero(Int)
-    dms._smalls      .= zero(Int)
-    dms.density_matrix[1, 1] = one(T)
+    dms._ap        .= zero(Float64)
+    dms._alias     .= zero(Int)
+    dms._larges    .= zero(Int)
+    dms._smalls    .= zero(Int)
     dms.qubit_count = qubit_count
-    dms.shots = shots
+    dms.shots       = shots
+    dms.density_matrix[1, 1] = one(T)
     dms._density_matrix_after_observables = S(undef, 0, 0)
     return
 end
@@ -134,6 +134,7 @@ function _evolve_op!(
 ) where {T<:Complex,S<:AbstractDensityMatrix{T},G<:Gate}
     reshaped_dm = reshape(dms.density_matrix, length(dms.density_matrix))
     apply_gate!(Val(false), op, reshaped_dm, target...)
+    # applies the *conjugate* of `op` to the "qubits" corresponding to the *transpose*
     apply_gate!(Val(true),  op, reshaped_dm, (dms.qubit_count .+ target)...)
     return
 end
@@ -161,9 +162,9 @@ function evolve!(
     dms::DensityMatrixSimulator{T,S},
     operations,
 )::DensityMatrixSimulator{T,S} where {T<:Complex,S<:AbstractDensityMatrix{T}}
-    for op in operations
+    for operation in operations
         # use this to dispatch on Gates vs Noises
-        _evolve_op!(dms, op.operator, op.target...)
+        _evolve_op!(dms, operation.operator, operation.target...)
     end
     return dms
 end
@@ -181,7 +182,7 @@ for (gate, obs) in (
             dm::S,
             targets,
         ) where {T<:Complex,S<:AbstractDensityMatrix{T}}
-            nq = Int(log2(size(dm, 1)))
+            n_qubits = Int(log2(size(dm, 1)))
             reshaped_dm = reshape(dm, length(dm))
             for target in targets
                 apply_gate!($gate(), reshaped_dm, target)
@@ -195,36 +196,28 @@ function apply_observable!(
     dm::DensityMatrix{T},
     targets::Int...,
 ) where {T<:Complex}
-    nq = Int(log2(size(dm, 1)))
-    n_amps = 2^nq
-    ts = collect(targets)
-    endian_ts = nq - 1 .- ts
-    o_mat = transpose(observable.matrix)
+    n_amps    = size(dm, 1)
+    n_qubits  = Int(log2(n_amps))
+    endian_ts = n_qubits - 1 .- collect(targets)
+    n_targets = length(endian_ts)
+    o_mat     = transpose(observable.matrix)
 
-    ordered_ts = sort(collect(endian_ts))
-    flip_list = map(0:2^length(ts)-1) do t
-        f_vals = Bool[(((1 << f_ix) & t) >> f_ix) for f_ix = 0:length(ts)-1]
-        return ordered_ts[f_vals]
+    ordered_ts = sort(endian_ts)
+    flip_list = map(0:2^n_targets-1) do target_amp
+        to_flip = Bool[(((1 << target_ix) & target_amp) >> target_ix) for target_ix = 0:n_targets-1]
+        return ordered_ts[to_flip]
     end
-    slim_size = div(n_amps, 2^length(ts))
+    slim_size = div(n_amps, 2^n_targets)
     Threads.@threads for raw_ix = 0:(slim_size^2)-1
         ix = div(raw_ix, slim_size)
         jx = mod(raw_ix, slim_size)
         padded_ix = pad_bits(ix, ordered_ts)
         padded_jx = pad_bits(jx, ordered_ts)
-        ixs = map(flip_list) do f
-            flipped_ix = padded_ix
-            for f_val in f
-                flipped_ix = flip_bit(flipped_ix, f_val)
-            end
-            return flipped_ix + 1
+        ixs = map(flip_list) do bits_to_flip
+            return flip_bits(padded_ix, bits_to_flip) + 1
         end
-        jxs = map(flip_list) do f
-            flipped_jx = padded_jx
-            for f_val in f
-                flipped_jx = flip_bit(flipped_jx, f_val)
-            end
-            return flipped_jx + 1
+        jxs = map(flip_list) do bits_to_flip 
+            return flip_bits(padded_jx, bits_to_flip) + 1
         end
         @views begin
             elems = dm[jxs[:], ixs[:]]
@@ -243,13 +236,13 @@ end
 function apply_observables!(dms::DensityMatrixSimulator, observables)
     !isempty(dms._density_matrix_after_observables) &&
         error("observables have already been applied.")
-    diag_gates = [diagonalizing_gates(obs...) for obs in observables]
+    diag_gates = [diagonalizing_gates(observable...) for observable in observables]
     operations = reduce(vcat, diag_gates)
     dms._density_matrix_after_observables = deepcopy(dms.density_matrix)
     reshaped_dm = reshape(dms._density_matrix_after_observables, length(dms.density_matrix))
-    for op in operations
-        apply_gate!(Val(false), op.operator, reshaped_dm, op.target...)
-        apply_gate!(Val(true), op.operator, reshaped_dm, (dms.qubit_count .+ op.target)...)
+    for operation in operations
+        apply_gate!(Val(false), operation.operator, reshaped_dm, operation.target...)
+        apply_gate!(Val(true), operation.operator, reshaped_dm, (dms.qubit_count .+ operation.target)...)
     end
     return dms
 end
@@ -270,20 +263,20 @@ function expectation(
     dm_copy = apply_observable(observable, dms.density_matrix, targets...)
     return real(sum(diag(dm_copy)))
 end
-state_vector(dms::DensityMatrixSimulator) = diag(dms.density_matrix)
-#    isdiag(dms.density_matrix) ? diag(dms.density_matrix) :
-#    error("cannot express density matrix with off-diagonal elements as a pure state.")
+state_vector(dms::DensityMatrixSimulator)   = diag(dms.density_matrix)
 density_matrix(dms::DensityMatrixSimulator) = dms.density_matrix
-probabilities(dms::DensityMatrixSimulator) = real.(diag(dms.density_matrix))
+probabilities(dms::DensityMatrixSimulator)  = real.(diag(dms.density_matrix))
 
 function swap_bits(ix::Int, qubit_map::Dict{Int,Int})
     # only flip 01 and 10
+    # flipping 00 and 11 will not change the final
+    # integer index
     for (in_q, out_q) in qubit_map
-        if in_q < out_q
-            in_val = ((1 << in_q) & ix) >> in_q
+        if in_q < out_q # avoid flipping twice
+            in_val  = ((1 << in_q)  & ix) >> in_q
             out_val = ((1 << out_q) & ix) >> out_q
             if in_val != out_val
-                ix = flip_bit(flip_bit(ix, in_q), out_q)
+                ix = flip_bits(ix, (in_q, out_q))
             end
         end
     end
@@ -295,36 +288,38 @@ function partial_trace(
     output_qubits = collect(0:Int(log2(size(ρ, 1)))-1),
 )
     isempty(output_qubits) && return sum(diag(ρ))
-    n_amps = size(ρ, 1)
-    nq = Int(log2(n_amps))
-    length(unique(output_qubits)) == nq && return ρ
+    n_amps   = size(ρ, 1)
+    n_qubits = Int(log2(n_amps))
+    length(unique(output_qubits)) == n_qubits && return ρ
 
-    qubits = setdiff(collect(0:nq-1), output_qubits)
-    endian_qubits = sort(nq .- qubits .- 1)
-    q_combos = vcat([Int[]], collect(combinations(endian_qubits)))
-    final_ρ = zeros(ComplexF64, 2^(nq - length(qubits)), 2^(nq - length(qubits)))
+    qubits        = setdiff(collect(0:n_qubits-1), output_qubits)
+    endian_qubits = sort(n_qubits .- qubits .- 1)
+    qubit_combos  = vcat([Int[]], collect(combinations(endian_qubits)))
+    final_ρ_dim   = 2^(n_qubits - length(qubits))
+    final_ρ       = zeros(ComplexF64, final_ρ_dim, final_ρ_dim)
     # handle possibly permuted targets
-    needs_perm = !issorted(output_qubits)
-    final_nq = length(output_qubits)
-    output_qubit_mapping =
-        needs_perm ?
-        Dict(zip(final_nq .- output_qubits .- 1, final_nq .- collect(0:final_nq-1) .- 1)) :
-        Dict{Int,Int}()
+    needs_perm     = !issorted(output_qubits)
+    final_n_qubits = length(output_qubits)
+    output_qubit_mapping = if needs_perm
+            original_outputs = final_n_qubits .- output_qubits .- 1
+            permuted_outputs = final_n_qubits .- collect(0:final_n_qubits-1) .- 1
+            Dict(zip(original_outputs, permuted_outputs))
+        else
+            Dict{Int,Int}()
+        end
     for raw_ix = 0:length(final_ρ)-1
         ix = div(raw_ix, size(final_ρ, 1))
         jx = mod(raw_ix, size(final_ρ, 1))
         padded_ix = pad_bits(ix, endian_qubits)
         padded_jx = pad_bits(jx, endian_qubits)
-        flipped_inds = Vector{CartesianIndex{2}}(undef, length(q_combos))
-        for (c_ix, flipped_qs) in enumerate(q_combos)
-            flipped_ix = padded_ix
-            flipped_jx = padded_jx
-            for flip_q in flipped_qs
-                flipped_ix = flip_bit(flipped_ix, flip_q)
-                flipped_jx = flip_bit(flipped_jx, flip_q)
-            end
+        flipped_inds = Vector{CartesianIndex{2}}(undef, length(qubit_combos))
+        for (c_ix, flipped_qubits) in enumerate(qubit_combos)
+            flipped_ix = flip_bits(padded_ix, flipped_qubits)
+            flipped_jx = flip_bits(padded_jx, flipped_qubits)
             flipped_inds[c_ix] = CartesianIndex{2}(flipped_ix + 1, flipped_jx + 1)
         end
+        # if the output qubits weren't in sorted order, we need to permute the
+        # final indices of ρ to match the desired qubit mapping
         out_ix = needs_perm ? swap_bits(ix, output_qubit_mapping) : ix
         out_jx = needs_perm ? swap_bits(jx, output_qubit_mapping) : jx
         @views begin

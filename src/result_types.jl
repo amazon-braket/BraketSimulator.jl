@@ -3,11 +3,12 @@
 # arguments `a`, `alias`, `larges`, and `smalls` **without**
 # reallocating them, which is useful if we are using the same
 # simulator instantiation for many circuit simulations (e.g.
-# in a large batch).
+# in a large batch). Based on the [alias method](https://en.wikipedia.org/wiki/Alias_method)
+# for sampling from discrete probability distributions.
 function make_alias_table!(
     weights::AbstractVector,
     wsum,
-    a::AbstractVector{Float64},
+    acceptance_probs::AbstractVector{Float64},
     alias::AbstractVector{Int},
     larges::AbstractVector{Int},
     smalls::AbstractVector{Int},
@@ -17,13 +18,13 @@ function make_alias_table!(
         throw(DimensionMismatch("Inconsistent array lengths. length(a) = $(length(a)), length(alias) = $(length(alias)), n = $n"))
 
     ac = n / wsum
-    a .= weights .* ac
+    acceptance_probs .= weights .* ac
 
     kl = 0  # actual number of larges
     ks = 0  # actual number of smalls
 
     @inbounds for i = 1:n
-        ai = a[i]
+        ai = acceptance_probs[i]
         if ai > 1.0
             larges[kl+=1] = i  # push to larges
         elseif ai < 1.0
@@ -37,7 +38,7 @@ function make_alias_table!(
         l = larges[kl]
         kl -= 1  # pop from larges
         alias[s] = l
-        al = a[l] = (a[l] - 1.0) + a[s]
+        al = acceptance_probs[l] = (acceptance_probs[l] - 1.0) + acceptance_probs[s]
         if al > 1.0
             larges[kl+=1] = l  # push to larges
         else
@@ -47,7 +48,7 @@ function make_alias_table!(
 
     # this loop should be redundant, except for rounding
     for i = 1:ks
-        @inbounds a[smalls[i]] = 1.0
+        @inbounds acceptance_probs[smalls[i]] = 1.0
     end
     nothing
 end

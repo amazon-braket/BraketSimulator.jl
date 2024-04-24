@@ -50,9 +50,9 @@ parse_program(d, program, shots::Int) = throw(MethodError(parse_program, (d, pro
 
 function _index_to_endian_bits(ix::Int, qubit_count::Int)
     bits = Vector{Int}(undef, qubit_count)
-    for q = 0:qubit_count-1
-        b = (ix >> q) & 1
-        bits[end-q] = b
+    for qubit = 0:qubit_count-1
+        bit = (ix >> qubit) & 1
+        bits[end-qubit] = bit
     end
     return bits
 end
@@ -197,28 +197,28 @@ function simulate(
     shots::Int = 0,
     kwargs...,
 )
-    program = parse_program(simulator, circuit_ir, shots)
-    qc      = qubit_count(program)
+    program  = parse_program(simulator, circuit_ir, shots)
+    n_qubits = qubit_count(program)
     _validate_ir_results_compatibility(simulator, program.results, Val(:JAQCD))
     _validate_ir_instructions_compatibility(simulator, program, Val(:JAQCD))
-    _validate_shots_and_ir_results(shots, program.results, qc)
+    _validate_shots_and_ir_results(shots, program.results, n_qubits)
     operations = program.instructions
     if shots > 0 && !isempty(program.basis_rotation_instructions)
         operations = vcat(operations, program.basis_rotation_instructions)
     end
     inputs        = isnothing(circuit_ir.inputs) ? Dict{String, Float64}() : Dict{String, Float64}(k=>v for (k,v) in circuit_ir.inputs)
     symbol_inputs = Dict{Symbol,Number}(Symbol(k) => v for (k, v) in inputs)
-    operations    = [Braket.bind_value!(op, symbol_inputs) for op in operations]
+    operations    = [Braket.bind_value!(operation, symbol_inputs) for operation in operations]
     _validate_operation_qubits(operations)
-    reinit!(simulator, qc, shots)
+    reinit!(simulator, n_qubits, shots)
     stats = @timed begin
         simulator = evolve!(simulator, operations)
     end
     @debug "Time for evolution: $(stats.time)"
-    results = shots == 0 && !isempty(program.results) ? _compute_exact_results(simulator, program, qc, inputs) : [Braket.ResultTypeValue(rt, 0.0) for rt in program.results]
-    mqs     = get(kwargs, :measured_qubits, collect(0:qc-1))
-    isempty(mqs) && (mqs = collect(0:qc-1))
-    stats   = @timed _bundle_results(results, circuit_ir, simulator; measured_qubits=mqs)
+    results = shots == 0 && !isempty(program.results) ? _compute_exact_results(simulator, program, n_qubits, inputs) : [Braket.ResultTypeValue(result_type, 0.0) for result_type in program.results]
+    measured_qubits = get(kwargs, :measured_qubits, collect(0:n_qubits-1))
+    isempty(measured_qubits) && (measured_qubits = collect(0:n_qubits-1))
+    stats   = @timed _bundle_results(results, circuit_ir, simulator; measured_qubits=measured_qubits)
     @debug "Time for results bundling: $(stats.time)"
     res = stats.value
     return res
@@ -240,7 +240,7 @@ function simulate(
     end
     inputs = get(kwargs, :inputs, Dict{String,Float64}())
     symbol_inputs = Dict{Symbol,Number}(Symbol(k) => v for (k, v) in inputs)
-    operations = [bind_value!(Instruction(op), symbol_inputs) for op in operations]
+    operations = [bind_value!(Instruction(operation), symbol_inputs) for operation in operations]
     _validate_operation_qubits(operations)
     reinit!(simulator, qubit_count, shots)
     stats = @timed begin
@@ -248,9 +248,9 @@ function simulate(
     end
     @debug "Time for evolution: $(stats.time)"
     results = shots == 0 && !isempty(circuit_ir.results) ? _compute_exact_results(simulator, circuit_ir, qubit_count, inputs) : Braket.ResultTypeValue[]
-    mqs     = get(kwargs, :measured_qubits, collect(0:qubit_count-1))
-    isempty(mqs) && (mqs = collect(0:qubit_count-1))
-    stats = @timed _bundle_results(results, circuit_ir, simulator; measured_qubits=mqs)
+    measured_qubits = get(kwargs, :measured_qubits, collect(0:qubit_count-1))
+    isempty(measured_qubits) && (measured_qubits = collect(0:qubit_count-1))
+    stats = @timed _bundle_results(results, circuit_ir, simulator; measured_qubits=measured_qubits)
     @debug "Time for results bundling: $(stats.time)"
     res = stats.value
     return res
@@ -271,8 +271,6 @@ function __init__()
         DensityMatrixSimulator{ComplexF64,DensityMatrix{ComplexF64}}
     Braket._simulator_devices[]["braket_sv_v2"] =
         StateVectorSimulator{ComplexF64,StateVector{ComplexF64}}
-    # Braket._simulator_devices[]["default"] =
-    #    StateVectorSimulator{ComplexF64,StateVector{ComplexF64}}
 end
 
 end # module BraketSimulator
