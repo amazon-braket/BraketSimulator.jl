@@ -168,7 +168,7 @@ function __init__()
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.instructions:Depolarizing", Instruction, jl_convert_depo)
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.instructions:Rx", Instruction, jl_convert_rx)
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.instructions:YY", Instruction, jl_convert_yy)
-    PythonCall.pyconvert_add_rule("braket.ir.jaqcd.instructions:EndVerbatimBox", EndVerbatimBox, jl_convert_endverbatim)
+    PythonCall.pyconvert_add_rule("braket.ir.jaqcd.instructions:EndVerbatimBox", Instruction, jl_convert_endverbatim)
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.instructions:T", Instruction, jl_convert_t)
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.instructions:CZ", Instruction, jl_convert_cz)
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.instructions:XY", Instruction, jl_convert_xy)
@@ -247,28 +247,25 @@ function __init__()
     PythonCall.pyconvert_add_rule("braket.ir.openqasm.program_v1:Program", OpenQasmProgram, jl_convert_oqprogram)
 end
 
-function BraketSimulator.parse_program(d::D, program::OpenQasmProgram, shots::Int) where {D<:AbstractSimulator}
-    pc = braket[].default_simulator.openqasm.program_context.ProgramContext()
-    interp = braket[].default_simulator.openqasm.interpreter.Interpreter(pc)
-    inputs = isnothing(program.inputs) ? pybuiltins.None : pydict(program.inputs)
+function BraketSimulator.parse_program(simulator::D, program::OpenQasmProgram, shots::Int) where {D<:AbstractSimulator}
+    pc      = braket[].default_simulator.openqasm.program_context.ProgramContext()
+    interp  = braket[].default_simulator.openqasm.interpreter.Interpreter(pc)
+    inputs  = isnothing(program.inputs) ? pybuiltins.None : pydict(program.inputs)
     py_circ = interp.build_circuit(source=pystr(program.source), inputs=inputs, is_file=endswith(program.source, ".qasm"))
     if shots > 0
-        bris = py_circ.basis_rotation_instructions
-        py_circ.instructions += bris
+        py_circ.instructions += py_circ.basis_rotation_instructions
     end
-    program = ir(pyconvert(Circuit, py_circ), Val(:JAQCD))
-    return program 
+    return ir(pyconvert(Circuit, py_circ), Val(:JAQCD))
 end
 
 function simulate(
-    d::AbstractSimulator,
+    simulator::AbstractSimulator,
     task_specs::Union{PyList{Any},NTuple{N,PyIterable},Py},
     args...;
     input::Union{PyList{Any},PyDict{Any,Any},Py}=PyDict{Any,Any}(),
     kwargs...,
 ) where {N}
     # handle inputs
-    jl_specs  = [] 
     jl_inputs = nothing
     shots = args[end]
     stats = @timed begin
@@ -277,172 +274,37 @@ function simulate(
         else
             jl_inputs = [pyconvert(Dict{String,Float64}, py_inputs) for py_inputs in input]
         end
-        s_ix = 1
-        for spec in task_specs
-            jl_prog = if pyhasattr(spec, "source")
+        jl_specs = map(task_specs) do spec 
+            return if pyhasattr(spec, "source")
                 pyconvert(OpenQasmProgram, spec)
             else
                 pyconvert(Program, spec)
             end
-            push!(jl_specs, jl_prog)
-            s_ix += 1
         end
         input = nothing
     end
     @debug "Time for conversion of specs and inputs: $(stats.time)."
     if haskey(kwargs, :measured_qubits)
-        jl_mqs = [pyconvert(Int, q) for q in kwargs[:measured_qubits]]
-        kwargs = merge(Dict(kwargs...), Dict(:measured_qubits=>jl_mqs))
+        jl_measured_qubits = [pyconvert(Int, qubit) for qubit in kwargs[:measured_qubits]]
+        kwargs = merge(Dict(kwargs...), Dict(:measured_qubits=>jl_measured_qubits))
     end
-
     PythonCall.GC.disable()
     if length(jl_specs) == 1
-        r = simulate(d, jl_specs[1], args[1:end-1]...; inputs = jl_inputs, shots=shots, kwargs...)
-        py_r = Py(r, task_specs[1])
-    else
-        r = simulate(d, jl_specs, args[1:end-1]...; inputs = jl_inputs, shots=shots, kwargs...)
-        py_r = Py(r, task_specs)
+        result     = simulate(simulator, jl_specs[1], args[1:end-1]...; inputs = jl_inputs, shots=shots, kwargs...)
+        py_result  = Py(result, task_specs[0])
+    else # this is a batch! use a Braket.jl LocalSimulator to take advantage of thread migration
+        local_sim   = Braket.LocalSimulator(simulator) 
+        task_batch  = simulate(local_sim, jl_specs, args[1:end-1]...; inputs = jl_inputs, shots=shots, kwargs...)
+        raw_results = results(task_batch)
+        # now have to convert back to GateModelTaskResult from GateModelQuantumTaskResult
+        processed_results = map(zip(raw_results, task_specs)) do (result, task_spec)
+            header = Braket.braketSchemaHeader("braket.task_result.gate_model_task_result", "1")
+            return Py(Braket.GateModelTaskResult(header, result.measurements, result.measurement_probabilities, result.result_types, result.measured_qubits, result.task_metadata, result.additional_metadata), task_spec)
+        end
+        py_result = pylist(processed_results)
     end
     PythonCall.GC.enable()
-    return py_r
-end
-
-py_obs(o::String) = pylist([pystr(o)])
-function py_obs(obs::Vector)
-    raw_obs = map(obs) do o
-        o isa String ? pystr(o) : pylist(pylist(pylist(o__) for o__ in o_) for o_ in o)
-    end
-    return pylist(raw_obs)
-end
-function Py(r::Braket.IR.Sample)
-    py_targets = isnothing(r.targets) ? PythonCall.pybuiltins.None : pylist(r.targets)
-    return braket[].ir.jaqcd.results.Sample(targets=py_targets, observable=py_obs(r.observable), type=pystr("sample"))
-end
-
-function Py(r::Braket.IR.Expectation)
-    py_targets = isnothing(r.targets) ? PythonCall.pybuiltins.None : pylist(r.targets)
-    return braket[].ir.jaqcd.results.Expectation(targets=py_targets, observable=py_obs(r.observable), type=pystr("expectation"))
-end
-
-function Py(r::Braket.IR.Variance)
-    py_targets = isnothing(r.targets) ? PythonCall.pybuiltins.None : pylist(r.targets)
-    return braket[].ir.jaqcd.results.Variance(observable=py_obs(r.observable), targets=py_targets, type=pystr("variance"))
-end
-
-function Py(r::Braket.IR.Amplitude)
-    return braket[].ir.jaqcd.results.Amplitude(states=pylist(pystr(s) for s in r.states), type=pystr("amplitude"))
-end
-
-function Py(r::Braket.IR.StateVector)
-    return braket[].ir.jaqcd.results.StateVector(type=pystr("statevector"))
-end
-
-function Py(r::Braket.IR.DensityMatrix)
-    py_targets = isnothing(r.targets) ? PythonCall.pybuiltins.None : pylist(r.targets)
-    return braket[].ir.jaqcd.results.DensityMatrix(targets=py_targets, type=pystr("densitymatrix"))
-end
-
-function Py(r::Braket.IR.Probability)
-    py_targets = isnothing(r.targets) ? PythonCall.pybuiltins.None : pylist(r.targets)
-    return braket[].ir.jaqcd.results.Probability(targets=py_targets, type=pystr("probability"))
-end
-
-function Py(r::Braket.IR.AdjointGradient)
-    py_targets = isnothing(r.targets) ? PythonCall.pybuiltins.None : pylist(r.targets)
-    return braket[].ir.jaqcd.results.AdjointGradient(targets=py_targets, observable=pylist(r.observable), parameters=pylist(pystr(p) for p in r.parameters), type=pystr("adjoint_gradient"))
-end
-
-function Py(rt::Braket.ResultTypeValue)
-    py_typ = Py(rt.type)
-    py_val = if rt.value isa Dict
-        pydict(rt.value)
-    elseif rt.value isa Float64
-        rt.value
-    elseif rt.value isa Vector{Vector{Vector{Float64}}}
-        pylist(pylist(pycomplex(v_...) for v_ in v) for v in rt.value)
-    else
-        Py(rt.value).to_numpy()
-    end
-    return braket[].task_result.gate_model_task_result_v1.ResultTypeValue(type=py_typ, value=py_val)
-end
-
-Py(op::Braket.H, targets) = braket[].ir.jaqcd.instructions.H(target=targets[1], type=pystr("h"))
-Py(op::Braket.X, targets) = braket[].ir.jaqcd.instructions.X(target=targets[1], type=pystr("x"))
-Py(op::Braket.Y, targets) = braket[].ir.jaqcd.instructions.Y(target=targets[1], type=pystr("y"))
-Py(op::Braket.Z, targets) = braket[].ir.jaqcd.instructions.Z(target=targets[1], type=pystr("z"))
-Py(op::Braket.I, targets) = braket[].ir.jaqcd.instructions.I(target=targets[1], type=pystr("i"))
-Py(op::Braket.T, targets) = braket[].ir.jaqcd.instructions.T(target=targets[1], type=pystr("t"))
-Py(op::Braket.V, targets) = braket[].ir.jaqcd.instructions.V(target=targets[1], type=pystr("v"))
-Py(op::Braket.S, targets) = braket[].ir.jaqcd.instructions.S(target=targets[1], type=pystr("s"))
-Py(op::Braket.Ti, targets) = braket[].ir.jaqcd.instructions.Ti(target=targets[1], type=pystr("ti"))
-Py(op::Braket.Si, targets) = braket[].ir.jaqcd.instructions.Si(target=targets[1], type=pystr("si"))
-Py(op::Braket.Vi, targets) = braket[].ir.jaqcd.instructions.Vi(target=targets[1], type=pystr("vi"))
-Py(op::Braket.Rx, targets) = braket[].ir.jaqcd.instructions.Rx(target=targets[1], angle=op.angle[1], type=pystr("rx"))
-Py(op::Braket.Ry, targets) = braket[].ir.jaqcd.instructions.Ry(target=targets[1], angle=op.angle[1], type=pystr("ry"))
-Py(op::Braket.Rz, targets) = braket[].ir.jaqcd.instructions.Rz(target=targets[1], angle=op.angle[1], type=pystr("rz"))
-Py(op::Braket.XX, targets) = braket[].ir.jaqcd.instructions.XX(targets=pylist(targets), angle=op.angle[1], type=pystr("xx"))
-Py(op::Braket.YY, targets) = braket[].ir.jaqcd.instructions.YY(targets=pylist(targets), angle=op.angle[1], type=pystr("yy"))
-Py(op::Braket.ZZ, targets) = braket[].ir.jaqcd.instructions.ZZ(targets=pylist(targets), angle=op.angle[1], type=pystr("zz"))
-Py(op::Braket.XY, targets) = braket[].ir.jaqcd.instructions.XY(targets=pylist(targets), angle=op.angle[1], type=pystr("xy"))
-Py(op::Braket.Swap, targets) = braket[].ir.jaqcd.instructions.Swap(targets=pylist(targets), type=pystr("swap"))
-Py(op::Braket.ISwap, targets) = braket[].ir.jaqcd.instructions.ISwap(targets=pylist(targets), type=pystr("iswap"))
-Py(op::Braket.PSwap, targets) = braket[].ir.jaqcd.instructions.PSwap(targets=pylist(targets), angle=op.angle[1], type=pystr("pswap"))
-Py(op::Braket.CSwap, targets) = braket[].ir.jaqcd.instructions.CSwap(control=targets[1], targets=pylist(targets[2:end]), type=pystr("cswap"))
-Py(op::Braket.CZ, targets) = braket[].ir.jaqcd.instructions.CZ(control=targets[1], target=targets[2], type=pystr("cz"))
-Py(op::Braket.CY, targets) = braket[].ir.jaqcd.instructions.CY(control=targets[1], target=targets[2], type=pystr("cy"))
-Py(op::Braket.CV, targets) = braket[].ir.jaqcd.instructions.CV(control=targets[1], target=targets[2], type=pystr("cv"))
-Py(op::Braket.CNot, targets) = braket[].ir.jaqcd.instructions.CNot(control=targets[1], target=targets[2], type=pystr("cnot"))
-Py(op::Braket.CCNot, targets) = braket[].ir.jaqcd.instructions.CCNot(controls=pylist(targets[1:2]), target=targets[3], type=pystr("ccnot"))
-Py(op::Braket.PhaseShift, targets) = braket[].ir.jaqcd.instructions.PhaseShift(target=targets[1], angle=op.angle[1], type=pystr("phaseshift"))
-Py(op::Braket.CPhaseShift, targets) = braket[].ir.jaqcd.instructions.CPhaseShift(control=targets[1], target=targets[2], angle=op.angle[1], type=pystr("cphaseshift"))
-Py(op::Braket.CPhaseShift00, targets) = braket[].ir.jaqcd.instructions.CPhaseShift00(control=targets[1], target=targets[2], angle=op.angle[1], type=pystr("cphaseshift00"))
-Py(op::Braket.CPhaseShift01, targets) = braket[].ir.jaqcd.instructions.CPhaseShift01(control=targets[1], target=targets[2], angle=op.angle[1], type=pystr("cphaseshift01"))
-Py(op::Braket.CPhaseShift10, targets) = braket[].ir.jaqcd.instructions.CPhaseShift10(control=targets[1], target=targets[2], angle=op.angle[1], type=pystr("cphaseshift10"))
-Py(op::Braket.ECR, targets) = braket[].ir.jaqcd.instructions.ECR(targets=pylist(targets), type=pystr("ecr"))
-Py(op::Braket.BitFlip, targets) = braket[].ir.jaqcd.instructions.BitFlip(target=targets[1], probability=op.probability, type=pystr("bit_flip"))
-Py(op::Braket.PhaseFlip, targets) = braket[].ir.jaqcd.instructions.PhaseFlip(target=targets[1], probability=op.probability, type=pystr("phase_flip"))
-Py(op::Braket.PauliChannel, targets) = braket[].ir.jaqcd.instructions.PauliChannel(target=targets[1], probX=op.probX, probY=op.probY, probZ=op.probZ, type=pystr("pauli_channel"))
-Py(op::Braket.MultiQubitPauliChannel, targets) = braket[].ir.jaqcd.instructions.MultiQubitPauliChannel(target=pylist(targets), probabilities=pydict(op.probabilities), type=pystr("multi_qubit_pauli_channel"))
-Py(op::Braket.Depolarizing, targets) = braket[].ir.jaqcd.instructions.Depolarizing(target=targets[1], probability=op.probability, type=pystr("depolarizing"))
-Py(op::Braket.TwoQubitDepolarizing, targets) = braket[].ir.jaqcd.instructions.TwoQubitDepolarizing(targets=pylist(targets), probability=op.probability, type=pystr("two_qubit_depolarizing"))
-Py(op::Braket.TwoQubitDephasing, targets) = braket[].ir.jaqcd.instructions.TwoQubitDephasing(targets=pylist(targets), probability=op.probability, type=pystr("two_qubit_dephasing"))
-Py(op::Braket.AmplitudeDamping, targets) = braket[].ir.jaqcd.instructions.AmplitudeDamping(target=targets[1], gamma=op.gamma, type=pystr("amplitude_damping"))
-Py(op::Braket.PhaseDamping, targets) = braket[].ir.jaqcd.instructions.PhaseDamping(target=targets[1], gamma=op.gamma, type=pystr("phase_damping"))
-Py(op::Braket.GeneralizedAmplitudeDamping, targets) = braket[].ir.jaqcd.instructions.GeneralizedAmplitudeDamping(target=targets[1], gamma=op.gamma, probability=op.probability, type=pystr("generalized_amplitude_damping"))
-Py(op::Braket.StartVerbatimBox) = braket[].ir.jaqcd.instructions.StartVerbatimBox(type=pystr("start_verbatim_box"))
-Py(op::Braket.EndVerbatimBox) = braket[].ir.jaqcd.instructions.EndVerbatimBox(type=pystr("end_verbatim_box"))
-function Py(op::Braket.Unitary, targets)
-    raw_mat = Braket.complex_matrix_to_ir(op.matrix)
-    py_mat = pylist(pylist(pylist(v__) for v__ in v_) for v_ in raw_mat)
-    return braket[].ir.jaqcd.instructions.Unitary(targets=pylist(targets), matrix=py_mat, type=pystr("unitary"))
-end
-function Py(op::Braket.Kraus, targets)
-    raw_mats = map(Braket.complex_matrix_to_ir, op.matrices)
-    py_mat = pylist(pylist(pylist(pylist(v__) for v__ in v_) for v_ in raw_mat) for raw_mat in raw_mats)
-    return braket[].ir.jaqcd.instructions.Kraus(targets=pylist(targets), matrices=py_mat, type=pystr("kraus"))
-end
-
-Py(ix::Instruction) = Py(ix.operator, ix.target)
-
-function Py(ir::OpenQasmProgram)
-    py_inputs = isnothing(ir.inputs) ? PythonCall.pybuiltins.None : pydict(ir.inputs)
-    return braket[].ir.openqasm.program_v1.Program(source=pystr(ir.source), inputs=py_inputs)
-end
-
-function Py(ir::Program)
-    bris = (isnothing(ir.basis_rotation_instructions) || isempty(ir.basis_rotation_instructions)) ? PythonCall.pybuiltins.None : pylist(ir.basis_rotation_instructions)
-    res  = (isnothing(ir.results) || isempty(ir.results)) ? PythonCall.pybuiltins.None : pylist(ir.results)
-    return braket[].ir.jaqcd.program_v1.Program(instructions=pylist(ir.instructions), results=res, basis_rotation_instructions=bris)
-end
-
-function Py(r::GateModelTaskResult, act)
-    py_measurements  = isempty(r.measurements) ? PythonCall.pybuiltins.None : pylist(pylist(meas) for meas in r.measurements)
-    py_probabilities = !isnothing(r.measurementProbabilities) ? pydict(Dict(pystr(k)=>v for (k,v) in r.measurementProbabilities)) : PythonCall.pybuiltins.None
-    py_qubits        = !isnothing(r.measuredQubits) ? pylist(r.measuredQubits) : PythonCall.pybuiltins.None
-    py_results       = pylist(Py(rtv) for rtv in r.resultTypes)
-    py_task_mtd      = braket[].task_result.task_metadata_v1.TaskMetadata(id=pystr(r.taskMetadata.id), shots=Py(r.taskMetadata.shots), deviceId=pystr(r.taskMetadata.deviceId))
-    py_addl_mtd      = braket[].task_result.additional_metadata.AdditionalMetadata(action=braket[].ir.openqasm.program_v1.Program(source=""))
-    return braket[].task_result.GateModelTaskResult(measurements=py_measurements, measurementProbabilities=py_probabilities, resultTypes=py_results, measuredQubits=py_qubits, taskMetadata=py_task_mtd, additionalMetadata=py_addl_mtd)
+    return py_result
 end
 
 include("precompile.jl")

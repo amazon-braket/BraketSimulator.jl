@@ -51,7 +51,7 @@ version = "0.1.8"
 
 [[deps.Braket]]
 deps = ["AWS", "AWSS3", "AxisArrays", "Base64", "CSV", "CodeTracking", "Compat", "DataStructures", "Dates", "DecFP", "Distributed", "Downloads", "Graphs", "HTTP", "InteractiveUtils", "JLD2", "JSON3", "LinearAlgebra", "Logging", "NamedTupleTools", "OrderedCollections", "Random", "StaticArrays", "Statistics", "StructTypes", "Tar", "UUIDs"]
-git-tree-sha1 = "f8c1557e8d1692e38325a41e73cad083a9e6430d"
+git-tree-sha1 = "35f4cd39a34d214ae3414c0f0f69640bb54c46ae"
 repo-rev = "ksh/oq3"
 repo-url = "git@ssh.gitlab.aws.dev:braket-science/braket.jl.git"
 uuid = "19504a0f-b47d-4348-9127-acc6cc69ef67"

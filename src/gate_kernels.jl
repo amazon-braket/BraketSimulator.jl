@@ -300,7 +300,7 @@ for (V, f) in ((true, :conj), (false, :identity))
             g_mat = $f(matrix_rep(tg))
             c_bit = control_bits[1] == 1
             Threads.@threads for ix = 0:div(n_amps, 8)-1
-                ix_00 = pad_bits(ix, [small_t, mid_t, big_t])
+                ix_00 = pad_bits(ix, (small_t, mid_t, big_t))
                 if c_bit
                     ix_00 = flip_bit(ix_00, endian_control)
                 end
@@ -308,11 +308,9 @@ for (V, f) in ((true, :conj), (false, :identity))
                 ix_01 = flip_bit(ix_00, endian_t1)
                 ix_11 = flip_bit(ix_01, endian_t2)
                 ix_vec = SVector{4,Int}(ix_00 + 1, ix_01 + 1, ix_10 + 1, ix_11 + 1)
-                @views begin
-                    @inbounds begin
-                        amps = SVector{4,T}(state_vec[ix_vec])
-                        state_vec[ix_vec] = g_mat * amps
-                    end
+                @views @inbounds begin
+                    amps = SVector{4,T}(state_vec[ix_vec])
+                    state_vec[ix_vec] = g_mat * amps
                 end
             end
             return
@@ -395,9 +393,9 @@ for (V, f) in ((false, :identity), (true, :conj))
             state_vec::StateVector{T},
             qubits::Int...,
         ) where {T<:Complex, N, B}
-            bvs = g.bitvals
+            bvs   = g.bitvals
             g_mat = ones(ComplexF64, 2^N)
-            ix = 0
+            ix    = 0
             for (bi, bv) in enumerate(bvs)
                 ix += bv << (bi - 1)
             end
@@ -421,21 +419,19 @@ function apply_gate!(
     ts::Vararg{Int,NQ},
 ) where {T<:Complex,NQ,N}
     n_amps, endian_ts = get_amps_and_qubits(state_vec, ts...)
-    endian_ts isa Int && (endian_ts = (endian_ts,))
+    endian_ts  = tuple(endian_ts...)
     ordered_ts = sort(collect(endian_ts))
-    flip_list = map(0:N-1) do t
+    flip_list  = map(0:N-1) do t
         f_vals = Bool[(((1 << f_ix) & t) >> f_ix) for f_ix = 0:NQ-1]
         return ordered_ts[f_vals]
     end
     Threads.@threads for ix = 0:div(n_amps, N)-1
         padded_ix = pad_bits(ix, ordered_ts)
         ixs = SVector{N,Int}(flip_bits(padded_ix, f) + 1 for f in flip_list)
-        @views begin
-            @inbounds begin
-                amps = SVector{N,T}(state_vec[ixs])
-                new_amps = g_mat * amps
-                state_vec[ixs] = new_amps
-            end
+        @views @inbounds begin
+            amps = SVector{N,T}(state_vec[ixs])
+            new_amps = g_mat * amps
+            state_vec[ixs] = new_amps
         end
     end
     return

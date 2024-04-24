@@ -1,20 +1,21 @@
 using Test, PythonCall, BraketSimulator, Braket
 
 @testset "Python integration" begin
-    braket_ixs = pyimport("braket.ir.jaqcd.instructions")
-    braket_rts = pyimport("braket.ir.jaqcd.results")
+    braket_ixs       = pyimport("braket.ir.jaqcd.instructions")
+    braket_rts       = pyimport("braket.ir.jaqcd.results")
     braket_sim_gates = pyimport("braket.default_simulator.gate_operations")
     braket_sim_noise = pyimport("braket.default_simulator.noise_operations")
     braket_sim_rts   = pyimport("braket.default_simulator.result_types")
     braket_sim_obs   = pyimport("braket.default_simulator.observables")
     np               = pyimport("numpy")
-    jl_mat     = ComplexF64[0.0 1.0; 1.0 0.0]
-    py_mat     = pylist([pylist([pylist([0.0; 0.0]); pylist([1.0; 0.0])]); pylist([pylist([1.0; 0.0]); pylist([0.0; 0.0])])])
-    py_sim_mat = np.array(pylist([pylist([0.0, 1.0]); pylist([1.0, 0.0])]))
+    jl_mat           = ComplexF64[0.0 1.0; 1.0 0.0]
+    py_mat           = pylist([pylist([pylist([0.0; 0.0]); pylist([1.0; 0.0])]); pylist([pylist([1.0; 0.0]); pylist([0.0; 0.0])])])
+    py_sim_mat       = np.array(pylist([pylist([0.0, 1.0]); pylist([1.0, 0.0])]))
     @testset "Gates" begin
         @testset for (jl_gate, py_gate, py_sim_gate) in zip(
-            [H(), X(), Y(), Z(), V(), Vi(), T(), Ti(), S(), Si(), Unitary(jl_mat)],
+            [Braket.I(), H(), X(), Y(), Z(), V(), Vi(), T(), Ti(), S(), Si(), Unitary(jl_mat)],
             [
+                braket_ixs.I(target=0),
                 braket_ixs.H(target=0),
                 braket_ixs.X(target=0),
                 braket_ixs.Y(target=0),
@@ -28,6 +29,7 @@ using Test, PythonCall, BraketSimulator, Braket
                 braket_ixs.Unitary(targets=pylist([0]), matrix=py_mat),
             ],
             [
+                braket_sim_gates.Identity(targets=pylist([0])),
                 braket_sim_gates.Hadamard(targets=pylist([0])),
                 braket_sim_gates.PauliX(targets=pylist([0])),
                 braket_sim_gates.PauliY(targets=pylist([0])),
@@ -42,6 +44,8 @@ using Test, PythonCall, BraketSimulator, Braket
             ],
         )
             @test pyconvert(Bool, Py(jl_gate, 0) == py_gate)
+            @test pyconvert(Bool, Py(Braket.Instruction(jl_gate, [0])) == py_gate)
+            @test pyconvert(typeof(jl_gate), py_gate) == jl_gate
             @test pyconvert(Braket.Instruction, py_gate) == Braket.Instruction(jl_gate, 0)
             @test pyconvert(Braket.Instruction, py_sim_gate) == Braket.Instruction(jl_gate, 0)
         end
@@ -64,6 +68,8 @@ using Test, PythonCall, BraketSimulator, Braket
             ],
         )
             @test pyconvert(Bool, Py(jl_gate, 0) == py_gate)
+            @test pyconvert(Bool, Py(Braket.Instruction(jl_gate, [0])) == py_gate)
+            @test pyconvert(typeof(jl_gate), py_gate) == jl_gate
             @test pyconvert(Braket.Instruction, py_gate) == Braket.Instruction(jl_gate, 0)
             @test pyconvert(Braket.Instruction, py_sim_gate) == Braket.Instruction(jl_gate, 0)
         end
@@ -71,12 +77,12 @@ using Test, PythonCall, BraketSimulator, Braket
             [
                 GPi(angle),
                 GPi2(angle),
-                #MultiQubitPhaseShift{1}(angle),
+                MultiQubitPhaseShift{1}(angle),
             ],
             [
                 braket_sim_gates.GPi(targets=pylist([0]), angle=angle),
                 braket_sim_gates.GPi2(targets=pylist([0]), angle=angle),
-                #braket_sim_gates.GPhase(angle=angle),
+                braket_sim_gates.GPhase(targets=pylist([0]), angle=angle),
             ],
         )
             @test pyconvert(Braket.Instruction, py_sim_gate) == Braket.Instruction(jl_gate, 0)
@@ -119,6 +125,8 @@ using Test, PythonCall, BraketSimulator, Braket
             ],
         )
             @test pyconvert(Bool, Py(jl_gate, [0, 1]) == py_gate)
+            @test pyconvert(Bool, Py(Braket.Instruction(jl_gate, [0, 1])) == py_gate)
+            @test pyconvert(typeof(jl_gate), py_gate) == jl_gate
             @test pyconvert(Braket.Instruction, py_gate) == Braket.Instruction(jl_gate, [0, 1])
             @test pyconvert(Braket.Instruction, py_sim_gate) == Braket.Instruction(jl_gate, [0, 1])
         end
@@ -158,6 +166,8 @@ using Test, PythonCall, BraketSimulator, Braket
             ],
         )
             @test pyconvert(Bool, Py(jl_gate, [0, 1]) == py_gate)
+            @test pyconvert(Bool, Py(Braket.Instruction(jl_gate, [0, 1])) == py_gate)
+            @test pyconvert(typeof(jl_gate), py_gate) == jl_gate
             @test pyconvert(Braket.Instruction, py_gate) == Braket.Instruction(jl_gate, [0, 1])
             @test pyconvert(Braket.Instruction, py_sim_gate) == Braket.Instruction(jl_gate, [0, 1])
         end
@@ -169,6 +179,8 @@ using Test, PythonCall, BraketSimulator, Braket
              braket_sim_gates.CSwap(targets=pylist([0, 1, 2]))],
         )
             @test pyconvert(Bool, Py(jl_gate, [0, 1, 2]) == py_gate)
+            @test pyconvert(Bool, Py(Braket.Instruction(jl_gate, [0, 1, 2])) == py_gate)
+            @test pyconvert(typeof(jl_gate), py_gate) == jl_gate
             @test pyconvert(Braket.Instruction, py_gate) == Braket.Instruction(jl_gate, [0, 1, 2])
             @test pyconvert(Braket.Instruction, py_sim_gate) == Braket.Instruction(jl_gate, [0, 1, 2])
         end
@@ -212,6 +224,8 @@ using Test, PythonCall, BraketSimulator, Braket
                 ],
             )
             @test pyconvert(Bool, Py(jl_noise, 0) == py_noise)
+            @test pyconvert(Bool, Py(Braket.Instruction(jl_noise, [0])) == py_noise)
+            @test pyconvert(typeof(jl_noise), py_noise) == jl_noise
             @test pyconvert(Braket.Instruction, py_noise) == Braket.Instruction(jl_noise, 0)
             @test pyconvert(Braket.Instruction, py_sim_noise) == Braket.Instruction(jl_noise, 0)
         end
@@ -227,8 +241,19 @@ using Test, PythonCall, BraketSimulator, Braket
             ],
         )
             @test pyconvert(Bool, Py(jl_noise, [0, 1]) == py_noise)
+            @test pyconvert(Bool, Py(Braket.Instruction(jl_noise, [0, 1])) == py_noise)
+            @test pyconvert(typeof(jl_noise), py_noise) == jl_noise
             @test pyconvert(Braket.Instruction, py_noise) == Braket.Instruction(jl_noise, [0, 1])
             @test pyconvert(Braket.Instruction, py_sim_noise) == Braket.Instruction(jl_noise, [0, 1])
+        end
+    end
+    @testset "Compiler directives" begin
+        @testset for (jl_cd, py_cd) in zip([StartVerbatimBox(), EndVerbatimBox()],
+                                           [braket_ixs.StartVerbatimBox(), braket_ixs.EndVerbatimBox()])
+            @test pyconvert(Bool, Py(jl_cd) == py_cd)
+            @test pyconvert(Bool, Py(Braket.Instruction(jl_cd)) == py_cd)
+            @test pyconvert(typeof(jl_cd), py_cd)      == jl_cd
+            @test pyconvert(Braket.Instruction, py_cd) == Braket.Instruction(jl_cd)
         end
     end
     @testset "Result types" begin
@@ -238,7 +263,7 @@ using Test, PythonCall, BraketSimulator, Braket
         py_herm = py_mat
         jl_tp_2 = Union{String, Vector{Vector{Vector{Float64}}}}["h", jl_herm]
         py_tp_2 = pylist([pystr("h"), py_herm])
-        @testset for (jl_rt, py_rt) in zip(
+        @testset for (jl_rt, py_rt, jl_braket_rt) in zip(
                 [
                     Braket.IR.StateVector("statevector"),
                     Braket.IR.Amplitude(["00", "11"], "amplitude"),
@@ -291,18 +316,73 @@ using Test, PythonCall, BraketSimulator, Braket
                     braket_rts.Variance(observable=py_tp_1, targets=pylist([0, 1])),
                     braket_rts.Variance(observable=py_tp_2, targets=pylist([0, 1])),
                 ],
+                [
+                    Braket.StateVector(),
+                    Braket.Amplitude(["00", "11"]),
+                    Braket.Probability(),
+                    Braket.Probability(0),
+                    Braket.DensityMatrix(),
+                    Braket.DensityMatrix(0),
+                    Braket.Sample(Braket.Observables.X(), Int[]),
+                    Braket.Sample(Braket.Observables.X(), [0]),
+                    Braket.Sample(Braket.Observables.HermitianObservable(jl_mat), Int[]),
+                    Braket.Sample(Braket.Observables.HermitianObservable(jl_mat), [0]),
+                    Braket.Sample(Braket.Observables.TensorProduct([Braket.Observables.H(), Braket.Observables.X()]), [0, 1]),
+                    Braket.Sample(Braket.Observables.TensorProduct([Braket.Observables.H(), Braket.Observables.HermitianObservable(jl_mat)]), [0, 1]),
+                    Braket.Expectation(Braket.Observables.X(), Int[]),
+                    Braket.Expectation(Braket.Observables.X(), [0]),
+                    Braket.Expectation(Braket.Observables.HermitianObservable(jl_mat), Int[]),
+                    Braket.Expectation(Braket.Observables.HermitianObservable(jl_mat), [0]),
+                    Braket.Expectation(Braket.Observables.TensorProduct([Braket.Observables.H(), Braket.Observables.X()]), [0, 1]),
+                    Braket.Expectation(Braket.Observables.TensorProduct([Braket.Observables.H(), Braket.Observables.HermitianObservable(jl_mat)]), [0, 1]),
+                    Braket.Variance(Braket.Observables.X(), Int[]),
+                    Braket.Variance(Braket.Observables.X(), [0]),
+                    Braket.Variance(Braket.Observables.HermitianObservable(jl_mat), Int[]),
+                    Braket.Variance(Braket.Observables.HermitianObservable(jl_mat), [0]),
+                    Braket.Variance(Braket.Observables.TensorProduct([Braket.Observables.H(), Braket.Observables.X()]), [0, 1]),
+                    Braket.Variance(Braket.Observables.TensorProduct([Braket.Observables.H(), Braket.Observables.HermitianObservable(jl_mat)]), [0, 1]),
+                ],
         )
             @test pyconvert(Bool, Py(jl_rt) == py_rt)
-            @test pyconvert(Braket.IR.AbstractProgramResult, py_rt) == jl_rt
+            @test pyconvert(Braket.AbstractProgramResult, py_rt) == jl_rt
+            @test pyconvert(typeof(jl_braket_rt), py_rt) == jl_braket_rt
+            @test pyconvert(Result, py_rt) == jl_braket_rt
         end
     end
-    @testset "Result types from default sim" begin
+    @testset "Result types and observables from default sim" begin
         jl_tp_1 = Braket.Observables.TensorProduct(["h", "x"])
         py_tp_1 = braket_sim_obs.TensorProduct(pylist([braket_sim_obs.Hadamard(targets=pylist([0])), braket_sim_obs.PauliX(targets=pylist([1]))]))
         jl_herm = Braket.Observables.HermitianObservable(jl_mat)
         py_herm = braket_sim_obs.Hermitian(targets=pylist([0]), matrix=py_sim_mat)
         jl_tp_2 = Braket.Observables.TensorProduct([Braket.Observables.H(), jl_herm])
         py_tp_2 = braket_sim_obs.TensorProduct(pylist([braket_sim_obs.Hadamard(targets=pylist([0])), braket_sim_obs.Hermitian(targets=pylist([1]), matrix=py_sim_mat)]))
+        @testset for (jl_obs, py_obs) in zip(
+                [
+                    jl_tp_1,
+                    jl_tp_2,
+                    jl_herm,
+                    Braket.Observables.H(),
+                    Braket.Observables.X(),
+                    Braket.Observables.Y(),
+                    Braket.Observables.Z(),
+                    Braket.Observables.I(),
+                ],
+                [
+                    py_tp_1,
+                    py_tp_2,
+                    py_herm,
+                    braket_sim_obs.Hadamard(targets=pylist([0])),
+                    braket_sim_obs.PauliX(targets=pylist([0])),
+                    braket_sim_obs.PauliY(targets=pylist([0])),
+                    braket_sim_obs.PauliZ(targets=pylist([0])),
+                    braket_sim_obs.Identity(targets=pylist([0])),
+                ],
+               )
+            # do this to avoid overspecialized parameter
+            T = jl_obs isa Braket.Observables.TensorProduct ? Braket.Observables.TensorProduct : typeof(jl_obs)
+            @test pyconvert(T, py_obs) == jl_obs
+            @test pyconvert(Braket.Observables.Observable, py_obs) == jl_obs
+        end
         @testset for (jl_rt, py_rt) in zip(
                 [
                     Braket.StateVector(),
@@ -337,7 +417,8 @@ using Test, PythonCall, BraketSimulator, Braket
                     braket_sim_rts.Variance(observable=py_tp_2),
                 ],
         )
-            @test pyconvert(Braket.Result, py_rt) == jl_rt
+            @test pyconvert(typeof(jl_rt), py_rt) == jl_rt
+            @test pyconvert(Result, py_rt) == jl_rt
         end
         py_tp_1 = pylist([pystr("h"), pystr("x")])
         py_herm = py_mat
@@ -396,7 +477,101 @@ using Test, PythonCall, BraketSimulator, Braket
                     braket_rts.Variance(observable=py_tp_2, targets=pylist([0, 1])),
                 ],
         )
-            @test pyconvert(Braket.Result, py_rt) == jl_rt
+            @test pyconvert(typeof(jl_rt), py_rt) == jl_rt
+            @test pyconvert(Result, py_rt) == jl_rt
         end
+    end
+    @testset "Programs" begin
+        sv_adder = """
+        OPENQASM 3;
+
+        input uint[4] a_in;
+        input uint[4] b_in;
+
+        gate majority a, b, c {
+            cnot c, b;
+            cnot c, a;
+            ccnot a, b, c;
+        }
+
+        gate unmaj a, b, c {
+            ccnot a, b, c;
+            cnot c, a;
+            cnot a, b;
+        }
+
+        qubit cin;
+        qubit[4] a;
+        qubit[4] b;
+        qubit cout;
+
+        // set input states
+        for int[8] i in [0: 3] {
+          if(bool(a_in[i])) x a[i];
+          if(bool(b_in[i])) x b[i];
+        }
+
+        // add a to b, storing result in b
+        majority cin, b[3], a[3];
+        for int[8] i in [3: -1: 1] { majority a[i], b[i - 1], a[i - 1]; }
+        cnot a[0], cout;
+        for int[8] i in [1: 3] { unmaj a[i], b[i - 1], a[i - 1]; }
+        unmaj cin, b[3], a[3];
+
+        // todo: subtle bug when trying to get a result type for both at once
+        #pragma braket result probability cout, b
+        #pragma braket result probability cout
+        #pragma braket result probability b
+        """
+        oq3_program = Braket.OpenQasmProgram(Braket.braketSchemaHeader("braket.ir.openqasm.program", "1"), sv_adder, Dict("a_in"=>3, "b_in"=>7))
+        n_qubits = 5
+        function qft_circuit(qubit_count::Int)
+            qft_circ = Circuit() 
+            for target_qubit = 0:qubit_count-1
+                angle = π/2
+                qft_circ(H(), target_qubit)
+                for control_qubit = target_qubit+1:qubit_count-1
+                    qft_circ(CPhaseShift(angle), control_qubit, target_qubit)
+                    angle /= 2
+                end
+            end
+            qft_circ(Amplitude([repeat("0", qubit_count), repeat("1", qubit_count)]))
+            qft_circ(Expectation(Braket.Observables.X(), 0))
+            qft_circ(DensityMatrix())
+            return qft_circ
+        end
+        jaqcd_program = ir(qft_circuit(n_qubits), Val(:JAQCD))
+        @test pyconvert(Braket.OpenQasmProgram, Py(oq3_program)) == oq3_program
+        @test pyconvert(Braket.Program, Py(jaqcd_program)) == jaqcd_program
+        @testset "Full Python circuit execution" begin
+            sv_simulator = StateVectorSimulator(n_qubits, 0)
+            oq3_results  = simulate(sv_simulator, pylist([Py(oq3_program)]), 0)
+            @test pyconvert(Bool, oq3_results.resultTypes[0].type == Py(Braket.IR.Probability([9, 5, 6, 7, 8], "probability")))
+            # test a "batch"
+            oq3_results  = simulate(sv_simulator, pylist([Py(oq3_program), Py(oq3_program)]), 0; input = pylist([pydict(Dict("a_in"=>2, "b_in"=>5)), pydict(Dict("a_in"=>3, "b_in"=>2))]))
+            @test pyconvert(Vector{Float64}, oq3_results[0].resultTypes[0].value) ≠ pyconvert(Vector{Float64}, oq3_results[0].resultTypes[1].value)
+
+            sv_simulator  = StateVectorSimulator(n_qubits, 0)
+            jaqcd_results = simulate(sv_simulator, pylist([Py(jaqcd_program)]), n_qubits, 0)
+            @test pyconvert(Bool, jaqcd_results.resultTypes[0].type == Py(Braket.IR.Amplitude([repeat("0", n_qubits), repeat("1", n_qubits)], "amplitude")))
+            @test pyconvert(Bool, jaqcd_results.resultTypes[1].type == Py(Braket.IR.Expectation(["x"], [0], "expectation")))
+            @test pyconvert(Bool, jaqcd_results.resultTypes[2].type == Py(Braket.IR.DensityMatrix(nothing, "density_matrix")))
+        end
+    end
+    @testset "Python circuit with measured qubits" begin
+        qasm = """
+        qubit[2] q; 
+        bit[1] b;
+        h q[0];
+        cnot q[0], q[1];
+        b[0] = measure q[0];
+        """
+        simulator    = StateVectorSimulator(2, 1000)
+        oq3_program  = Braket.OpenQasmProgram(Braket.braketSchemaHeader("braket.ir.openqasm.program", "1"), qasm, nothing)
+        result       = simulate(simulator, pylist([Py(oq3_program)]), 1000; measured_qubits=pylist([0]))
+        measurements = [[pyconvert(Int, m) for m in measurement] for measurement in result.measurements]
+        @test 400 < sum(m[1] for m in measurements) < 600
+        @test all(length(m) == 1 for m in measurements)
+        @test pyconvert(Bool, result.measuredQubits == pylist([0]))
     end
 end

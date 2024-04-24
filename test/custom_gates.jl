@@ -151,6 +151,7 @@ using BraketSimulator: DoubleExcitation, SingleExcitation, matrix_rep, Control
         end
         @testset for nq in 1:2
             ϕ = 2.12
+            @test qubit_count(Control(MultiQubitPhaseShift{nq}(ϕ), ntuple(i->0, nq))) == nq
             instructions     = vcat([Instruction(H(), [q]) for q in 0:nq-1], [Instruction(Control(MultiQubitPhaseShift{nq}(ϕ), ntuple(i->0, nq)), collect(0:nq-1))])
             u                = Matrix(matrix_rep(Control(MultiQubitPhaseShift{nq}(ϕ), ntuple(i->0, nq))))
             u_instructions   = vcat([Instruction(H(), [q]) for q in 0:nq-1], [Instruction(Unitary(u), collect(0:nq-1))])
