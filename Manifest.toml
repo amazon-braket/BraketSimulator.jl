@@ -2,7 +2,7 @@
 
 julia_version = "1.9.4"
 manifest_format = "2.0"
-project_hash = "9bce471f6e2030868f7c2725554c17994c9de553"
+project_hash = "24284403668594f0d5f51c3c4dd626663c409526"
 
 [[deps.AWS]]
 deps = ["Base64", "Compat", "Dates", "Downloads", "GitHub", "HTTP", "IniFile", "JSON", "MbedTLS", "Mocking", "OrderedCollections", "Random", "SHA", "Sockets", "URIs", "UUIDs", "XMLDict"]
@@ -51,7 +51,7 @@ version = "0.1.8"
 
 [[deps.Braket]]
 deps = ["AWS", "AWSS3", "AxisArrays", "Base64", "CSV", "CodeTracking", "Compat", "DataStructures", "Dates", "DecFP", "Distributed", "Downloads", "Graphs", "HTTP", "InteractiveUtils", "JLD2", "JSON3", "LinearAlgebra", "Logging", "NamedTupleTools", "OrderedCollections", "Random", "StaticArrays", "Statistics", "StructTypes", "Tar", "UUIDs"]
-git-tree-sha1 = "13b4efaace055069aa90b275aca286c0c2dab80d"
+git-tree-sha1 = "f8c1557e8d1692e38325a41e73cad083a9e6430d"
 repo-rev = "ksh/oq3"
 repo-url = "git@ssh.gitlab.aws.dev:braket-science/braket.jl.git"
 uuid = "19504a0f-b47d-4348-9127-acc6cc69ef67"
@@ -360,9 +360,9 @@ version = "2.28.2+0"
 
 [[deps.Missings]]
 deps = ["DataAPI"]
-git-tree-sha1 = "f66bdc5de519e8f8ae43bdc598782d35a25b1272"
+git-tree-sha1 = "ec4f7fbeab05d7747bdf98eb74d130a2a2ed298d"
 uuid = "e1d29d7a-bbdc-5cf2-9ac0-f12de2c33e28"
-version = "1.1.0"
+version = "1.2.0"
 
 [[deps.Mmap]]
 uuid = "a63ad114-7e13-5084-954f-fe012c677804"
@@ -398,9 +398,9 @@ version = "0.8.1+0"
 
 [[deps.OpenSSL]]
 deps = ["BitFlags", "Dates", "MozillaCACerts_jll", "OpenSSL_jll", "Sockets"]
-git-tree-sha1 = "af81a32750ebc831ee28bdaaba6e1067decef51e"
+git-tree-sha1 = "38cb508d080d21dc1128f7fb04f20387ed4c0af4"
 uuid = "4d8831e6-92b7-49fb-bdf8-b643e874388c"
-version = "1.4.2"
+version = "1.4.3"
 
 [[deps.OpenSSL_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]

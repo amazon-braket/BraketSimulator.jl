@@ -1,4 +1,4 @@
-using Test, cuStateVec, CUDA, Braket, BraketSimulator, LinearAlgebra
+using Test, Braket, BraketSimulator, LinearAlgebra
 import Braket: Instruction
 
 const NUM_SAMPLES = 1000
@@ -23,8 +23,6 @@ all_qubit_observables_testdata = [
     Braket.Observables.I(),
     Braket.Observables.HermitianObservable([0.0 1.0; 1.0 0.0]),
 ]
-
-funcs = CUDA.functional() ? (identity, cu) : (identity,)
 
 @testset "Result types" begin
     state_vector() = (sqrt.(collect(0:15) ./ 120.0)) .* vcat(ones(8), im .* ones(8))
@@ -57,20 +55,18 @@ funcs = CUDA.functional() ? (identity, cu) : (identity,)
         ],
     )
 
-    function simulation(obs_func, f, ::Val{:sv})
+    function simulation(obs_func, ::Val{:sv})
         sim = BraketSimulator.StateVectorSimulator(4, NUM_SAMPLES)
         sim.state_vector = state_vector()
-        sim = f(sim)
         @test sum(abs2.(sim.state_vector)) ≈ 1.0
         if !isnothing(obs_func)
             sim = BraketSimulator.apply_observables!(sim, [obs_func()])
         end
         return sim
     end
-    function simulation(obs_func, f, ::Val{:dm})
+    function simulation(obs_func, ::Val{:dm})
         sim = BraketSimulator.DensityMatrixSimulator(4, NUM_SAMPLES)
         sim.density_matrix = density_matrix(state_vector())
-        sim = f(sim)
         @test sum(diag(sim.density_matrix)) ≈ 1.0
         if !isnothing(obs_func)
             sim = BraketSimulator.apply_observables!(sim, [obs_func()])
@@ -102,15 +98,13 @@ funcs = CUDA.functional() ? (identity, cu) : (identity,)
         return real(dot(marginal, (real.(evs) .^ 2) .- real(dot(marginal, evs)^2)))
     end
     targs = collect(0:3)
-    @testset "Simulation type $sim_type, f $f" for sim_type in (Val(:sv), Val(:dm)),
-        f in funcs
-
+    @testset "Simulation type $sim_type" for sim_type in (Val(:sv), Val(:dm))
         if sim_type isa Val{:sv}
             @testset "Amplitude" begin
                 result_type = Braket.Amplitude(["0010", "0101", "1110"])
                 amplitudes = BraketSimulator.calculate(
                     result_type,
-                    simulation(observable, f, sim_type),
+                    simulation(observable, sim_type),
                 )
                 sv = state_vector()
                 @test amplitudes["0010"] ≈ sv[3]
@@ -121,7 +115,7 @@ funcs = CUDA.functional() ? (identity, cu) : (identity,)
         @testset "Probability" begin
             probability_12 = BraketSimulator.calculate(
                 Braket.Probability([1, 2]),
-                simulation(nothing, f, sim_type),
+                simulation(nothing, sim_type),
             )
             @test collect(probability_12) ≈ marginal_12()
 
@@ -129,7 +123,7 @@ funcs = CUDA.functional() ? (identity, cu) : (identity,)
             probability_all_qubits = collect(
                 BraketSimulator.calculate(
                     Braket.Probability([0, 1, 2, 3]),
-                    simulation(nothing, f, sim_type),
+                    simulation(nothing, sim_type),
                 ),
             )
             @test probability_all_qubits ≈ state_vector_probabilities
@@ -139,11 +133,11 @@ funcs = CUDA.functional() ? (identity, cu) : (identity,)
             @test result_type.observable == obs[1]
             @test result_type.targets == QubitSet(obs[2])
 
-            sim = simulation(() -> obs, f, sim_type)
+            sim = simulation(() -> obs, sim_type)
             calculated = BraketSimulator.calculate(result_type, sim)
             from_diagonalization = _expectation_from_diagonalization(
                 BraketSimulator.state_with_observables(
-                    simulation(() -> obs, f, sim_type),
+                    simulation(() -> obs, sim_type),
                 ),
                 obs[2],
                 eigvals(obs[1]),
@@ -157,13 +151,13 @@ funcs = CUDA.functional() ? (identity, cu) : (identity,)
             calculated = [
                 BraketSimulator.calculate(
                     result_type,
-                    simulation(() -> (obs, targs), f, sim_type),
+                    simulation(() -> (obs, targs), sim_type),
                 ) for result_type in result_types
             ]
             from_diagonalization = [
                 _expectation_from_diagonalization(
                     BraketSimulator.state_with_observables(
-                        simulation(() -> (obs, t), f, sim_type),
+                        simulation(() -> (obs, t), sim_type),
                     ),
                     t,
                     eigvals(obs),
@@ -172,14 +166,14 @@ funcs = CUDA.functional() ? (identity, cu) : (identity,)
             @test calculated ≈ from_diagonalization
         end
         @testset "Variance obs $obs" for obs in observables_testdata
-            sim = simulation(() -> obs, f, sim_type)
+            sim = simulation(() -> obs, sim_type)
             result_type = Variance(obs...)
             @test result_type.observable == obs[1]
             @test result_type.targets == QubitSet(obs[2])
             calculated = BraketSimulator.calculate(result_type, sim)
             from_diagonalization = _variance_from_diagonalization(
                 BraketSimulator.state_with_observables(
-                    simulation(() -> obs, f, sim_type),
+                    simulation(() -> obs, sim_type),
                 ),
                 obs[2],
                 eigvals(obs[1]),
@@ -193,13 +187,13 @@ funcs = CUDA.functional() ? (identity, cu) : (identity,)
             calculated = [
                 BraketSimulator.calculate(
                     result_type,
-                    simulation(() -> (obs, targs), f, sim_type),
+                    simulation(() -> (obs, targs), sim_type),
                 ) for result_type in result_types
             ]
             from_diagonalization = [
                 _variance_from_diagonalization(
                     BraketSimulator.state_with_observables(
-                        simulation(() -> (obs, t), f, sim_type),
+                        simulation(() -> (obs, t), sim_type),
                     ),
                     t,
                     eigvals(obs),
@@ -209,7 +203,7 @@ funcs = CUDA.functional() ? (identity, cu) : (identity,)
         end
         @testset "Density matrix $qubit" for (qubit, mat) in dm_dict
             dm  = DensityMatrix(qubit)
-            sim = simulation(nothing, f, sim_type)
+            sim = simulation(nothing, sim_type)
             calculated = BraketSimulator.calculate(dm, sim)
             @test collect(calculated) ≈ mat rtol = 1e-6
         end

@@ -7,17 +7,12 @@ CurrentModule = BraketSimulator
 
 This package is a suite of Julia simulators of gate-based quantum circuits with (density matrix) and without (state vector) noise.
 It is designed to integrate with [Amazon Braket](https://aws.amazon.com/braket/), the quantum computing service from AWS.
-By default, it offers threaded CPU-based simulation of these circuits, and with optional package extensions you can use GPU-accelerated
-versions of these simulators (via NVIDIA's CUQUANTUM and [`CUDA.jl`](https://github.com/JuliaGPU/CUDA.jl/)) and integrate with Python.
-
-To use the GPU acceleration, you will need an NVIDIA CUDA-capable GPU and you will need to install the `cuStateVec.jl` package. During
-installation this package will install any necessary CUDA artifacts.
-
+By default, it offers threaded CPU-based simulation of these circuits, and an optional package extension you can integrate with Python.
 To use the Python integration, you will need to install [`PythonCall.jl`](https://github.com/JuliaPy/PythonCall.jl).
 
 See the [Julia Pkg docs](https://pkgdocs.julialang.org/v1/creating-packages/#Conditional-loading-of-code-in-packages-(Extensions)) for more information about package extensions.
 
-If you wish to use this package **from Python**, see [`amazon-braket-julia-simulator`](), a Python package built on top of [`juliacall`](https://pypi.org/project/juliacall/)
+If you wish to use this package **from Python**, see [`amazon-braket-simulator-v2`](), a Python package built on top of [`juliacall`](https://pypi.org/project/juliacall/)
 which will automatically install Julia and all necessary Julia packages in a Python virtual environment, set appropriate environment variables, and allow you to use
 these simulators from Python packages such as the [Amazon Braket SDK](https://github.com/amazon-braket/amazon-braket-sdk-python) or [PennyLane](https://pennylane.ai/).
 
