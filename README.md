@@ -23,6 +23,16 @@ You do *not* need a Python installation or the Python Amazon Braket SDK installe
 
 All necessary Julia packages will be installed for you when you run `Pkg.add("BraketSimulator")` or `] instantiate` (if you're doing a `dev` install). The minimum supported Julia version is 1.9.
 
+## Generating precompilation instructions
+
+In order to generate a new set of precompilation instructions, you'll need to comment out the `include("precompile.jl")` lines in `src/BraketSimulator.jl` and `ext/BraketSimulatorPythonExt/BraketSimulatorPythonExt.jl`. Then, `cd` to `precompile` and run:
+
+```bash
+julia --project=../test snoop_compilation.jl
+```
+
+This will run the test suite using [`SnoopCompile.jl`](https://timholy.github.io/SnoopCompile.jl/dev/snoopi_deep_parcel/) to generate precompilation instructions. Once this is completed, you can *un*comment `include("precompile.jl")` lines in `src/BraketSimulator.jl` and `ext/BraketSimulatorPythonExt/BraketSimulatorPythonExt.jl`.
+
 ## Package Extensions
 
 `BraketSimulator.jl` has an optional extension to support integration with Python (`BraketSimulatorPythonExt`).
