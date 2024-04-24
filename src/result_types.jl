@@ -14,8 +14,8 @@ function make_alias_table!(
     smalls::AbstractVector{Int},
 )
     n = length(weights)
-    length(a) == length(alias) == n ||
-        throw(DimensionMismatch("Inconsistent array lengths. length(a) = $(length(a)), length(alias) = $(length(alias)), n = $n"))
+    length(acceptance_probs) == length(alias) == n ||
+        throw(DimensionMismatch("Inconsistent array lengths. length(acceptance_probs) = $(length(acceptance_probs)), length(alias) = $(length(alias)), n = $n"))
 
     ac = n / wsum
     acceptance_probs .= weights .* ac

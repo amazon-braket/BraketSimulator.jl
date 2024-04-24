@@ -7,3 +7,5 @@ lcov.info
 /docs/Manifest.toml
 /docs/build/
 /.coverage
+.DS_Store
+*/.DS_Store

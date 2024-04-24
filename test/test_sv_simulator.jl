@@ -2,8 +2,6 @@ using Test, Logging, Braket, BraketSimulator, DataStructures
 
 import Braket: I, Instruction
 
-Logging.disable_logging(Logging.Warn)
-
 LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
 
 @testset "State vector simulator" begin
