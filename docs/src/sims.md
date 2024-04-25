@@ -10,13 +10,6 @@ and an **array type** (so that we can specialize for GPU arrays, for example).
 
 Each simulator can be initialized with a `qubit_count` and `shots` value. You may query the [`properties`](@ref Braket.properties) of a simulator to learn what gate types, result types, and other operations it supports.
 
-```@docs
-AbstractSimulator
-StateVectorSimulator
-DensityMatrixSimulator
-Braket.properties(::StateVectorSimulator)
-Braket.properties(::DensityMatrixSimulator)
-BraketSimulator.evolve!
-expectation
-probabilities
+```@autodocs
+Modules = [BraketSimulator]
 ```

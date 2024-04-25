@@ -29,10 +29,14 @@ using Pkg
 Pkg.add("BraketSimulator")
 ```
 
-Then you can run a simulation of a simple [GHZ state](https://en.wikipedia.org/wiki/Greenberger%E2%80%93Horne%E2%80%93Zeilinger_state) preparation circuit:
+Then you can run a simulation of a simple [GHZ state](https://en.wikipedia.org/wiki/Greenberger%E2%80%93Horne%E2%80%93Zeilinger_state) preparation circuit.
+
+!!! note
+    To simulate OpenQASM3 programs, you will need to load the Python extension `BraketSimulatorPythonExt` like so: `using PythonCall, BraketSimulator`. If
+    you prefer not to install or use Python, make sure to set the default `IRType` for `Braket.jl` to JAQCD: `Braket.IRType[] = :JAQCD`. 
 
 ```jldoctest
-julia> using Braket, BraketSimulator 
+julia> using Braket, BraketSimulator
 
 julia> n_qubits = 10;
 
@@ -44,9 +48,9 @@ julia> foreach(q->CNot(c, 0, q), 1:n_qubits-1);
 
 julia> Amplitude(c, [repeat("0", n_qubits), repeat("1", n_qubits)]);
 
-julia> sim = LocalSimulator("braket_sv"); # use the state vector simulator (without noise)
+julia> sim = LocalSimulator("braket_sv_v2"); # use the state vector simulator (without noise)
 
-julia> res = result(sim(c, shots=0));
+julia> res = result(simulate(sim, ir(c, Val(:JAQCD)), shots=0));
 
 julia> res.values
 1-element Vector{Any}:
