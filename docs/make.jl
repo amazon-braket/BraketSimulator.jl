@@ -18,8 +18,7 @@ makedocs(;
     ],
 )
 
-# TODO UNCOMMENT ME WHEN PUBLIC
-#=deploydocs(;
+deploydocs(;
     repo="github.com/amazon-braket/BraketSimulator.jl",
     devbranch="main",
-)=#
+)

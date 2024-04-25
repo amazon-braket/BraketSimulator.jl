@@ -72,5 +72,5 @@ jobs:
         run: |
           using Documenter: DocMeta, doctest
           using BraketSimulator
-          DocMeta.setdocmeta!(BraketSimulator, :DocTestSetup, :(using BraketSimulator); recursive=true)
+          DocMeta.setdocmeta!(BraketSimulator, :DocTestSetup, :(using Braket, BraketSimulator); recursive=true)
           doctest(BraketSimulator)
