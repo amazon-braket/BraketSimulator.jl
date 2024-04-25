@@ -71,6 +71,6 @@ jobs:
         shell: julia --project=docs --color=yes {0}
         run: |
           using Documenter: DocMeta, doctest
-          using BraketSimulator
+          using Braket, BraketSimulator
           DocMeta.setdocmeta!(BraketSimulator, :DocTestSetup, :(using Braket, BraketSimulator); recursive=true)
           doctest(BraketSimulator)
