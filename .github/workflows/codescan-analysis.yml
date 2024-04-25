@@ -22,4 +22,4 @@ jobs:
     - name: Get rules from JuliaComputing
       run: git clone https://github.com/JuliaComputing/semgrep-rules-julia.git
     - name: Run Semgrep Julia rules
-      run: semgrep -c semgrep-rules-julia/rules .
+      run: semgrep --test --test-ignore-todo --config semgrep-rules-julia/rules .
