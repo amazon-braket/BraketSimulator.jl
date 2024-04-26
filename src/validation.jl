@@ -74,17 +74,16 @@ end
 function _validate_ir_instructions_compatibility(
     simulator::D,
     circuit::Union{Program,Circuit},
-    ::Val{:JAQCD},
+    supported_operations,
 ) where {D<:AbstractSimulator}
     circuit_instruction_names = map(ix->replace(lowercase(string(typeof(ix.operator))), "_"=>""), circuit.instructions)
-    supported_operations      = properties(simulator).action["braket.ir.jaqcd.program"].supportedOperations
-    supported_instructions    = Set(replace(lowercase(op), "_"=>"") for op in supported_operations)
+    supported_instructions    = Set(map(op->replace(lowercase(op), "_"=>""), supported_operations))
     no_noise = true
     for name in circuit_instruction_names
         if name in _NOISE_INSTRUCTIONS
             no_noise = false
             if name ∉ supported_instructions
-                throw(ErrorException("Noise instructions are not supported by the state vector simulator (by default). You need to use the density matrix simulator: LocalSimulator(\"braket_dm_v2\")."))
+                throw(ErrorException("Noise instructions are not supported by $simulator (by default). You need to use the density matrix simulator: LocalSimulator(\"braket_dm_v2\")."))
             end
         end
     end
@@ -93,30 +92,7 @@ function _validate_ir_instructions_compatibility(
     end
     return
 end
-        
-function _validate_ir_instructions_compatibility(
-    simulator::D,
-    circuit::Union{Program,Circuit},
-    ::Val{:OpenQASM},
-) where {D<:AbstractSimulator}
-    circuit_instruction_names = map(ix->replace(lowercase(string(typeof(ix.operator))), "_"=>""), circuit.instructions)
-    supported_operations      = properties(simulator).action["braket.ir.openqasm.program"].supportedOperations
-    supported_instructions    = Set(replace(lowercase(op), "_"=>"") for op in supported_operations)
-    no_noise = true
-    for name in circuit_instruction_names
-        if name in _NOISE_INSTRUCTIONS
-            no_noise = false
-            if name ∉ supported_instructions
-                throw(ErrorException("Noise instructions are not supported by the state vector simulator (by default). You need to use the density matrix simulator: LocalSimulator(\"braket_dm_v2\")."))
-            end
-        end
-    end
-    if no_noise && !isempty(intersect(_NOISE_INSTRUCTIONS, supported_instructions))
-        @warn "You are running a noise-free circuit on the density matrix simulator. Consider running this circuit on the state vector simulator: LocalSimulator(\"braket_sv_v2\") for a better user experience."
-    end
-    return
-end
-
+_validate_ir_instructions_compatibility(simulator::D, circuit::Union{Program,Circuit}, v::Val{V}) where {D<:AbstractSimulator, V} = _validate_ir_instructions_compatibility(simulator, circuit, supported_operations(simulator, v))
 
 _validate_result_type_qubits_exist(rt::Braket.StateVector, qubit_count::Int) = return
 _validate_result_type_qubits_exist(rt::Braket.Amplitude, qubit_count::Int) = return
