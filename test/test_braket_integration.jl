@@ -34,8 +34,10 @@ end
     NOISE_DEVICES = [NOISE_DEVICE]
     SHOT_LIST = (0, 8000)
 
+    # looser tolerance bounds here to account
+    # for differences in `np.allclose` vs `isapprox`
     get_tol(shots::Int) = return (
-        shots > 0 ? Dict("atol" => 0.1, "rtol" => 0.15) : Dict("atol" => 0.01, "rtol" => 0)
+        shots > 0 ? Dict("atol" => 0.2, "rtol" => 0.25) : Dict("atol" => 0.01, "rtol" => 0)
     )
 
     bell_circ() = Circuit([(H, 0), (CNot, 0, 1)])

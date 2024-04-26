@@ -1,6 +1,10 @@
 # BraketSimulator
 
 [![Aqua](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
+[![Stable docs](https://img.shields.io/badge/docs-stable-blue.svg)](https://amazon-braket.github.io/BraketSimulator.jl/stable)
+[![Latest docs](https://img.shields.io/badge/docs-dev-blue.svg)](https://amazon-braket.github.io/BraketSimulator.jl/dev)
+[![CI](https://github.com/amazon-braket/braketsimulator.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/amazon-braket/braketsimulator.jl/actions/workflows/CI.yml)
+[![Coverage](https://codecov.io/gh/amazon-braket/BraketSimulator.jl/graph/badge.svg?token=TvAJbwbNcn)](https://codecov.io/gh/amazon-braket/BraketSimulator.jl)
 
 This package is a quantum circuit simulator written in the [Julia programming language](https://julialang.org/), meant to be compatible with the [Amazon Braket SDK](https://github.com/aws/amazon-braket-sdk-python). It can simulate gate-based quantum circuits using both statevectors and density matrices (when noise is present).
 
