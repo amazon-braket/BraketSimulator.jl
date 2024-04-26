@@ -30,16 +30,16 @@ for (rt, brt, fn) in ((:(Braket.IR.Sample), :(Braket.Sample), :jl_convert_sample
                       (:(Braket.IR.Variance), :(Braket.Variance), :jl_convert_variance),
                      )
     @eval begin
-        function $fn(::Type{$rt}, x::Py)
+        function $fn(t::Type{$rt}, x::Py)
             jl_obs = convert_ir_obs(x.observable)
             jl_ts  = convert_ir_target(x.targets)
-            jl_rt  = $rt(jl_obs, jl_ts, pyconvert(String, x.type))
+            jl_rt  = t(jl_obs, jl_ts, pyconvert(String, x.type))
             PythonCall.pyconvert_return(jl_rt)
         end
         $fn(::Type{AbstractProgramResult}, x::Py) = $fn($rt, x)
-        function $fn(::Type{$brt}, x::Py)
+        function $fn(t::Type{$brt}, x::Py)
             jl_obs = Braket.StructTypes.constructfrom(Braket.Observables.Observable, convert_ir_obs(x.observable))
-            PythonCall.pyconvert_return($brt(jl_obs, convert_ir_target(x.targets)))
+            PythonCall.pyconvert_return(t(jl_obs, convert_ir_target(x.targets)))
         end
         $fn(::Type{Braket.Result}, x::Py) = $fn($brt, x::Py)
     end
@@ -49,9 +49,9 @@ for (rt, brt, fn) in ((:(Braket.IR.Probability), :(Braket.Probability), :jl_conv
                       (:(Braket.IR.DensityMatrix), :(Braket.DensityMatrix), :jl_convert_densitymatrix),
                      )
     @eval begin
-        function $fn(::Type{$rt}, x::Py)
+        function $fn(t::Type{$rt}, x::Py)
             jl_ts = convert_ir_target(x.targets)
-            jl_rt = $rt(jl_ts, pyconvert(String, x.type))
+            jl_rt = t(jl_ts, pyconvert(String, x.type))
             PythonCall.pyconvert_return(jl_rt)
         end
         $fn(::Type{AbstractProgramResult}, x::Py) = $fn($rt, x)
@@ -73,27 +73,28 @@ function inputs_to_jl(x)
         return Dict(jl_inputs)
     end
 end
-function jl_convert_oqprogram(::Type{OpenQasmProgram}, x::Py)
+function jl_convert_oqprogram(t::Type{OpenQasmProgram}, x::Py)
     bsh    = pyconvert(Braket.braketSchemaHeader, x.braketSchemaHeader)
     source = pyconvert(String, x.source)
     inputs = inputs_to_jl(x.inputs) 
-    PythonCall.pyconvert_return(OpenQasmProgram(bsh, source, inputs))
+    PythonCall.pyconvert_return(t(bsh, source, inputs))
 end
 
-function jl_convert_amplitude(::Type{Braket.IR.Amplitude}, x::Py)
-    jl_rt = Braket.IR.Amplitude([pyconvert(String, s) for s in x.states], pyconvert(String, x.type))
+function jl_convert_amplitude(t::Type{Braket.IR.Amplitude}, x::Py)
+    states = map(state->pyconvert(String, state), x.states)
+    jl_rt  = t(states, pyconvert(String, x.type))
     PythonCall.pyconvert_return(jl_rt)
 end
 jl_convert_amplitude(::Type{AbstractProgramResult}, x::Py) = jl_convert_amplitude(Braket.IR.Amplitude, x::Py)
 
-function jl_convert_amplitude(::Type{Braket.Amplitude}, x::Py)
-    jl_rt = Braket.Amplitude([pyconvert(String, s) for s in x.states])
-    PythonCall.pyconvert_return(jl_rt)
+function jl_convert_amplitude(t::Type{Braket.Amplitude}, x::Py)
+    states = map(state->pyconvert(String, state), x.states)
+    PythonCall.pyconvert_return(t(states))
 end
 jl_convert_amplitude(::Type{Braket.Result}, x::Py) = jl_convert_amplitude(Braket.Amplitude, x::Py)
 
-function jl_convert_statevector(::Type{Braket.IR.StateVector}, x::Py)
-    jl_rt = Braket.IR.StateVector(pyconvert(String, x.type))
+function jl_convert_statevector(t::Type{Braket.IR.StateVector}, x::Py)
+    jl_rt = t(pyconvert(String, x.type))
     PythonCall.pyconvert_return(jl_rt)
 end
 jl_convert_statevector(::Type{AbstractProgramResult}, x::Py) = jl_convert_statevector(Braket.IR.StateVector, x::Py)
@@ -103,11 +104,11 @@ jl_convert_statevector(::Type{Braket.Result}, x::Py) = jl_convert_statevector(Br
 # exclude adjoint gradient translation from coverage for now
 # as we don't yet implement this, so don't have a test for it
 # COV_EXCL_START
-function jl_convert_adjointgradient(::Type{Braket.IR.AdjointGradient}, x::Py)
+function jl_convert_adjointgradient(t::Type{Braket.IR.AdjointGradient}, x::Py)
     jl_targets = pyis(x.targets, pybuiltins.None) ? nothing : [convert_targets(t_) for t_ in t]
     jl_params = pyis(x.targets, pybuiltins.None) ? nothing : [pyconvert(String, p) for p in x.parameters]
     jl_obs = pyisinstance(x.observable, pybuiltins.str) ? pyconvert(String, x.observable) : [convert_ir_obs(o) for o in x.observable] 
-    jl_rt = Braket.IR.AdjointGradient(jl_params, jl_obs, jl_targets, pyconvert(String, x.type))
+    jl_rt = t(jl_params, jl_obs, jl_targets, pyconvert(String, x.type))
     PythonCall.pyconvert_return(jl_rt)
 end
 jl_convert_adjointgradient(::Type{AbstractProgramResult}, x::Py) = jl_convert_adjointgradient(Braket.IR.AdjointGradient, x::Py)
@@ -237,7 +238,7 @@ for (g, fn) in ((:CPhaseShift, :jl_convert_cphaseshift),
     end
 end
 
-function jl_convert_ix(::Type{Instruction}, x::Py)::Instruction
+function jl_convert_ix(t::Type{Instruction}, x::Py)::Instruction
     # extract targets
     full_targets = QubitSet()
     for attr ∈ ("control", "target") # single-qubit
@@ -256,14 +257,14 @@ function jl_convert_ix(::Type{Instruction}, x::Py)::Instruction
     py_name = pyconvert(String, pygetattr(x, "type"))
     jl_type = sts[Symbol(py_name)]
     # bad, can we come up with something more generic
-    ix = Instruction(PythonCall.pyconvert(jl_type, x), full_targets)
+    ix = t(PythonCall.pyconvert(jl_type, x), full_targets)
     PythonCall.pyconvert_return(ix)
 end
 
-function jl_convert_bsh(::Type{Braket.braketSchemaHeader}, x::Py)
+function jl_convert_bsh(t::Type{Braket.braketSchemaHeader}, x::Py)
     name    = pyconvert(String, x.name)
     version = pyconvert(String, x.version)
-    PythonCall.pyconvert_return(Braket.braketSchemaHeader(name, version))
+    PythonCall.pyconvert_return(t(name, version))
 end
 
 for (fn, jl_typ) in ((:jl_convert_sim_identity, :(Braket.Observables.I)),
@@ -311,9 +312,9 @@ for (fn, jl_typ) in ((:jl_convert_sim_identity, :(Braket.I)),
                      (:jl_convert_sim_ccnot, :CCNot),
                     )
     @eval begin
-        function $fn(::Type{Braket.Instruction}, x::Py)
+        function $fn(t::Type{Braket.Instruction}, x::Py)
             jl_operation = _handle_modifiers($jl_typ(), x)
-            PythonCall.pyconvert_return(Instruction(jl_operation, convert_targets(x.targets)))
+            PythonCall.pyconvert_return(t(jl_operation, convert_targets(x.targets)))
         end
     end
 end
@@ -334,9 +335,9 @@ for (fn, jl_typ) in ((:jl_convert_sim_gpi, :GPi),
                      (:jl_convert_sim_zz, :ZZ),
                     )
     @eval begin
-        function $fn(::Type{Braket.Instruction}, x::Py)
+        function $fn(t::Type{Braket.Instruction}, x::Py)
             jl_operation = _handle_modifiers($jl_typ(pyconvert(Union{Float64, FreeParameter}, x._angle)), x)
-            PythonCall.pyconvert_return(Instruction(jl_operation, convert_targets(x.targets)))
+            PythonCall.pyconvert_return(t(jl_operation, convert_targets(x.targets)))
         end
     end
 end
@@ -344,19 +345,19 @@ for (fn, jl_typ, a1, a2, a3) in ((:jl_convert_sim_ms, :MS, "_angle_1", "_angle_2
                                  (:jl_convert_sim_u, :U, "_theta", "_phi", "_lambda"),
                                 )
     @eval begin
-        function $fn(::Type{Braket.Instruction}, x::Py)
+        function $fn(t::Type{Braket.Instruction}, x::Py)
             angle      = (pyconvert(Union{Float64, FreeParameter}, getproperty(x, Symbol($a1))),
                           pyconvert(Union{Float64, FreeParameter}, getproperty(x, Symbol($a2))),
                           pyconvert(Union{Float64, FreeParameter}, getproperty(x, Symbol($a3))))
             jl_operation = _handle_modifiers($jl_typ(angle), x)
-            PythonCall.pyconvert_return(Instruction(jl_operation, convert_targets(x.targets)))
+            PythonCall.pyconvert_return(t(jl_operation, convert_targets(x.targets)))
         end
     end
 end
-function jl_convert_sim_unitary(::Type{Braket.Instruction}, x::Py)
+function jl_convert_sim_unitary(t::Type{Braket.Instruction}, x::Py)
     jl_matrix    = pyconvert(Matrix{ComplexF64}, x._matrix)
     jl_operation = _handle_modifiers(Unitary(jl_matrix), x)
-    PythonCall.pyconvert_return(Instruction(jl_operation, convert_targets(x.targets)))
+    PythonCall.pyconvert_return(t(jl_operation, convert_targets(x.targets)))
 end
 for (fn, jl_typ) in ((:jl_convert_sim_bitflip, :BitFlip),
                      (:jl_convert_sim_phaseflip, :PhaseFlip),
@@ -365,9 +366,9 @@ for (fn, jl_typ) in ((:jl_convert_sim_bitflip, :BitFlip),
                      (:jl_convert_sim_twoqubitdephasing, :TwoQubitDephasing),
                     )
     @eval begin
-        function $fn(::Type{Braket.Instruction}, x::Py)
+        function $fn(t::Type{Braket.Instruction}, x::Py)
             jl_op = $jl_typ(pyconvert(Union{Float64, FreeParameter}, x._probability))
-            PythonCall.pyconvert_return(Instruction(jl_op, convert_targets(x.targets)))
+            PythonCall.pyconvert_return(t(jl_op, convert_targets(x.targets)))
         end
     end
 end
@@ -376,45 +377,41 @@ for (fn, jl_typ) in ((:jl_convert_sim_amplitudedamping, :AmplitudeDamping),
                      (:jl_convert_sim_phasedamping, :PhaseDamping),
                     )
     @eval begin
-        function $fn(::Type{Braket.Instruction}, x::Py)
+        function $fn(t::Type{Braket.Instruction}, x::Py)
             jl_op = $jl_typ(pyconvert(Union{Float64, FreeParameter}, x._gamma))
-            PythonCall.pyconvert_return(Instruction(jl_op, convert_targets(x.targets)))
+            PythonCall.pyconvert_return(t(jl_op, convert_targets(x.targets)))
         end
     end
 end
-function jl_convert_sim_paulichannel(::Type{Braket.Instruction}, x::Py)
+function jl_convert_sim_paulichannel(t::Type{Braket.Instruction}, x::Py)
     jl_op = PauliChannel(pyconvert(Union{Float64, FreeParameter}, x._probX),
                          pyconvert(Union{Float64, FreeParameter}, x._probY),
                          pyconvert(Union{Float64, FreeParameter}, x._probZ)
                         )
-    PythonCall.pyconvert_return(Instruction(jl_op, convert_targets(x.targets)))
+    PythonCall.pyconvert_return(t(jl_op, convert_targets(x.targets)))
 end
-function jl_convert_sim_generalizedamplitudedamping(::Type{Braket.Instruction}, x::Py)
+function jl_convert_sim_generalizedamplitudedamping(t::Type{Braket.Instruction}, x::Py)
     jl_op = GeneralizedAmplitudeDamping(pyconvert(Union{Float64, FreeParameter}, x._probability),
                                         pyconvert(Union{Float64, FreeParameter}, x._gamma),
                                        )
-    PythonCall.pyconvert_return(Instruction(jl_op, convert_targets(x.targets)))
+    PythonCall.pyconvert_return(t(jl_op, convert_targets(x.targets)))
 end
 
 jl_convert_sympy_Pi(::Type{Float64}, x::Py) = PythonCall.pyconvert_return(convert(Float64, π))
 jl_convert_sympy_E(::Type{Float64}, x::Py) = PythonCall.pyconvert_return(convert(Float64, ℯ))
 
-function jl_convert_sympy_Mul(::Type{Float64}, x::Py)
-    jl_args = [pyconvert(Float64, a) for a in x.args]
-    val     = prod(jl_args, init=1.0)
-    PythonCall.pyconvert_return(val)
-end
+jl_convert_sympy_Mul(::Type{Float64}, x::Py) = PythonCall.pyconvert_return(mapreduce(arg->pyconvert(Float64, arg), *, x.args, init=1.0))
 
-function jl_convert_sim_gphase(::Type{Braket.Instruction}, x::Py)
+function jl_convert_sim_gphase(t::Type{Braket.Instruction}, x::Py)
     angle      = pyconvert(Union{FreeParameter, Float64}, x._angle)
     jl_targets = convert_targets(x.targets)
     jl_op      = MultiQubitPhaseShift{length(jl_targets)}(angle)
-    PythonCall.pyconvert_return(Instruction(jl_op, jl_targets))
+    PythonCall.pyconvert_return(t(jl_op, jl_targets))
 end
 
-function jl_convert_sim_kraus(::Type{Braket.Instruction}, x::Py)
+function jl_convert_sim_kraus(t::Type{Braket.Instruction}, x::Py)
     jl_op      = Kraus([pyconvert(Matrix{ComplexF64}, m) for m in x._matrices])
-    PythonCall.pyconvert_return(Instruction(jl_op, convert_targets(x.targets)))
+    PythonCall.pyconvert_return(t(jl_op, convert_targets(x.targets)))
 end
 
 for (rt, fn) in ((:(Braket.Sample), :jl_convert_sim_sample),
@@ -422,9 +419,9 @@ for (rt, fn) in ((:(Braket.Sample), :jl_convert_sim_sample),
                  (:(Braket.Variance), :jl_convert_sim_variance),
                 )
     @eval begin
-        function $fn(::Type{$rt}, x::Py)
+        function $fn(t::Type{$rt}, x::Py)
             jl_obs = pyconvert(Braket.Observables.Observable, x._observable)
-            PythonCall.pyconvert_return($rt(jl_obs, convert_ir_target(x._targets)))
+            PythonCall.pyconvert_return(t(jl_obs, convert_ir_target(x._targets)))
         end
     end
 end
@@ -437,9 +434,9 @@ for (rt, fn) in ((:(Braket.Probability), :jl_convert_sim_probability),
     end
 end
 
-function jl_convert_sim_amplitude(::Type{Braket.Amplitude}, x::Py)
-    jl_rt = Braket.Amplitude([pyconvert(String, s) for s in x._states])
-    PythonCall.pyconvert_return(jl_rt)
+function jl_convert_sim_amplitude(t::Type{Braket.Amplitude}, x::Py)
+    states = map(state->pyconvert(String, state), x._states)
+    PythonCall.pyconvert_return(t(states))
 end
 
 # exclude adjoint gradient translation from coverage for now
@@ -450,20 +447,20 @@ jl_convert_sim_adjointgradient(::Type{Braket.Result}, x::Py) = error("not implem
 # COV_EXCL_STOP
 jl_convert_sim_statevector(::Type{Braket.StateVector}, x::Py) = PythonCall.pyconvert_return(Braket.StateVector())
 
-function jl_convert_sim_circuit(::Type{Braket.Circuit}, x)
-    instructions = [pyconvert(Instruction, ix) for ix in x.instructions]
-    results      = [pyconvert(Result, rt) for rt in x.results]
-    prog         = Braket.Circuit()
+function jl_convert_sim_circuit(t::Type{Braket.Circuit}, x)
+    instructions = map(ix->pyconvert(Instruction, ix), x.instructions)
+    results      = map(rt->pyconvert(Result, rt), x.results)
+    prog         = t()
     foreach(ix->Braket.add_instruction!(prog, ix), instructions)
     foreach(rt->push!(prog.result_types, rt), results)
     PythonCall.pyconvert_return(prog)
 end
 
-function jl_convert_program(::Type{Braket.IR.Program}, x_jaqcd)
-    instructions = [pyconvert(Instruction, ix) for ix in x_jaqcd.instructions]
+function jl_convert_program(t::Type{Braket.IR.Program}, x_jaqcd)
+    instructions = map(ix->pyconvert(Instruction, ix), x_jaqcd.instructions)
     results      = pyisinstance(x_jaqcd.results, PythonCall.pybuiltins.list) ? [pyconvert(AbstractProgramResult, rt) for rt in x_jaqcd.results] : AbstractProgramResult[]
     bris         = pyisinstance(x_jaqcd.basis_rotation_instructions, PythonCall.pybuiltins.list) ? [pyconvert(Instruction, ix) for ix in x_jaqcd.basis_rotation_instructions] : Instruction[]
-    prog         = Braket.Program(Braket.header_dict[Braket.Program], instructions, results, bris)
+    prog         = t(Braket.header_dict[Braket.Program], instructions, results, bris)
     PythonCall.pyconvert_return(prog)
 end
 jl_convert_circuit(::Type{Braket.IR.Program}, x) = jl_convert_program(Braket.IR.Program, x._to_jaqcd())
@@ -579,6 +576,6 @@ function Py(r::GateModelTaskResult, action)
     py_qubits        = !isnothing(r.measuredQubits) ? pylist(r.measuredQubits) : PythonCall.pybuiltins.None
     py_results       = pylist(Py(rtv) for rtv in r.resultTypes)
     py_task_mtd      = braket[].task_result.task_metadata_v1.TaskMetadata(id=pystr(r.taskMetadata.id), shots=Py(r.taskMetadata.shots), deviceId=pystr(r.taskMetadata.deviceId))
-    py_addl_mtd      = braket[].task_result.additional_metadata.AdditionalMetadata(action=braket[].ir.openqasm.program_v1.Program(source=""))
+    py_addl_mtd      = braket[].task_result.additional_metadata.AdditionalMetadata(action=action)
     return braket[].task_result.GateModelTaskResult(measurements=py_measurements, measurementProbabilities=py_probabilities, resultTypes=py_results, measuredQubits=py_qubits, taskMetadata=py_task_mtd, additionalMetadata=py_addl_mtd)
 end

@@ -39,10 +39,10 @@ mutable struct DensityMatrixSimulator{T,S} <:
     end
 end
 function init(
-    ::Type{DensityMatrixSimulator{T,S}},
+    t::Type{S},
     qubit_count::Int,
-) where {T,S<:AbstractMatrix{T}}
-    dm = S(undef, 2^qubit_count, 2^qubit_count)
+) where {T<:Complex,S<:AbstractMatrix{T}}
+    dm = t(undef, 2^qubit_count, 2^qubit_count)
     fill!(dm, zero(T))
     dm[1, 1] = one(T)
     return dm
@@ -51,7 +51,7 @@ function DensityMatrixSimulator{T,S}(
     qubit_count::Int,
     shots::Int,
 ) where {T,S<:AbstractDensityMatrix{T}}
-    dm = init(DensityMatrixSimulator{T,S}, qubit_count)
+    dm = init(S, qubit_count)
     return DensityMatrixSimulator{T,S}(dm, qubit_count, shots)
 end
 """
@@ -70,10 +70,12 @@ Braket.qubit_count(dms::DensityMatrixSimulator) = dms.qubit_count
 Query the properties and capabilities of a `DensityMatrixSimulator`, including which gates and result types are supported and the minimum and maximum shot and qubit counts.
 """
 Braket.properties(d::DensityMatrixSimulator) = dm_props
-supported_operations(d::DensityMatrixSimulator) =
-    dm_props.action["braket.ir.openqasm.program"].supportedOperations
-supported_result_types(d::DensityMatrixSimulator) =
-    dm_props.action["braket.ir.openqasm.program"].supportedResultTypes
+supported_operations(d::DensityMatrixSimulator, ::Val{:OpenQASM}) = dm_props.action["braket.ir.openqasm.program"].supportedOperations
+supported_operations(d::DensityMatrixSimulator, ::Val{:JAQCD}) = dm_props.action["braket.ir.jaqcd.program"].supportedOperations
+supported_operations(d::DensityMatrixSimulator) = supported_operations(d::DensityMatrixSimulator, Val(:OpenQASM))
+supported_result_types(d::DensityMatrixSimulator, ::Val{:OpenQASM}) = dm_props.action["braket.ir.openqasm.program"].supportedResultTypes
+supported_result_types(d::DensityMatrixSimulator, ::Val{:JAQCD}) = dm_props.action["braket.ir.jaqcd.program"].supportedResultTypes
+supported_result_types(d::DensityMatrixSimulator) = supported_result_types(d::DensityMatrixSimulator, Val(:OpenQASM))
 Braket.device_id(dms::DensityMatrixSimulator) = "braket_dm_v2"
 Braket.name(dms::DensityMatrixSimulator) = "DensityMatrixSimulator"
 Base.show(io::IO, dms::DensityMatrixSimulator) =
@@ -169,24 +171,14 @@ function evolve!(
     return dms
 end
 
-for (gate, obs) in (
-    (:X, :(Braket.Observables.X)),
-    (:Y, :(Braket.Observables.Y)),
-    (:Z, :(Braket.Observables.Z)),
-    (:I, :(Braket.Observables.I)),
-    (:H, :(Braket.Observables.H)),
-)
-    @eval begin
-        function apply_observable!(
-            observable::$obs,
-            dm::S,
-            targets,
-        ) where {T<:Complex,S<:AbstractDensityMatrix{T}}
-            reshaped_dm = reshape(dm, length(dm))
-            foreach(target->apply_gate!($gate(), reshaped_dm, target), targets)
-            return dm
-        end
-    end
+function apply_observable!(
+    gate::G,
+    dm::S,
+    targets,
+) where {T<:Complex,S<:AbstractDensityMatrix{T}, G<:Gate}
+    reshaped_dm = reshape(dm, length(dm))
+    foreach(target->apply_gate!(gate, reshaped_dm, target), targets)
+    return dm
 end
 function apply_observable!(
     observable::Braket.Observables.HermitianObservable,
@@ -233,8 +225,7 @@ end
 function apply_observables!(dms::DensityMatrixSimulator, observables)
     !isempty(dms._density_matrix_after_observables) &&
         error("observables have already been applied.")
-    diag_gates = [diagonalizing_gates(observable...) for observable in observables]
-    operations = reduce(vcat, diag_gates)
+    operations = mapreduce(obs->diagonalizing_gates(obs...), vcat, observables)
     dms._density_matrix_after_observables = deepcopy(dms.density_matrix)
     reshaped_dm = reshape(dms._density_matrix_after_observables, length(dms.density_matrix))
     for operation in operations

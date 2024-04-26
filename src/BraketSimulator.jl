@@ -145,13 +145,12 @@ function _generate_results(
     result_types::Vector,
     simulator::D,
 ) where {D<:AbstractSimulator}
-    result_values = [calculate(result_type, simulator) for result_type in result_types]
+    result_values = map(result_type -> calculate(result_type, simulator), result_types)
     result_values =
         [val isa Matrix ? Braket.complex_matrix_to_ir(val) : val for val in result_values]
-    return [
-        Braket.ResultTypeValue(result, result_value) for
-        (result, result_value) in zip(results, result_values)
-    ]
+    return map(zip(results, result_values)) do (result, result_value)
+        Braket.ResultTypeValue(result, result_value)
+    end
 end
 
 _translate_result_type(r::Braket.IR.Amplitude, qc::Int)     = Braket.Amplitude(r.states)
@@ -182,10 +181,10 @@ function _translate_result_types(
     results::Vector{Braket.AbstractProgramResult},
     qubit_count::Int,
 )
-    return [_translate_result_type(r, qubit_count) for r in results]
+    return map(result->_translate_result_type(result, qubit_count), results)
 end
 
-function _compute_exact_results(d::AbstractSimulator, program::Program, qc::Int, inputs::Dict{String, Float64})
+function _compute_exact_results(d::AbstractSimulator, program::Program, qc::Int)
     result_types = _translate_result_types(program.results, qc)
     _validate_result_types_qubits_exist(result_types, qc)
     return _generate_results(program.results, result_types, d)
@@ -225,7 +224,7 @@ function simulate(
         simulator = evolve!(simulator, operations)
     end
     @debug "Time for evolution: $(stats.time)"
-    results = shots == 0 && !isempty(program.results) ? _compute_exact_results(simulator, program, n_qubits, inputs) : [Braket.ResultTypeValue(result_type, 0.0) for result_type in program.results]
+    results = shots == 0 && !isempty(program.results) ? _compute_exact_results(simulator, program, n_qubits) : [Braket.ResultTypeValue(result_type, 0.0) for result_type in program.results]
     measured_qubits = get(kwargs, :measured_qubits, collect(0:n_qubits-1))
     isempty(measured_qubits) && (measured_qubits = collect(0:n_qubits-1))
     stats   = @timed _bundle_results(results, circuit_ir, simulator; measured_qubits=measured_qubits)
@@ -257,7 +256,7 @@ function simulate(
         simulator = evolve!(simulator, operations)
     end
     @debug "Time for evolution: $(stats.time)"
-    results = shots == 0 && !isempty(circuit_ir.results) ? _compute_exact_results(simulator, circuit_ir, qubit_count, inputs) : Braket.ResultTypeValue[]
+    results = shots == 0 && !isempty(circuit_ir.results) ? _compute_exact_results(simulator, circuit_ir, qubit_count) : Braket.ResultTypeValue[]
     measured_qubits = get(kwargs, :measured_qubits, collect(0:qubit_count-1))
     isempty(measured_qubits) && (measured_qubits = collect(0:qubit_count-1))
     stats = @timed _bundle_results(results, circuit_ir, simulator; measured_qubits=measured_qubits)

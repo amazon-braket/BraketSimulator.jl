@@ -28,21 +28,13 @@ Base.inv(g::Unitary) = Unitary(inv(g.matrix))
 Base.inv(g::GPi2) = GPi2(g.angle[1] + π)
 Base.inv(g::MS) = MS(g.angle[1] + π, g.angle[2], g.angle[3])
 
-function Base.inv(g::ISwap)
-    u_mat = zeros(ComplexF64, 4, 4)
-    u_mat[1, 1] = 1.0
-    u_mat[4, 4] = 1.0
-    u_mat[2, 3] = -im
-    u_mat[3, 2] = -im
-    return Unitary(u_mat)
-end
-function Base.inv(g::CV)
-    u_mat = zeros(ComplexF64, 4, 4)
-    u_mat[1, 1] = 1.0
-    u_mat[2, 2] = 1.0
-    u_mat[3, 3] = 0.5-0.5im
-    u_mat[3, 4] = 0.5+0.5im
-    u_mat[4, 3] = 0.5+0.5im
-    u_mat[4, 4] = 0.5-0.5im
-    return Unitary(u_mat)
-end
+const iswap_inv = ComplexF64[1.0 0.0 0.0 0.0;
+                             0.0 0.0 -im 0.0;
+                             0.0 -im 0.0 0.0;
+                             0.0 0.0 0.0 1.0]
+Base.inv(::ISwap) = Unitary(iswap_inv)
+const cv_inv = ComplexF64[1.0 0.0 0.0 0.0;
+                          0.0 1.0 0.0 0.0;
+                          0.0 0.0 0.5-0.5im 0.5+0.5im;
+                          0.0 0.0 0.5+0.5im 0.5-0.5im]
+Base.inv(::CV) = Unitary(cv_inv)

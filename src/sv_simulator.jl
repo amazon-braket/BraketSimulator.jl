@@ -41,10 +41,10 @@ mutable struct StateVectorSimulator{T,S<:AbstractVector{T}} <: AbstractSimulator
     end
 end
 function init(
-    ::Type{StateVectorSimulator{T,S}},
+    t::Type{S},
     qubit_count::Int,
 ) where {T,S<:AbstractVector{T}}
-    sv = S(undef, 2^qubit_count)
+    sv = t(undef, 2^qubit_count)
     fill!(sv, zero(T))
     sv[1] = one(T)
     return sv
@@ -54,7 +54,7 @@ function StateVectorSimulator{T,S}(
     qubit_count::Int,
     shots::Int,
 ) where {T,S<:AbstractVector{T}}
-    sv = init(StateVectorSimulator{T,S}, qubit_count)
+    sv = init(S, qubit_count)
     return StateVectorSimulator{T,S}(sv, qubit_count, shots)
 end
 """
@@ -73,10 +73,12 @@ Braket.qubit_count(svs::StateVectorSimulator) = svs.qubit_count
 Query the properties and capabilities of a `StateVectorSimulator`, including which gates and result types are supported and the minimum and maximum shot and qubit counts.
 """
 Braket.properties(svs::StateVectorSimulator) = sv_props
-supported_operations(svs::StateVectorSimulator) =
-    sv_props.action["braket.ir.openqasm.program"].supportedOperations
-supported_result_types(svs::StateVectorSimulator) =
-    sv_props.action["braket.ir.openqasm.program"].supportedResultTypes
+supported_operations(svs::StateVectorSimulator, ::Val{:OpenQASM}) = sv_props.action["braket.ir.openqasm.program"].supportedOperations
+supported_operations(svs::StateVectorSimulator) = supported_operations(svs::StateVectorSimulator, Val(:OpenQASM))
+supported_operations(svs::StateVectorSimulator, ::Val{:JAQCD}) = sv_props.action["braket.ir.jaqcd.program"].supportedOperations
+supported_result_types(svs::StateVectorSimulator, ::Val{:OpenQASM}) = sv_props.action["braket.ir.openqasm.program"].supportedResultTypes
+supported_result_types(svs::StateVectorSimulator, ::Val{:JAQCD}) = sv_props.action["braket.ir.jaqcd.program"].supportedResultTypes
+supported_result_types(svs::StateVectorSimulator) = supported_result_types(svs::StateVectorSimulator, Val(:OpenQASM))
 Braket.device_id(svs::StateVectorSimulator) = "braket_sv_v2"
 Braket.name(svs::StateVectorSimulator) = "StateVectorSimulator"
 Base.show(io::IO, svs::StateVectorSimulator) =
@@ -151,23 +153,13 @@ state_vector(svs::StateVectorSimulator) = svs.state_vector
 density_matrix(svs::StateVectorSimulator) =
     kron(svs.state_vector, adjoint(svs.state_vector))
 
-for (gate, obs) in (
-    (:X, :(Braket.Observables.X)),
-    (:Y, :(Braket.Observables.Y)),
-    (:Z, :(Braket.Observables.Z)),
-    (:I, :(Braket.Observables.I)),
-    (:H, :(Braket.Observables.H)),
-)
-    @eval begin
-        function apply_observable!(
-            observable::$obs,
-            sv::S,
-            target::Int,
-        ) where {S<:AbstractVector{<:Complex}}
-            apply_gate!($gate(), sv, target)
-            return sv
-        end
-    end
+function apply_observable!(
+    gate::G,
+    sv::S,
+    target::Int,
+) where {S<:AbstractVector{<:Complex}, G<:Gate}
+    apply_gate!(gate, sv, target)
+    return sv
 end
 function apply_observable!(
     observable::Braket.Observables.HermitianObservable,
@@ -271,7 +263,7 @@ function apply_observables!(svs::StateVectorSimulator, observables)
     !isempty(svs._state_vector_after_observables) &&
         error("observables have already been applied.")
     svs._state_vector_after_observables = deepcopy(svs.state_vector)
-    operations = reduce(vcat, diagonalizing_gates(obs...) for obs in observables)
+    operations = mapreduce(obs->diagonalizing_gates(obs...), vcat, observables)
     for operation in operations
         apply_gate!(operation.operator, svs._state_vector_after_observables, operation.target...)
     end

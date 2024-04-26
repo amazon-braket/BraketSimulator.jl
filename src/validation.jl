@@ -23,39 +23,20 @@ function _validate_amplitude_states(states::Vector{String}, qubit_count::Int)
 end
 
 function _validate_ir_results_compatibility(
-    d::D,
+    simulator::D,
     results,
-    ::Val{:OpenQASM},
+    supported_result_types,
 ) where {D<:AbstractSimulator}
     isempty(results) && return
-
     circuit_result_types_name    = [rt.type for rt in results]
-    supported_result_types       = properties(d).action["braket.ir.openqasm.program"].supportedResultTypes
-    supported_result_types_names = [lowercase(string(srt.name)) for srt in supported_result_types]
+    supported_result_types_names = map(supported_rt->lowercase(string(supported_rt.name)), supported_result_types)
     for name in circuit_result_types_name
         name ∉ supported_result_types_names &&
-            throw(ErrorException("result type $name not supported by $D"))
+            throw(ErrorException("result type $name not supported by $simulator"))
     end
     return
 end
-
-function _validate_ir_results_compatibility(
-    d::D,
-    results,
-    ::Val{:JAQCD},
-) where {D<:AbstractSimulator}
-    isempty(results) && return
-
-    circuit_result_types_name = [rt.type for rt in results]
-    supported_result_types =
-        properties(d).action["braket.ir.jaqcd.program"].supportedResultTypes
-    supported_result_types_names = [lowercase(srt.name) for srt in supported_result_types]
-    for name in circuit_result_types_name
-        name ∉ supported_result_types_names &&
-            throw(ErrorException("result type $name not supported by $D"))
-    end
-    return
-end
+_validate_ir_results_compatibility(simulator::D, results, ::Val{V}) where {D<:AbstractSimulator, V} = _validate_ir_results_compatibility(simulator, results, supported_result_types(simulator, Val(V)))
 
 function _validate_shots_and_ir_results(shots::Int, results, qubit_count::Int)
     if shots == 0
@@ -91,12 +72,13 @@ function _validate_input_provided(circuit)
 end
 
 function _validate_ir_instructions_compatibility(
-    d::D,
+    simulator::D,
     circuit::Union{Program,Circuit},
     ::Val{:JAQCD},
 ) where {D<:AbstractSimulator}
-    circuit_instruction_names = [replace(lowercase(string(typeof(ix.operator))), "_"=>"") for ix in circuit.instructions] 
-    supported_instructions    = Set(replace(lowercase(op), "_"=>"") for op in properties(d).action["braket.ir.jaqcd.program"].supportedOperations)
+    circuit_instruction_names = map(ix->replace(lowercase(string(typeof(ix.operator))), "_"=>""), circuit.instructions)
+    supported_operations      = properties(simulator).action["braket.ir.jaqcd.program"].supportedOperations
+    supported_instructions    = Set(replace(lowercase(op), "_"=>"") for op in supported_operations)
     no_noise = true
     for name in circuit_instruction_names
         if name in _NOISE_INSTRUCTIONS
@@ -113,12 +95,13 @@ function _validate_ir_instructions_compatibility(
 end
         
 function _validate_ir_instructions_compatibility(
-    d::D,
+    simulator::D,
     circuit::Union{Program,Circuit},
     ::Val{:OpenQASM},
 ) where {D<:AbstractSimulator}
-    circuit_instruction_names = [replace(lowercase(string(typeof(ix.operator))), "_"=>"") for ix in circuit.instructions] 
-    supported_instructions    = Set(replace(lowercase(op), "_"=>"") for op in properties(d).action["braket.ir.openqasm.program"].supportedOperations)
+    circuit_instruction_names = map(ix->replace(lowercase(string(typeof(ix.operator))), "_"=>""), circuit.instructions)
+    supported_operations      = properties(simulator).action["braket.ir.openqasm.program"].supportedOperations
+    supported_instructions    = Set(replace(lowercase(op), "_"=>"") for op in supported_operations)
     no_noise = true
     for name in circuit_instruction_names
         if name in _NOISE_INSTRUCTIONS
@@ -158,12 +141,12 @@ end
 _validate_result_types_qubits_exist(rts::Vector{RT}, qubit_count::Int) where {RT<:Result} = foreach(rt->_validate_result_type_qubits_exist(rt, qubit_count), rts)
 
 function _validate_operation_qubits(operations::Vector{<:Instruction})
-    targs = (ix.target for ix in operations)
     unique_qs = Set{Int}()
     max_qc = 0
-    for t in targs
-        max_qc = max(max_qc, t...)
-        union!(unique_qs, t)
+    for operation in operations
+        targets = operation.target
+        max_qc = max(max_qc, targets...)
+        union!(unique_qs, targets)
     end
     max_qc >= length(unique_qs) && throw(
         "Non-contiguous qubit indices supplied; qubit indices in a circuit must be contiguous. Qubits referenced: $unique_qs",

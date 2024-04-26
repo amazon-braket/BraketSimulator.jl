@@ -254,7 +254,9 @@ function BraketSimulator.parse_program(simulator::D, program::OpenQasmProgram, s
     if shots > 0
         py_circ.instructions += py_circ.basis_rotation_instructions
     end
-    return ir(pyconvert(Circuit, py_circ), Val(:JAQCD))
+    circ = pyconvert(Circuit, py_circ)
+    @assert qubit_count(circ) <= properties(simulator).paradigm.qubitCount "parsed circuit's qubit count $(qubit_count(circ)) is larger than maximum ($(properties(simulator).paradigm.qubitCount)) for simulator type $D."
+    return ir(circ, Val(:JAQCD))
 end
 
 function simulate(
