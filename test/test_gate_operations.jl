@@ -11,7 +11,7 @@ using BraketSimulator: DoubleExcitation, SingleExcitation, matrix_rep, Control
     q1_mat = [0 -im; im 0] 
     q2_mat = [1 0 0 0; 0 1 0 0 ; 0 0 0 -im; 0 0 im 0] 
     @testset "Inverted gates" begin
-        @testset for g in [X(), Y(), Z(), H(), GPi(ϕ), GPi2(ϕ), Rx(ϕ), Ry(ϕ), Rz(ϕ), PhaseShift(ϕ), S(), Si(), T(), Ti(), V(), Vi(), U(θ, ϕ, λ), Unitary(q1_mat)]
+        @testset "1q Gate $g" for g in [X(), Y(), Z(), H(), GPi(ϕ), GPi2(ϕ), Rx(ϕ), Ry(ϕ), Rz(ϕ), PhaseShift(ϕ), S(), Si(), T(), Ti(), V(), Vi(), U(θ, ϕ, λ), Unitary(q1_mat)]
             @test inv(matrix_rep(g)) ≈ matrix_rep(inv(g))
             @test matrix_rep(inv(g)) * matrix_rep(g) ≈ Diagonal(ones(2))
             sim = StateVectorSimulator(nq, 0)
@@ -21,7 +21,7 @@ using BraketSimulator: DoubleExcitation, SingleExcitation, matrix_rep, Control
             new_sim = evolve!(new_sim, [Instruction(g, [0]), Instruction(inv(g), [0])])
             @test new_sim.state_vector ≈ sim.state_vector
         end
-        @testset for g in [XX(ϕ), YY(ϕ), ZZ(ϕ), XY(ϕ), ECR(), Swap(), ISwap(), PSwap(ϕ), MS(θ, ϕ, λ), CPhaseShift(ϕ), CPhaseShift00(ϕ), CPhaseShift01(ϕ), CPhaseShift10(ϕ), Unitary(q2_mat), CNot(), CY(), CZ(), CV()]
+        @testset "2q Gate $g" for g in [XX(ϕ), YY(ϕ), ZZ(ϕ), XY(ϕ), ECR(), Swap(), ISwap(), PSwap(ϕ), MS(θ, ϕ, λ), CPhaseShift(ϕ), CPhaseShift00(ϕ), CPhaseShift01(ϕ), CPhaseShift10(ϕ), Unitary(q2_mat), CNot(), CY(), CZ(), CV()]
             @test inv(matrix_rep(g)) ≈ matrix_rep(inv(g))
             @test matrix_rep(inv(g)) * matrix_rep(g) ≈ Diagonal(ones(4))
             sim = StateVectorSimulator(nq, 0)
@@ -31,7 +31,7 @@ using BraketSimulator: DoubleExcitation, SingleExcitation, matrix_rep, Control
             new_sim = evolve!(new_sim, [Instruction(g, [0, 1]), Instruction(inv(g), [0, 1])])
             @test new_sim.state_vector ≈ sim.state_vector atol=1e-5
         end
-        @testset for g in [CCNot(), CSwap()]
+        @testset "3q Gate $g" for g in [CCNot(), CSwap()]
             @test inv(matrix_rep(g)) ≈ matrix_rep(inv(g))
             @test matrix_rep(inv(g)) * matrix_rep(g) ≈ Diagonal(ones(8))
             sim = StateVectorSimulator(nq, 0)
@@ -43,7 +43,7 @@ using BraketSimulator: DoubleExcitation, SingleExcitation, matrix_rep, Control
         end
     end
     @testset "Exponentiated gates" begin
-        @testset "Gate $g, pow $pow" for g in [X(), Y(), Z(), H(), GPi(ϕ), GPi2(ϕ), Rx(ϕ), Ry(ϕ), Rz(ϕ), PhaseShift(ϕ), S(), Si(), T(), Ti(), V(), Vi(), U(θ, ϕ, λ), Unitary(q1_mat), MultiQubitPhaseShift{1}(ϕ)], pow in (0, 1, 2, 3, 4)
+        @testset "1q Gate $g, pow $pow" for g in [X(), Y(), Z(), H(), GPi(ϕ), GPi2(ϕ), Rx(ϕ), Ry(ϕ), Rz(ϕ), PhaseShift(ϕ), S(), Si(), T(), Ti(), V(), Vi(), U(θ, ϕ, λ), Unitary(q1_mat), MultiQubitPhaseShift{1}(ϕ)], pow in (0, 1, 2, 3, 4)
             sim = StateVectorSimulator(nq, 0)
             new_sim = StateVectorSimulator(nq, 0)
             instructions = vcat([Instruction(H(), [q]) for q in 0:nq-1], [Instruction(g^pow, [0])])
@@ -53,7 +53,7 @@ using BraketSimulator: DoubleExcitation, SingleExcitation, matrix_rep, Control
             new_sim = evolve!(new_sim, new_instructions)
             @test new_sim.state_vector ≈ sim.state_vector
         end
-        @testset "Gate $g, pow $pow" for g in [XX(ϕ), YY(ϕ), ZZ(ϕ), XY(ϕ), CNot(), CY(), CZ(), CV(), ECR(), Swap(), ISwap(), PSwap(ϕ), MS(θ, ϕ, λ), CPhaseShift(ϕ), CPhaseShift00(ϕ), CPhaseShift01(ϕ), CPhaseShift10(ϕ), Unitary(q2_mat), MultiQubitPhaseShift{2}(ϕ), Control(MultiQubitPhaseShift{2}(ϕ), (0,0)), Control(X(), (1,))], pow in (0, 1, 2, 3, 4)
+        @testset "2q Gate $g, pow $pow" for g in [XX(ϕ), YY(ϕ), ZZ(ϕ), XY(ϕ), CNot(), CY(), CZ(), CV(), ECR(), Swap(), ISwap(), PSwap(ϕ), MS(θ, ϕ, λ), CPhaseShift(ϕ), CPhaseShift00(ϕ), CPhaseShift01(ϕ), CPhaseShift10(ϕ), Unitary(q2_mat), MultiQubitPhaseShift{2}(ϕ), Control(MultiQubitPhaseShift{2}(ϕ), (0,0)), Control(X(), (1,))], pow in (0, 1, 2, 3, 4)
             sim              = StateVectorSimulator(nq, 0)
             new_sim          = StateVectorSimulator(nq, 0)
             instructions     = vcat([Instruction(H(), [q]) for q in 0:nq-1], [Instruction(g^pow, [0, 1])])
@@ -66,7 +66,7 @@ using BraketSimulator: DoubleExcitation, SingleExcitation, matrix_rep, Control
             new_sim = evolve!(new_sim, new_instructions)
             @test new_sim.state_vector ≈ sim.state_vector
         end
-        @testset "Gate $g, pow $pow" for g in [CCNot(), CSwap()], pow in (0, 1, 2, 3, 4)
+        @testset "3q Gate $g, pow $pow" for g in [CCNot(), CSwap()], pow in (0, 1, 2, 3, 4)
             sim = StateVectorSimulator(nq, 0)
             new_sim = StateVectorSimulator(nq, 0)
             instructions = vcat([Instruction(H(), [q]) for q in 0:nq-1], [Instruction(g^pow, [0, 1, 3])])
