@@ -12,7 +12,7 @@ using Test, PythonCall, BraketSimulator, Braket
     py_mat           = pylist([pylist([pylist([0.0; 0.0]); pylist([1.0; 0.0])]); pylist([pylist([1.0; 0.0]); pylist([0.0; 0.0])])])
     py_sim_mat       = np.array(pylist([pylist([0.0, 1.0]); pylist([1.0, 0.0])]))
     @testset "Gates" begin
-        @testset for (jl_gate, py_gate, py_sim_gate) in zip(
+        @testset "1q static gate $jl_gate" for (jl_gate, py_gate, py_sim_gate) in zip(
             [Braket.I(), H(), X(), Y(), Z(), V(), Vi(), T(), Ti(), S(), Si(), Unitary(jl_mat)],
             [
                 braket_ixs.I(target=0),
@@ -52,7 +52,7 @@ using Test, PythonCall, BraketSimulator, Braket
         angle    = π / 3.5
         angle2   = π / 5.2
         angle3   = π / 0.6
-        @testset for (jl_gate, py_gate, py_sim_gate) in zip(
+        @testset "1q 1-parameter gate $jl_gate" for (jl_gate, py_gate, py_sim_gate) in zip(
             [Rx(angle), Ry(angle), Rz(angle), PhaseShift(angle)],
             [
                 braket_ixs.Rx(target=0, angle=angle),
@@ -73,7 +73,7 @@ using Test, PythonCall, BraketSimulator, Braket
             @test pyconvert(Braket.Instruction, py_gate) == Braket.Instruction(jl_gate, 0)
             @test pyconvert(Braket.Instruction, py_sim_gate) == Braket.Instruction(jl_gate, 0)
         end
-        @testset for (jl_gate, py_sim_gate) in zip(
+        @testset "1q 1-parameter gate $jl_gate" for (jl_gate, py_sim_gate) in zip(
             [
                 GPi(angle),
                 GPi2(angle),
@@ -87,7 +87,7 @@ using Test, PythonCall, BraketSimulator, Braket
         )
             @test pyconvert(Braket.Instruction, py_sim_gate) == Braket.Instruction(jl_gate, 0)
         end
-        @testset for (jl_gate, py_sim_gate, targets) in zip(
+        @testset "3-parameter gate $jl_gate" for (jl_gate, py_sim_gate, targets) in zip(
             [
                 MS(angle, angle2, angle3),
                 U(angle, angle2, angle3),
@@ -103,7 +103,7 @@ using Test, PythonCall, BraketSimulator, Braket
         )
             @test pyconvert(Braket.Instruction, py_sim_gate) == Braket.Instruction(jl_gate, targets)
         end
-        @testset for (jl_gate, py_gate, py_sim_gate) in zip(
+        @testset "2q static gate $jl_gate" for (jl_gate, py_gate, py_sim_gate) in zip(
             [CNot(), CY(), CZ(), CV(), Swap(), ISwap(), ECR()],
             [
                 braket_ixs.CNot(control=0, target=1),
@@ -130,7 +130,7 @@ using Test, PythonCall, BraketSimulator, Braket
             @test pyconvert(Braket.Instruction, py_gate) == Braket.Instruction(jl_gate, [0, 1])
             @test pyconvert(Braket.Instruction, py_sim_gate) == Braket.Instruction(jl_gate, [0, 1])
         end
-        @testset for (jl_gate, py_gate, py_sim_gate) in zip(
+        @testset "2q 1-parameter gate $jl_gate" for (jl_gate, py_gate, py_sim_gate) in zip(
             [
                 XX(angle),
                 XY(angle),
@@ -171,7 +171,7 @@ using Test, PythonCall, BraketSimulator, Braket
             @test pyconvert(Braket.Instruction, py_gate) == Braket.Instruction(jl_gate, [0, 1])
             @test pyconvert(Braket.Instruction, py_sim_gate) == Braket.Instruction(jl_gate, [0, 1])
         end
-        @testset for (jl_gate, py_gate, py_sim_gate) in zip(
+        @testset "3q static gate $jl_gate" for (jl_gate, py_gate, py_sim_gate) in zip(
             [CCNot(), CSwap()],
             [braket_ixs.CCNot(controls=pylist([0, 1]), target=2),
              braket_ixs.CSwap(control=0, targets=pylist([1, 2]))],
@@ -191,7 +191,7 @@ using Test, PythonCall, BraketSimulator, Braket
     proby = 0.2
     probz = 0.3
     @testset "Noises" begin
-        @testset for (jl_noise, py_noise, py_sim_noise) in zip(
+        @testset "1q noise $jl_noise" for (jl_noise, py_noise, py_sim_noise) in zip(
                 [
                     BitFlip(prob),
                     PhaseFlip(prob),
@@ -229,7 +229,7 @@ using Test, PythonCall, BraketSimulator, Braket
             @test pyconvert(Braket.Instruction, py_noise) == Braket.Instruction(jl_noise, 0)
             @test pyconvert(Braket.Instruction, py_sim_noise) == Braket.Instruction(jl_noise, 0)
         end
-        @testset for (jl_noise, py_noise, py_sim_noise) in zip(
+        @testset "2q noise $jl_noise" for (jl_noise, py_noise, py_sim_noise) in zip(
             [TwoQubitDepolarizing(prob), TwoQubitDephasing(prob)],
             [
              braket_ixs.TwoQubitDepolarizing(targets=pylist([0, 1]), probability=prob),

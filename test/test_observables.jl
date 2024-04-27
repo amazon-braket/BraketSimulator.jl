@@ -21,7 +21,7 @@ single_qubit_tests = [
         end
         @test collect(eigvals(obs)) ≈ collect(eigenvalues)
     end
-    @testset "Tensor product of standard gates" begin
+    @testset "Tensor product of Pauli-like (with eigenvalues ±1) observables" begin
         tensor = Observables.TensorProduct([
             Observables.H(),
             Observables.X(),
@@ -36,7 +36,7 @@ single_qubit_tests = [
         @test actual_gates[2] == Braket.basis_rotation_gates(Observables.X())
         @test actual_gates[4] == Braket.basis_rotation_gates(Observables.Y())
     end
-    @testset "Tensor product of nonstandard gates" begin
+    @testset "Tensor product of arbitrary observables" begin
         tensor = Observables.TensorProduct([
             Observables.H(),
             Observables.I(),
