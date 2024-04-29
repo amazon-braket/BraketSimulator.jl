@@ -1,5 +1,5 @@
-@inline function pad_bit(amp_index::Ti, t::Tj)::Ti where {Ti<:Integer,Tj<:Integer}
-    left = (amp_index >> t) << t
+@inline function pad_bit(amp_index::Ti, bit::Tj)::Ti where {Ti<:Integer,Tj<:Integer}
+    left  = (amp_index >> bit) << bit
     right = amp_index - left
     return (left << one(Ti)) ⊻ right
 end
@@ -11,35 +11,42 @@ function pad_bits(ix::Ti, to_pad)::Ti where {Ti<:Integer}
     return padded_ix
 end
 
-@inline function flip_bit(amp_index::Ti, t::Tj)::Ti where {Ti<:Integer,Tj<:Integer}
-    return amp_index ⊻ (one(Ti) << t)
+@inline function flip_bit(amp_index::Ti, bit::Tj)::Ti where {Ti<:Integer,Tj<:Integer}
+    return amp_index ⊻ (one(Ti) << bit)
 end
 function flip_bits(ix::Ti, to_flip)::Ti where {Ti<:Integer}
     flipped_ix = ix
-    for f_val in to_flip
-        flipped_ix = flip_bit(flipped_ix, f_val)
+    for bit in to_flip
+        flipped_ix = flip_bit(flipped_ix, bit)
     end
     return flipped_ix
 end
-@inline endian_qubits(nq::Int, qubit::Int) = nq - 1 - qubit
-@inline endian_qubits(nq::Int, qubits::Int...) = nq .- 1 .- qubits
+@inline endian_qubits(n_qubits::Int, qubit::Int) = n_qubits - 1 - qubit
+@inline endian_qubits(n_qubits::Int, qubits::Int...) = n_qubits .- 1 .- qubits
 @inline function get_amps_and_qubits(state_vec::AbstractStateVector, qubits::Int...)
-    n_amps = length(state_vec)
-    nq = Int(log2(n_amps))
-    return n_amps, endian_qubits(nq, qubits...)
+    n_amps   = length(state_vec)
+    n_qubits = Int(log2(n_amps))
+    return n_amps, endian_qubits(n_qubits, qubits...)
 end
 
-matrix_rep(g::H) = SMatrix{2,2}(complex((1 / √2) * [1.0 1.0; 1.0 -1.0]))
-matrix_rep(g::X) = SMatrix{2,2}(complex([0.0 1.0; 1.0 0.0]))
-matrix_rep(g::Y) = SMatrix{2,2}(complex([0.0 -im; im 0.0]))
-matrix_rep(g::Z) = SMatrix{2,2}(complex([1.0 0.0; 0.0 -1.0]))
-matrix_rep(g::I) = SMatrix{2,2}(complex([1.0 0.0; 0.0 1.0]))
-matrix_rep(g::V) = SMatrix{2,2}(0.5 * [1.0+im 1.0-im; 1.0-im 1.0+im])
-matrix_rep(g::Vi) = SMatrix{2,2}(0.5 * [1.0-im 1.0+im; 1.0+im 1.0-im])
-matrix_rep(g::S) = SMatrix{2,2}([1.0 0.0; 0.0 im])
-matrix_rep(g::Si) = SMatrix{2,2}([1.0 0.0; 0.0 -im])
-matrix_rep(g::T) = SMatrix{2,2}([1.0 0.0; 0.0 exp(im * π / 4.0)])
-matrix_rep(g::Ti) = SMatrix{2,2}([1.0 0.0; 0.0 exp(-im * π / 4.0)])
+matrix_rep(::H) = SMatrix{2,2}(complex((1 / √2) * [1.0 1.0; 1.0 -1.0]))
+matrix_rep(::X) = SMatrix{2,2}(complex([0.0 1.0; 1.0 0.0]))
+matrix_rep(::Y) = SMatrix{2,2}(complex([0.0 -im; im 0.0]))
+matrix_rep(::Z) = SMatrix{2,2}(complex([1.0 0.0; 0.0 -1.0]))
+matrix_rep(::I) = SMatrix{2,2}(complex([1.0 0.0; 0.0 1.0]))
+matrix_rep(::V) = SMatrix{2,2}(0.5 * [1.0+im 1.0-im; 1.0-im 1.0+im])
+matrix_rep(::Vi) = SMatrix{2,2}(0.5 * [1.0-im 1.0+im; 1.0+im 1.0-im])
+matrix_rep(::S) = SMatrix{2,2}([1.0 0.0; 0.0 im])
+matrix_rep(::Si) = SMatrix{2,2}([1.0 0.0; 0.0 -im])
+matrix_rep(::T) = SMatrix{2,2}([1.0 0.0; 0.0 exp(im * π / 4.0)])
+matrix_rep(::Ti) = SMatrix{2,2}([1.0 0.0; 0.0 exp(-im * π / 4.0)])
+
+matrix_rep(::CNot) = SMatrix{4,4}(complex([1.0 0.0 0.0 0.0; 0.0 1.0 0.0 0.0; 0.0 0.0 0.0 1.0; 0.0 0.0 1.0 0.0]))
+matrix_rep(::CY) = SMatrix{4,4}([1.0 0.0 0.0 0.0; 0.0 1.0 0.0 0.0; 0.0 0.0 0.0 -im; 0.0 0.0 im 0.0])
+matrix_rep(::CZ) = SMatrix{4,4}(complex([1.0 0.0 0.0 0.0; 0.0 1.0 0.0 0.0; 0.0 0.0 1.0 0.0; 0.0 0.0 0.0 -1.0]))
+matrix_rep(::CV) = SMatrix{4,4}([1.0 0.0 0.0 0.0; 0.0 1.0 0.0 0.0; 0.0 0.0 0.5+0.5im 0.5-0.5im; 0.0 0.0 0.5-0.5im 0.5+0.5im])
+matrix_rep(::CCNot) = SMatrix{8,8}(complex([1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0; 0.0 1.0 0.0 0.0 0.0 0.0 0.0 0.0; 0.0 0.0 1.0 0.0 0.0 0.0 0.0 0.0; 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0; 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0; 0.0 0.0 0.0 0.0 0.0 1.0 0.0 0.0; 0.0 0.0 0.0 0.0 0.0 0.0 0.0 1.0; 0.0 0.0 0.0 0.0 0.0 0.0 1.0 0.0]))
+matrix_rep(::CSwap) = SMatrix{8,8}(complex([1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0; 0.0 1.0 0.0 0.0 0.0 0.0 0.0 0.0; 0.0 0.0 1.0 0.0 0.0 0.0 0.0 0.0; 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0; 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0; 0.0 0.0 0.0 0.0 0.0 0.0 1.0 0.0; 0.0 0.0 0.0 0.0 0.0 1.0 0.0 0.0; 0.0 0.0 0.0 0.0 0.0 0.0 0.0 1.0]))
 
 matrix_rep(g::CNot) = SMatrix{4,4}(complex([1.0 0.0 0.0 0.0; 0.0 1.0 0.0 0.0; 0.0 0.0 0.0 1.0; 0.0 0.0 1.0 0.0]))
 matrix_rep(g::CY) = SMatrix{4,4}([1.0 0.0 0.0 0.0; 0.0 1.0 0.0 0.0; 0.0 0.0 0.0 -im; 0.0 0.0 im 0.0])
@@ -84,6 +91,26 @@ matrix_rep(g::MS) = SMatrix{4,4}(
     ),
 )
 matrix_rep(g::PhaseShift) = SMatrix{2,2}([1.0 0.0; 0.0 exp(im * g.angle[1])])
+
+# controlled unitaries
+for (cph, ind) in
+    ((:CPhaseShift, 4), (:CPhaseShift00, 1), (:CPhaseShift01, 3), (:CPhaseShift10, 2))
+    @eval begin
+        matrix_rep(g::$cph) = Diagonal(
+            SVector{4,ComplexF64}(
+                setindex!(ones(ComplexF64, 4), exp(im * g.angle[1]), $ind),
+            ),
+        )
+    end
+end
+
+for (sw, factor) in ((:Swap, 1.0), (:ISwap, im), (:PSwap, :(exp(im * g.angle[1]))))
+    @eval begin
+        matrix_rep(g::$sw) = SMatrix{4,4,ComplexF64}(
+            [1.0 0.0 0.0 0.0 0.0 0.0 $factor 0.0 0.0 $factor 0.0 0.0 0.0 0.0 0.0 1.0],
+        )
+    end
+end
 matrix_rep(g::XX) = SMatrix{4,4}(
     [
         cos(g.angle[1] / 2.0) 0.0 0.0 -im*sin(g.angle[1] / 2)
@@ -131,31 +158,44 @@ function apply_gate!(
     qubit::Int,
 ) where {T<:Complex}
     n_amps, endian_qubit = get_amps_and_qubits(state_vec, qubit)
-    n_tasks = n_amps >> 1
+    n_tasks  = n_amps >> 1
+    # We split the set of amplitude pairs (`n_tasks`) into `n_chunks` groups
+    # so that we do not spawn too many tasks at each gate invocation. Each
+    # iteration of the threaded for loop spawns a `Task`, which has a (small)
+    # startup and teardown time. If the lifetime of the `Task` is short, these
+    # overheads can come to dominate the overall runtime.
+    # Using this chunking protects the Julia scheduler from being overwhelmed
+    # and prevents the time to spawn and reap Julia `Task`s from dominating
+    # the runtime.
     n_chunks = max(div(n_tasks, CHUNK_SIZE), 1)
-    flipper = 1 << endian_qubit
+    # Pairs amplitudes for the gate application. For example,
+    # 000000 and 000100 would be paired by `flipper` if `endian_qubit` is 3.
+    flipper  = 1 << endian_qubit
+    # check if the qubit index to flip to find amplitude pairs is larger or smaller
+    # than the chunk size.
     is_small_target = flipper < CHUNK_SIZE
     g_00, g_10, g_01, g_11 = g_mat
-    Threads.@threads for c_ix = 0:n_chunks-1
+    Threads.@threads for chunk_index = 0:n_chunks-1
+        # my_amps is the group of amplitude generators which this `Task` will process
         my_amps = if n_chunks > 1
-            c_ix*CHUNK_SIZE:((c_ix+1)*CHUNK_SIZE-1)
+            chunk_index*CHUNK_SIZE:((chunk_index+1)*CHUNK_SIZE-1)
         else
             0:n_tasks-1
         end
-        lower_ix = pad_bit(my_amps[1], endian_qubit) + 1
+        lower_ix  = pad_bit(my_amps[1], endian_qubit) + 1
         higher_ix = lower_ix + flipper
         for task_amp = 0:length(my_amps)-1
             if is_small_target && div(task_amp, flipper) > 0 && mod(task_amp, flipper) == 0
-                lower_ix = higher_ix
+                lower_ix  = higher_ix
                 higher_ix = lower_ix + flipper
             end
             @inbounds begin
-                lower_amp = state_vec[lower_ix]
+                lower_amp  = state_vec[lower_ix]
                 higher_amp = state_vec[higher_ix]
-                state_vec[lower_ix] = g_00 * lower_amp + g_01 * higher_amp
+                state_vec[lower_ix]  = g_00 * lower_amp + g_01 * higher_amp
                 state_vec[higher_ix] = g_10 * lower_amp + g_11 * higher_amp
             end
-            lower_ix += 1
+            lower_ix  += 1
             higher_ix += 1
         end
     end
@@ -174,8 +214,8 @@ function apply_gate!(
     n_tasks        = n_amps >> 2
     n_chunks       = max(div(n_tasks, CHUNK_SIZE), 1)
     chunked_amps   = collect(Iterators.partition(0:n_tasks-1, CHUNK_SIZE))
-    Threads.@threads for c_ix = 1:n_chunks
-        for ix in chunked_amps[c_ix]
+    Threads.@threads for chunk_index = 1:n_chunks
+        for ix in chunked_amps[chunk_index]
             ix_00   = pad_bit(pad_bit(ix, small_t), big_t)
             ix_10   = flip_bit(ix_00, endian_t2)
             ix_01   = flip_bit(ix_00, endian_t1)
@@ -217,26 +257,6 @@ for (V, f) in ((false, :identity), (true, :conj))
 end
 
 apply_gate!(g::G, args...) where {G<:Gate} = apply_gate!(Val(false), g, args...)
-
-# controlled unitaries
-for (cph, ind) in
-    ((:CPhaseShift, 4), (:CPhaseShift00, 1), (:CPhaseShift01, 3), (:CPhaseShift10, 2))
-    @eval begin
-        matrix_rep(g::$cph) = Diagonal(
-            SVector{4,ComplexF64}(
-                setindex!(ones(ComplexF64, 4), exp(im * g.angle[1]), $ind),
-            ),
-        )
-    end
-end
-
-for (sw, factor) in ((:Swap, 1.0), (:ISwap, im), (:PSwap, :(exp(im * g.angle[1]))))
-    @eval begin
-        matrix_rep(g::$sw) = SMatrix{4,4,ComplexF64}(
-            [1.0 0.0 0.0 0.0 0.0 0.0 $factor 0.0 0.0 $factor 0.0 0.0 0.0 0.0 0.0 1.0],
-        )
-    end
-end
 
 function apply_controlled_gate!(
     g_matrix::SMatrix{2, 2, ComplexF64},
