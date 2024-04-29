@@ -1,3 +1,5 @@
+# exclude precompilation from coverage 
+# COV_EXCL_START
 function _precompile_()
     ccall(:jl_generating_output, Cint, ()) == 1 || return nothing
     Base.precompile(Tuple{typeof(apply_observables!),StateVectorSimulator{ComplexF64, Vector{ComplexF64}},Vector{Tuple{HermitianObservable, Vector{Int64}}}})   # time: 2.3760564
@@ -270,3 +272,4 @@ function _precompile_()
     Base.precompile(Tuple{Type{DensityMatrixSimulator},Int64,Int64})   # time: 0.001066707
     Base.precompile(Tuple{typeof(evolve!),DensityMatrixSimulator{ComplexF64, Matrix{ComplexF64}},Vector{Instruction{XX}}})   # time: 0.001022039
 end
+# COV_EXCL_STOP

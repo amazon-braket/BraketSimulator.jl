@@ -1,3 +1,5 @@
+# exclude precompilation from coverage 
+# COV_EXCL_START
 function _precompile_()
     ccall(:jl_generating_output, Cint, ()) == 1 || return nothing
     Base.precompile(Tuple{typeof(jl_convert_sim_hadamard),Type{Instruction},Py})   # time: 4.069578
@@ -110,3 +112,4 @@ function _precompile_()
     Base.precompile(Tuple{Type{Py},TwoQubitDephasing,Vector{Int64}})   # time: 0.001219169
     isdefined(BraketSimulatorPythonExt, Symbol("#201#204")) && Base.precompile(Tuple{getfield(BraketSimulatorPythonExt, Symbol("#201#204")),Vector{Vector{Float64}}})   # time: 0.001131461
 end
+# COV_EXCL_STOP
