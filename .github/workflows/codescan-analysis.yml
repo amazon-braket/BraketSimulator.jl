@@ -1,0 +1,25 @@
+name: Semgrep Codescan
+
+on:
+  pull_request:
+    branches:
+      - main
+      - feature/**
+
+jobs:
+  semgrep-codescan:
+    name: Semgrep Codescan
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+    - name: Install Semgrep
+      run: python3 -m pip install semgrep
+    - name: Get rules from JuliaComputing
+      run: git clone https://github.com/JuliaComputing/semgrep-rules-julia.git
+    - name: Run Semgrep Julia rules
+      run: semgrep --error --config semgrep-rules-julia/rules .

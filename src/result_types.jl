@@ -193,6 +193,16 @@ function expectation_op_squared(
     )
 end
 
+for (gate, obs) in (
+    (:X, :(Braket.Observables.X)),
+    (:Y, :(Braket.Observables.Y)),
+    (:Z, :(Braket.Observables.Z)),
+    (:I, :(Braket.Observables.I)),
+    (:H, :(Braket.Observables.H)),
+)
+    @eval apply_observable!(::$obs, sv_or_dm::T, targets) where {T<:AbstractVecOrMat{<:Complex}} = apply_observable!($gate(), sv_or_dm, targets)
+end
+
 function apply_observable!(
     observable::Braket.Observables.TensorProduct,
     sv_or_dm::T,

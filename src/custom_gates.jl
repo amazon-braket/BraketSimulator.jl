@@ -62,6 +62,23 @@ Braket.chars(::Type{MultiQubitPhaseShift}) = "GPhase(ang)"
 Braket.qubit_count(g::MultiQubitPhaseShift{N}) where {N} = N
 Base.inv(g::MultiQubitPhaseShift{N}) where {N} = MultiQubitPhaseShift{N}((-g.angle[1],))
 
+function apply_gate!(
+    factor::ComplexF64,
+    diagonal::Braket.PauliEigenvalues{N},
+    state_vec::StateVector{T},
+    ts::Vararg{Int,N},
+) where {T<:Complex,N}
+    g_mat  = Diagonal(SVector{2^N,ComplexF64}(exp(factor * diagonal[i]) for i = 1:2^N))
+    apply_gate!(g_mat, state_vec, ts...)
+end
+function apply_gate!(
+    factor::ComplexF64,
+    state_vec::StateVector{T},
+    ts::Vararg{Int,N},
+) where {T<:Complex,N}
+    g_mat = Diagonal(SVector{2^N,ComplexF64}(factor for i = 1:2^N))
+    apply_gate!(g_mat, state_vec, ts...)
+end
 for (V, f) in ((true, :conj), (false, :identity))
     @eval begin
         apply_gate!(
@@ -77,77 +94,44 @@ for (V, f) in ((true, :conj), (false, :identity))
             t1::Int,
             t2::Int,
         ) where {T<:Complex} = apply_gate!(Val($V), ZZ(g.angle), state_vec, t1, t2)
-        function apply_gate!(
+        apply_gate!(
             ::Val{$V},
             g::MultiRZ,
             state_vec::StateVector{T},
             ts::Vararg{Int,N},
-        ) where {T<:Complex,N}
-            factor = -im * g.angle[1] / 2.0
-            r_mat = Braket.PauliEigenvalues(Val(N))
-            g_mat = Diagonal($f(SVector{2^N,ComplexF64}(exp(factor * r_mat[i]) for i = 1:2^N)))
-            apply_gate!(g_mat, state_vec, ts...)
-        end
-        function apply_gate!(
-            ::Val{$V},
-            g::MultiQubitPhaseShift{1},
-            state_vec::StateVector{T},
-            t::Int,
-        ) where {T<:Complex}
-            g_mat = $f(Diagonal(SVector{2, ComplexF64}(exp(im*g.angle[1]), exp(im*g.angle[1]))))
-            return apply_gate!(g_mat, state_vec, t)
-        end
-        function apply_gate!(
-            ::Val{$V},
-            g::MultiQubitPhaseShift{N},
-            state_vec::StateVector{T},
-            ts::Vararg{Int,N},
-        ) where {T<:Complex,N}
-            n_amps, endian_ts = get_amps_and_qubits(state_vec, ts...)
-            ordered_ts = sort(collect(endian_ts))
-            flip_list = map(0:2^N-1) do t
-                f_vals = Bool[(((1 << f_ix) & t) >> f_ix) for f_ix = 0:N-1]
-                return ordered_ts[f_vals]
-            end
-            factor = im * g.angle[1]
-            r_mat = ones(Float64, 2^N)
-            g_mat = Diagonal($f(SVector{2^N,ComplexF64}(exp(factor) * r_mat[i] for i = 1:2^N)))
-            apply_gate!(g_mat, state_vec, ts...)
-        end
+        ) where {T<:Complex,N} = apply_gate!($f(-im * g.angle[1] / 2.0), Braket.PauliEigenvalues(Val(N)), state_vec, ts...)
+        apply_gate!(::Val{$V}, g::MultiQubitPhaseShift{N}, state_vec::StateVector{T}, ts::Vararg{Int,N}) where {T<:Complex, N} = apply_gate!($f(exp(im*g.angle[1])), state_vec, ts...)
     end
 end
 
-for V in (false, true)
-    @eval begin
-        function apply_gate!(
-            ::Val{$V},
-            g::DoubleExcitation,
-            state_vec::StateVector{T},
-            t1::Int,
-            t2::Int,
-            t3::Int,
-            t4::Int,
-        ) where {T<:Complex}
-            n_amps, endian_ts = get_amps_and_qubits(state_vec, t1, t2, t3, t4)
-            ordered_ts = sort(collect(endian_ts))
-            cosϕ = cos(g.angle[1] / 2.0)
-            sinϕ = sin(g.angle[1] / 2.0)
-            e_t1, e_t2, e_t3, e_t4 = endian_ts
-            Threads.@threads for ix = 0:div(n_amps, 2^4)-1
-                padded_ix = pad_bits(ix, ordered_ts)
-                i0011 = flip_bits(padded_ix, (e_t3, e_t4)) + 1
-                i1100 = flip_bits(padded_ix, (e_t1, e_t2)) + 1
-                @inbounds begin
-                    amp0011 = state_vec[i0011]
-                    amp1100 = state_vec[i1100]
-                    state_vec[i0011] = cosϕ * amp0011 - sinϕ * amp1100
-                    state_vec[i1100] = sinϕ * amp0011 + cosϕ * amp1100
-                end
-            end
-            return
+function apply_gate!(
+    g::DoubleExcitation,
+    state_vec::StateVector{T},
+    t1::Int,
+    t2::Int,
+    t3::Int,
+    t4::Int,
+) where {T<:Complex}
+    n_amps, endian_ts = get_amps_and_qubits(state_vec, t1, t2, t3, t4)
+    ordered_ts = sort(collect(endian_ts))
+    cosϕ = cos(g.angle[1] / 2.0)
+    sinϕ = sin(g.angle[1] / 2.0)
+    e_t1, e_t2, e_t3, e_t4 = endian_ts
+    Threads.@threads for ix = 0:div(n_amps, 2^4)-1
+        padded_ix = pad_bits(ix, ordered_ts)
+        i0011 = flip_bits(padded_ix, (e_t3, e_t4)) + 1
+        i1100 = flip_bits(padded_ix, (e_t1, e_t2)) + 1
+        @inbounds begin
+            amp0011 = state_vec[i0011]
+            amp1100 = state_vec[i1100]
+            state_vec[i0011] = cosϕ * amp0011 - sinϕ * amp1100
+            state_vec[i1100] = sinϕ * amp0011 + cosϕ * amp1100
         end
     end
+    return
 end
+apply_gate!(::Val{true}, g::DoubleExcitation, state_vec::StateVector{T}, t1::Int, t2::Int, t3::Int, t4::Int) where {T<:Complex} = apply_gate!(g, state_vec, t1, t2, t3, t4)
+apply_gate!(::Val{false}, g::DoubleExcitation, state_vec::StateVector{T}, t1::Int, t2::Int, t3::Int, t4::Int) where {T<:Complex} = apply_gate!(g, state_vec, t1, t2, t3, t4)
 
 struct Control{G<:Gate, B} <: Gate
     g::G
