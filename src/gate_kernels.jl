@@ -48,12 +48,6 @@ matrix_rep(::CV) = SMatrix{4,4}([1.0 0.0 0.0 0.0; 0.0 1.0 0.0 0.0; 0.0 0.0 0.5+0
 matrix_rep(::CCNot) = SMatrix{8,8}(complex([1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0; 0.0 1.0 0.0 0.0 0.0 0.0 0.0 0.0; 0.0 0.0 1.0 0.0 0.0 0.0 0.0 0.0; 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0; 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0; 0.0 0.0 0.0 0.0 0.0 1.0 0.0 0.0; 0.0 0.0 0.0 0.0 0.0 0.0 0.0 1.0; 0.0 0.0 0.0 0.0 0.0 0.0 1.0 0.0]))
 matrix_rep(::CSwap) = SMatrix{8,8}(complex([1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0; 0.0 1.0 0.0 0.0 0.0 0.0 0.0 0.0; 0.0 0.0 1.0 0.0 0.0 0.0 0.0 0.0; 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0; 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0; 0.0 0.0 0.0 0.0 0.0 0.0 1.0 0.0; 0.0 0.0 0.0 0.0 0.0 1.0 0.0 0.0; 0.0 0.0 0.0 0.0 0.0 0.0 0.0 1.0]))
 
-matrix_rep(g::CNot) = SMatrix{4,4}(complex([1.0 0.0 0.0 0.0; 0.0 1.0 0.0 0.0; 0.0 0.0 0.0 1.0; 0.0 0.0 1.0 0.0]))
-matrix_rep(g::CY) = SMatrix{4,4}([1.0 0.0 0.0 0.0; 0.0 1.0 0.0 0.0; 0.0 0.0 0.0 -im; 0.0 0.0 im 0.0])
-matrix_rep(g::CZ) = SMatrix{4,4}(complex([1.0 0.0 0.0 0.0; 0.0 1.0 0.0 0.0; 0.0 0.0 1.0 0.0; 0.0 0.0 0.0 -1.0]))
-matrix_rep(g::CV) = SMatrix{4,4}([1.0 0.0 0.0 0.0; 0.0 1.0 0.0 0.0; 0.0 0.0 0.5+0.5im 0.5-0.5im; 0.0 0.0 0.5-0.5im 0.5+0.5im])
-matrix_rep(g::CCNot) = SMatrix{8,8}(complex([1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0; 0.0 1.0 0.0 0.0 0.0 0.0 0.0 0.0; 0.0 0.0 1.0 0.0 0.0 0.0 0.0 0.0; 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0; 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0; 0.0 0.0 0.0 0.0 0.0 1.0 0.0 0.0; 0.0 0.0 0.0 0.0 0.0 0.0 0.0 1.0; 0.0 0.0 0.0 0.0 0.0 0.0 1.0 0.0]))
-matrix_rep(g::CSwap) = SMatrix{8,8}(complex([1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0; 0.0 1.0 0.0 0.0 0.0 0.0 0.0 0.0; 0.0 0.0 1.0 0.0 0.0 0.0 0.0 0.0; 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0; 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0; 0.0 0.0 0.0 0.0 0.0 0.0 1.0 0.0; 0.0 0.0 0.0 0.0 0.0 1.0 0.0 0.0; 0.0 0.0 0.0 0.0 0.0 0.0 0.0 1.0]))
 matrix_rep(g::PRx) = SMatrix{2,2}(
     [
          cos(g.angle[1] / 2.0) -im*exp(-im*g.angle[2])*sin(g.angle[1]/2.0)
@@ -153,7 +147,7 @@ apply_gate!(::Val{true}, g::I, state_vec::StateVector{T}, qubits::Int...) where 
     return
 
 function apply_gate!(
-    g_mat::Union{SMatrix{2,2,T}, Diagonal{T,SVector{2,T}}},
+    g_matrix::Union{SMatrix{2,2,T}, Diagonal{T,SVector{2,T}}},
     state_vec::StateVector{T},
     qubit::Int,
 ) where {T<:Complex}
@@ -174,7 +168,7 @@ function apply_gate!(
     # check if the qubit index to flip to find amplitude pairs is larger or smaller
     # than the chunk size.
     is_small_target = flipper < CHUNK_SIZE
-    g_00, g_10, g_01, g_11 = g_mat
+    g_00, g_10, g_01, g_11 = g_matrix
     Threads.@threads for chunk_index = 0:n_chunks-1
         # my_amps is the group of amplitude generators which this `Task` will process
         my_amps = if n_chunks > 1
@@ -259,7 +253,7 @@ end
 apply_gate!(g::G, args...) where {G<:Gate} = apply_gate!(Val(false), g, args...)
 
 function apply_controlled_gate!(
-    g_matrix::SMatrix{2, 2, ComplexF64},
+    g_matrix::Union{SMatrix{2,2,T}, Diagonal{T,SVector{2,T}}},
     c_bit::Bool,
     state_vec::StateVector{T},
     control::Int,
@@ -287,15 +281,15 @@ function apply_controlled_gate!(
     return
 end
 function apply_controlled_gate!(
-    g_matrix::SMatrix{4, 4, ComplexF64},
+    g_matrix::Union{SMatrix{4, 4, T}, Diagonal{T, SVector{4, T}}},
     c_bit::Bool,
     state_vec::StateVector{T},
     control::Int,
-    t1::Int,
-    t2::Int,
+    target_1::Int,
+    target_2::Int,
 ) where {T<:Complex}
     n_amps, (endian_control, endian_t1, endian_t2) =
-        get_amps_and_qubits(state_vec, control, t1, t2)
+        get_amps_and_qubits(state_vec, control, target_1, target_2)
     small_t, mid_t, big_t = sort([endian_control, endian_t1, endian_t2])
     Threads.@threads for ix = 0:div(n_amps, 8)-1
         ix_00 = pad_bits(ix, (small_t, mid_t, big_t))
@@ -315,16 +309,16 @@ function apply_controlled_gate!(
 end
 # doubly controlled unitaries
 function apply_controlled_gate!(
-    g_matrix::SMatrix{2, 2, ComplexF64},
+    g_matrix::Union{SMatrix{2, 2, T}, Diagonal{T, SVector{2, T}}},
     c1_bit::Bool,
     c2_bit::Bool,
     state_vec::StateVector{T},
-    c1::Int,
-    c2::Int,
-    t::Int,
+    control_1::Int,
+    control_2::Int,
+    target::Int,
 ) where {T<:Complex}
     n_amps, (endian_c1, endian_c2, endian_target) =
-        get_amps_and_qubits(state_vec, c1, c2, t)
+        get_amps_and_qubits(state_vec, control_1, control_2, target)
     small_t, mid_t, big_t = sort([endian_c1, endian_c2, endian_target])
     g_00, g_10, g_01, g_11 = g_matrix
     Threads.@threads for ix = 0:div(n_amps, 8)-1
@@ -332,8 +326,8 @@ function apply_controlled_gate!(
         padded_ix = pad_bits(ix, [small_t, mid_t, big_t])
         # flip c1 and c2 if needed
         lower_ix = padded_ix
-        for (c_val, c_bit) in zip((c1_bit, c2_bit), (endian_c1, endian_c2))
-            c_val == 1 && (lower_ix = flip_bit(lower_ix, c_bit))
+        for (c_bit, c_qubit) in zip((c1_bit, c2_bit), (endian_c1, endian_c2))
+            c_bit && (lower_ix = flip_bit(lower_ix, c_qubit))
         end
         # flip target
         higher_ix = flip_bit(lower_ix, endian_target) + 1
@@ -352,76 +346,77 @@ for (V, f) in ((true, :conj), (false, :identity))
         apply_controlled_gate!(
             ::Val{$V},
             ::Val{1},
-            g::G,
-            tg::TG,
+            # controlled gate on *all* qubits (e.g. CV)
+            gate::G,
+            # gate on *target* qubit bits only (e.g. V)
+            target_gate::TG,
             state_vec::StateVector{T},
             control_bits::NTuple{1,Int},
             control::Int,
             target::Int,
-        ) where {G<:Gate,TG<:Gate,T<:Complex} = apply_controlled_gate!($f(matrix_rep(tg)), control_bits[1] == 1, state_vec, control, target)
+        ) where {G<:Gate,TG<:Gate,T<:Complex} = apply_controlled_gate!($f(matrix_rep(target_gate)), control_bits[1] == 1, state_vec, control, target)
         apply_controlled_gate!(
             ::Val{$V},
             ::Val{1},
-            g::G,
-            tg::TG,
+            gate::G,
+            target_gate::TG,
             state_vec::StateVector{T},
             control_bits::NTuple{1,Int},
             control::Int,
-            t1::Int,
-            t2::Int,
-        ) where {G<:Gate,TG<:Gate,T<:Complex} = apply_controlled_gate!($f(matrix_rep(tg)), control_bits[1] == 1, state_vec, control, t1, t2)
+            target_1::Int,
+            target_2::Int,
+        ) where {G<:Gate,TG<:Gate,T<:Complex} = apply_controlled_gate!($f(matrix_rep(target_gate)), control_bits[1] == 1, state_vec, control, target_1, target_2)
         # doubly controlled unitaries
         apply_controlled_gate!(
             ::Val{$V},
             ::Val{2},
-            g::G,
-            tg::TG,
+            gate::G,
+            target_gate::TG,
             state_vec::StateVector{T},
             control_bits::NTuple{2,Int},
-            c1::Int,
-            c2::Int,
-            t::Int,
-        ) where {G<:Gate,TG<:Gate,T<:Complex} = apply_controlled_gate!($f(matrix_rep(tg)), control_bits[1] == 1, control_bits[2] == 1, state_vec, c1, c2, t)
+            control_1::Int,
+            control_2::Int,
+            target::Int,
+        ) where {G<:Gate,TG<:Gate,T<:Complex} = apply_controlled_gate!($f(matrix_rep(target_gate)), control_bits[1] == 1, control_bits[2] == 1, state_vec, control_1, control_2, target)
     end
 end
 
-for (cg, tg, nc) in (
+for (control_gate, target_gate, n_controls) in (
         (:CNot, :X, 1),
         (:CY, :Y, 1),
         (:CZ, :Z, 1),
         (:CV, :V, 1),
         (:CSwap, :Swap, 1),
         (:CCNot, :X, 2),
-    ),
-    (Vc, f) in ((false, :identity), (true, :conj))
+    ), Vc in (false, true)
 
     @eval begin
         apply_gate!(
             ::Val{$Vc},
-            g::$cg,
+            gate::$control_gate,
             state_vec::StateVector{T},
             qubits::Int...,
         ) where {T<:Complex} =
-            apply_controlled_gate!(Val($Vc), Val($nc), g, $tg(), state_vec, ntuple(i->1, Val($nc)), qubits...)
+            apply_controlled_gate!(Val($Vc), Val($n_controls), gate, $target_gate(), state_vec, ntuple(control_bit->1, Val($n_controls)), qubits...)
     end
 end
 
 
 function apply_gate!(
     factor::Complex,
-    g::Control{MultiQubitPhaseShift{N}, B},
+    gate::Control{MultiQubitPhaseShift{N}, B},
     state_vec::StateVector{T},
     qubits::Int...,
 ) where {T<:Complex, N, B}
-    bvs   = g.bitvals
-    g_mat = ones(ComplexF64, 2^N)
-    ix    = 0
-    for (bi, bv) in enumerate(bvs)
-        ix += bv << (bi - 1)
+    bit_values  = gate.bitvals
+    g_matrix    = ones(ComplexF64, 2^N)
+    phase_index = 1
+    # find index of state to shift phase of
+    for (bit_index, bit_value) in enumerate(bit_values)
+        phase_index += bit_value << (bit_index - 1)
     end
-    ix += 1
-    g_mat[ix] = exp(factor*g.g.angle[1])
-    apply_gate!(Diagonal(SVector{2^N, ComplexF64}(g_mat)), state_vec, qubits...)
+    g_matrix[phase_index] = exp(factor*gate.g.angle[1])
+    apply_gate!(Diagonal(SVector{2^N, ComplexF64}(g_matrix)), state_vec, qubits...)
 end
 
 # arbitrary number of targets
@@ -429,44 +424,44 @@ for (V, f) in ((false, :identity), (true, :conj))
     @eval begin
         apply_gate!(
             ::Val{$V},
-            g::Control{G, B},
+            gate::Control{G, B},
             state_vec::StateVector{T},
             qubits::Int...,
         ) where {T<:Complex, G<:Gate, B} =
-            apply_controlled_gate!(Val($V), Val(B), g, g.g, state_vec, g.bitvals, qubits...)
+            apply_controlled_gate!(Val($V), Val(B), gate, gate.g, state_vec, gate.bitvals, qubits...)
         apply_gate!(
             ::Val{$V},
-            g::Control{MultiQubitPhaseShift{N}, B},
+            gate::Control{MultiQubitPhaseShift{N}, B},
             state_vec::StateVector{T},
             qubits::Int...,
-        ) where {T<:Complex, N, B} = apply_gate!($f(im), g, state_vec, qubits...)
+        ) where {T<:Complex, N, B} = apply_gate!($f(im), gate, state_vec, qubits...)
         apply_gate!(
             ::Val{$V},
-            g::Unitary,
+            gate::Unitary,
             state_vec::StateVector{T},
-            ts::Vararg{Int,NQ},
+            targets::Vararg{Int,NQ},
         ) where {T<:Complex,NQ} = 
-            apply_gate!($f(SMatrix{2^NQ, 2^NQ, ComplexF64}(matrix_rep(g))), state_vec, ts...)
+            apply_gate!($f(SMatrix{2^NQ, 2^NQ, ComplexF64}(matrix_rep(gate))), state_vec, targets...)
     end
 end
 function apply_gate!(
-    g_mat::Union{SMatrix{N, N, T}, Diagonal{T, SVector{N, T}}},
+    g_matrix::Union{SMatrix{N, N, T}, Diagonal{T, SVector{N, T}}},
     state_vec::StateVector{T},
-    ts::Vararg{Int,NQ},
+    targets::Vararg{Int,NQ},
 ) where {T<:Complex,NQ,N}
-    n_amps, endian_ts = get_amps_and_qubits(state_vec, ts...)
-    endian_ts  = tuple(endian_ts...)
+    n_amps, endian_ts = get_amps_and_qubits(state_vec, targets...)
     ordered_ts = sort(collect(endian_ts))
-    flip_list  = map(0:N-1) do t
-        f_vals = Bool[(((1 << f_ix) & t) >> f_ix) for f_ix = 0:NQ-1]
-        return ordered_ts[f_vals]
+    flip_list  = map(0:N-1) do target_amp
+        # select qubits to flip for each index in the target space
+        to_flip = Bool[(((1 << qubit_ix) & target_amp) >> qubit_ix) for qubit_ix = 0:NQ-1]
+        return ordered_ts[to_flip]
     end
     Threads.@threads for ix = 0:div(n_amps, N)-1
         padded_ix = pad_bits(ix, ordered_ts)
-        ixs = SVector{N,Int}(flip_bits(padded_ix, f) + 1 for f in flip_list)
+        ixs = SVector{N,Int}(flip_bits(padded_ix, to_flip) + 1 for to_flip in flip_list)
         @views @inbounds begin
             amps = SVector{N,T}(state_vec[ixs])
-            new_amps = g_mat * amps
+            new_amps = g_matrix * amps
             state_vec[ixs] = new_amps
         end
     end
