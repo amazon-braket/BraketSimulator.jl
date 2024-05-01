@@ -292,7 +292,7 @@ function simulate(
     PythonCall.GC.disable()
     if length(jl_specs) == 1
         result     = simulate(simulator, jl_specs[1], args[1:end-1]...; inputs = jl_inputs, shots=shots, kwargs...)
-        py_result  = Py(result, task_specs[1])
+        py_result  = Py(result)
     else # this is a batch! use a Braket.jl LocalSimulator to take advantage of thread migration
         local_sim   = Braket.LocalSimulator(simulator) 
         task_batch  = simulate(local_sim, jl_specs, args[1:end-1]...; inputs = jl_inputs, shots=shots, kwargs...)
@@ -300,7 +300,7 @@ function simulate(
         # now have to convert back to GateModelTaskResult from GateModelQuantumTaskResult
         processed_results = map(zip(raw_results, task_specs)) do (result, task_spec)
             header = Braket.braketSchemaHeader("braket.task_result.gate_model_task_result", "1")
-            return Py(Braket.GateModelTaskResult(header, result.measurements, result.measurement_probabilities, result.result_types, result.measured_qubits, result.task_metadata, result.additional_metadata), task_spec)
+            return Py(Braket.GateModelTaskResult(header, result.measurements, result.measurement_probabilities, result.result_types, result.measured_qubits, result.task_metadata, result.additional_metadata))
         end
         py_result = pylist(processed_results)
     end

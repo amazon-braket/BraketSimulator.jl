@@ -570,12 +570,14 @@ function Py(ir::Program)
     return braket[].ir.jaqcd.program_v1.Program(instructions=pylist(ir.instructions), results=res, basis_rotation_instructions=bris)
 end
 
-function Py(r::GateModelTaskResult, action)
+function Py(r::GateModelTaskResult)
     py_measurements  = (isnothing(r.measurements) || isempty(r.measurements)) ? PythonCall.pybuiltins.None : pylist(pylist(meas) for meas in r.measurements)
     py_probabilities = !isnothing(r.measurementProbabilities) ? pydict(Dict(pystr(k)=>v for (k,v) in r.measurementProbabilities)) : PythonCall.pybuiltins.None
     py_qubits        = !isnothing(r.measuredQubits) ? pylist(r.measuredQubits) : PythonCall.pybuiltins.None
     py_results       = pylist(Py(rtv) for rtv in r.resultTypes)
     py_task_mtd      = braket[].task_result.task_metadata_v1.TaskMetadata(id=pystr(r.taskMetadata.id), shots=Py(r.taskMetadata.shots), deviceId=pystr(r.taskMetadata.deviceId))
-    py_addl_mtd      = braket[].task_result.additional_metadata.AdditionalMetadata(action=action)
+    # we create a placeholder OpenQASM3 Program here -- this is replaced by the "true" action in the Python wrapper
+    dummy_action     = braket[].ir.openqasm.program_v1.Program(source=pystr(""))
+    py_addl_mtd      = braket[].task_result.additional_metadata.AdditionalMetadata(action=dummy_action)
     return braket[].task_result.GateModelTaskResult(measurements=py_measurements, measurementProbabilities=py_probabilities, resultTypes=py_results, measuredQubits=py_qubits, taskMetadata=py_task_mtd, additionalMetadata=py_addl_mtd)
 end
