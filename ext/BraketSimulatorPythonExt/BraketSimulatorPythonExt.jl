@@ -259,7 +259,7 @@ end
 
 function simulate(
     simulator::AbstractSimulator,
-    task_specs::Union{PyList{Any},NTuple{N,PyIterable},Py},
+    task_specs::Union{PyList{Any},NTuple{N,PyIterable}},
     args...;
     input::Union{PyList{Any},PyDict{Any,Any},Py}=PyDict{Any,Any}(),
     kwargs...,
