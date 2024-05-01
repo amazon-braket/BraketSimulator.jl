@@ -544,18 +544,21 @@ using Test, PythonCall, BraketSimulator, Braket
         @test pyconvert(Braket.OpenQasmProgram, Py(oq3_program)) == oq3_program
         @test pyconvert(Braket.Program, Py(jaqcd_program)) == jaqcd_program
         @testset "Full Python circuit execution" begin
-            sv_simulator = StateVectorSimulator(n_qubits, 0)
-            oq3_results  = simulate(sv_simulator, pylist([Py(oq3_program)]), 0)
-            @test pyconvert(Bool, oq3_results.resultTypes[0].type == Py(Braket.IR.Probability([9, 5, 6, 7, 8], "probability")))
-            # test a "batch"
-            oq3_results  = simulate(sv_simulator, pylist([Py(oq3_program), Py(oq3_program)]), 0; input = pylist([pydict(Dict("a_in"=>2, "b_in"=>5)), pydict(Dict("a_in"=>3, "b_in"=>2))]))
-            @test pyconvert(Vector{Float64}, oq3_results[0].resultTypes[0].value) ≠ pyconvert(Vector{Float64}, oq3_results[0].resultTypes[1].value)
-
-            sv_simulator  = StateVectorSimulator(n_qubits, 0)
-            jaqcd_results = simulate(sv_simulator, pylist([Py(jaqcd_program)]), n_qubits, 0)
-            @test pyconvert(Bool, jaqcd_results.resultTypes[0].type == Py(Braket.IR.Amplitude([repeat("0", n_qubits), repeat("1", n_qubits)], "amplitude")))
-            @test pyconvert(Bool, jaqcd_results.resultTypes[1].type == Py(Braket.IR.Expectation(["x"], [0], "expectation")))
-            @test pyconvert(Bool, jaqcd_results.resultTypes[2].type == Py(Braket.IR.DensityMatrix(nothing, "density_matrix")))
+            @testset "OpenQASM3" begin
+                sv_simulator = StateVectorSimulator(n_qubits, 0)
+                oq3_results  = simulate(sv_simulator, PyList{Any}([Py(oq3_program)]), 0)
+                @test pyconvert(Bool, oq3_results.resultTypes[0].type == Py(Braket.IR.Probability([9, 5, 6, 7, 8], "probability")))
+                # test a "batch"
+                oq3_results  = simulate(sv_simulator, PyList{Any}([Py(oq3_program)]), 0; input = pylist([pydict(Dict("a_in"=>2, "b_in"=>5)), pydict(Dict("a_in"=>3, "b_in"=>2))]))
+                @test pyconvert(Vector{Float64}, oq3_results.resultTypes[0].value) ≠ pyconvert(Vector{Float64}, oq3_results.resultTypes[1].value)
+            end
+            @testset "JAQCD" begin
+                sv_simulator  = StateVectorSimulator(n_qubits, 0)
+                jaqcd_results = simulate(sv_simulator, PyList{Any}([Py(jaqcd_program)]), n_qubits, 0)
+                @test pyconvert(Bool, jaqcd_results.resultTypes[0].type == Py(Braket.IR.Amplitude([repeat("0", n_qubits), repeat("1", n_qubits)], "amplitude")))
+                @test pyconvert(Bool, jaqcd_results.resultTypes[1].type == Py(Braket.IR.Expectation(["x"], [0], "expectation")))
+                @test pyconvert(Bool, jaqcd_results.resultTypes[2].type == Py(Braket.IR.DensityMatrix(nothing, "density_matrix")))
+            end
         end
     end
     @testset "Python circuit with measured qubits" begin
@@ -568,7 +571,7 @@ using Test, PythonCall, BraketSimulator, Braket
         """
         simulator    = StateVectorSimulator(2, 1000)
         oq3_program  = Braket.OpenQasmProgram(Braket.braketSchemaHeader("braket.ir.openqasm.program", "1"), qasm, nothing)
-        result       = simulate(simulator, pylist([Py(oq3_program)]), 1000; measured_qubits=pylist([0]))
+        result       = simulate(simulator, PyList{Any}([Py(oq3_program)]), 1000; measured_qubits=pylist([0]))
         measurements = [[pyconvert(Int, m) for m in measurement] for measurement in result.measurements]
         @test 400 < sum(m[1] for m in measurements) < 600
         @test all(length(m) == 1 for m in measurements)

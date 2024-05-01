@@ -261,7 +261,7 @@ end
 
 function simulate(
     simulator::AbstractSimulator,
-    task_specs::Union{PyList{Any},NTuple{N,PyIterable},Py},
+    task_specs::Union{PyList{Any},NTuple{N,PyIterable}},
     args...;
     input::Union{PyList{Any},PyDict{Any,Any},Py}=PyDict{Any,Any}(),
     kwargs...,
@@ -292,7 +292,7 @@ function simulate(
     PythonCall.GC.disable()
     if length(jl_specs) == 1
         result     = simulate(simulator, jl_specs[1], args[1:end-1]...; inputs = jl_inputs, shots=shots, kwargs...)
-        py_result  = Py(result, task_specs[0])
+        py_result  = Py(result, task_specs[1])
     else # this is a batch! use a Braket.jl LocalSimulator to take advantage of thread migration
         local_sim   = Braket.LocalSimulator(simulator) 
         task_batch  = simulate(local_sim, jl_specs, args[1:end-1]...; inputs = jl_inputs, shots=shots, kwargs...)
