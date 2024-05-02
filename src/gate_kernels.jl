@@ -110,8 +110,8 @@ matrix_rep(g::ZZ) = SMatrix{4,4}(
         exp(-im * g.angle[1] / 2.0),
     ]),
 )
-matrix_rep(g::ECR) =
-    SMatrix{4,4}(1/√2 * [0.0 0.0 1.0 im; 0.0 0.0 im 1.0; 1.0 -im 0.0 0.0; -im 1.0 0.0 0.0])
+# 1/√2 * (IX - XY)
+matrix_rep(g::ECR) = SMatrix{4,4}(1/√2 * [0 1 0 im; 1 0 -im 0; 0 im 0 1; -im 0 1 0])
 matrix_rep(g::Unitary) = g.matrix
 
 apply_gate!(::Val{false}, g::I, state_vec::StateVector{T}, qubits::Int...) where {T<:Complex} =
