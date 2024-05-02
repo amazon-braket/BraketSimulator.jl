@@ -341,6 +341,13 @@ for (fn, jl_typ) in ((:jl_convert_sim_gpi, :GPi),
         end
     end
 end
+function jl_convert_sim_prx(t::Type{Braket.Instruction}, x::Py)
+    angle = (pyconvert(Union{Float64, FreeParameter}, getproperty(x, :_angle_1)),
+             pyconvert(Union{Float64, FreeParameter}, getproperty(x, :_angle_2)),
+            )
+    jl_operation = _handle_modifiers(PRx(angle), x)
+    PythonCall.pyconvert_return(t(jl_operation, convert_targets(x.targets)))
+end
 for (fn, jl_typ, a1, a2, a3) in ((:jl_convert_sim_ms, :MS, "_angle_1", "_angle_2", "_angle_3"),
                                  (:jl_convert_sim_u, :U, "_theta", "_phi", "_lambda"),
                                 )

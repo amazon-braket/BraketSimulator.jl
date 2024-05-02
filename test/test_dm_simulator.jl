@@ -420,6 +420,7 @@ LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
                 "ms",
                 "pswap",
                 "phaseshift",
+                "prx",
                 "rx",
                 "ry",
                 "rz",

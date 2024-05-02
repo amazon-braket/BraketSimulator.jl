@@ -23,7 +23,7 @@ BraketSimulatorPythonExt = "PythonCall"
 
 [compat]
 Aqua = "=0.8"
-Braket = "=0.8.3"
+Braket = "=0.9.0"
 Combinatorics = "=1.0.2"
 Dates = "1.6"
 JSON3 = "=1.14.0"
