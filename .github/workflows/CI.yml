@@ -58,6 +58,7 @@ jobs:
         with:
           version: '1'
       - uses: julia-actions/cache@v1
+      - uses: julia-actions/julia-buildpkg@v1 # forces PkgServer refresh
       - name: Configure doc environment
         shell: julia --project=docs --color=yes {0}
         run: |

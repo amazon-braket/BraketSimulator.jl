@@ -165,6 +165,12 @@ LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
             [0.5, 0.5],
         ),
         (
+            [Instruction(H(), [0]), Instruction(PRx(0.15, 0.4), [0])],
+            1,
+            [0.6844863 - 0.04880085im, 0.72575165 - 0.04880085im],
+            [0.47090303, 0.52909697],
+        ),
+        (
             [Instruction(X(), [0]), Instruction(PSwap(0.15), [0, 1])],
             2,
             [0, 0.98877108 + 0.14943813 * im, 0, 0],
@@ -381,6 +387,7 @@ LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
                 "ms",
                 "pswap",
                 "phaseshift",
+                "prx",
                 "rx",
                 "ry",
                 "rz",

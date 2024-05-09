@@ -87,6 +87,19 @@ using Test, PythonCall, BraketSimulator, Braket
         )
             @test pyconvert(Braket.Instruction, py_sim_gate) == Braket.Instruction(jl_gate, 0)
         end
+        @testset "2-parameter gate $jl_gate" for (jl_gate, py_sim_gate, targets) in zip(
+            [
+                PRx(angle, angle2),
+            ],
+            [
+                braket_sim_gates.PRx(targets=pylist([0]), angle_1=angle, angle_2=angle2),
+            ],
+            [
+                [0],
+            ],
+        )
+            @test pyconvert(Braket.Instruction, py_sim_gate) == Braket.Instruction(jl_gate, targets)
+        end
         @testset "3-parameter gate $jl_gate" for (jl_gate, py_sim_gate, targets) in zip(
             [
                 MS(angle, angle2, angle3),

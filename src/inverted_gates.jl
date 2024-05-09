@@ -25,6 +25,7 @@ for (G, Gi) in ((:V, :Vi), (:S, :Si), (:T, :Ti))
     end
 end
 Base.inv(g::Unitary) = Unitary(inv(g.matrix))
+Base.inv(g::PRx)  = PRx(-g.angle[1], g.angle[2])
 Base.inv(g::GPi2) = GPi2(g.angle[1] + π)
 Base.inv(g::MS) = MS(g.angle[1] + π, g.angle[2], g.angle[3])
 
