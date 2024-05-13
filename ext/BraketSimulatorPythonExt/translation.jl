@@ -313,8 +313,8 @@ for (fn, jl_typ) in ((:jl_convert_sim_identity, :(Braket.I)),
                     )
     @eval begin
         function $fn(t::Type{Braket.Instruction}, x::Py)
-            jl_operation = _handle_modifiers($jl_typ(), x)
-            PythonCall.pyconvert_return(t(jl_operation, convert_targets(x.targets)))
+            jl_operation::$jl_typ = _handle_modifiers($jl_typ(), x)
+            PythonCall.pyconvert_return(Braket.Instruction{$jl_typ}(jl_operation, convert_targets(x.targets)))
         end
     end
 end
