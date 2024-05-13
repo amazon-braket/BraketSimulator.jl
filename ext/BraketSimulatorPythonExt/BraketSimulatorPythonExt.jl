@@ -245,33 +245,6 @@ function __init__()
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.results:Variance", Braket.Result, jl_convert_variance)
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.results:AdjointGradient", Braket.Result, jl_convert_adjointgradient)
     PythonCall.pyconvert_add_rule("braket.ir.openqasm.program_v1:Program", OpenQasmProgram, jl_convert_oqprogram)
-    # at init run many commonly used gates and noises to force compilation
-    # for this Python session
-    # must be done at init because each new Python session has a separate handle and
-    # seems to invalidate old methods
-    py_str = """
-       import warnings
-       # suppress user warning
-       with warnings.catch_warnings():
-           warnings.filterwarnings("ignore")
-           from braket.circuits.circuit import Circuit
-           c = Circuit().h(0).cnot(0, 1).rx(0, 0.1).ry(1, 0.2).rz(0, 0.1)
-           c.x(0).y(1).z(0).zz(0, 1, 0.2).xx(0, 1, 0.1).yy(0, 1, 0.1).xy(0, 1, 0.2)
-           c.swap(1, 0).ecr(0, 1).gpi(0, 0.1).gpi2(1, 0.2).ms(0, 1, 0.1, 0.2, 0.3)
-           c.iswap(1, 0).pswap(0, 1, 0.2).cphaseshift(0, 1, 0.2).cphaseshift00(1, 0, 0.2)
-           c.cphaseshift01(1, 0, 0.2).cphaseshift10(0, 1, 0.2).phaseshift(0, 0.2)
-           c.ccnot(1, 0, 2).cswap(0, 1, 2)
-           from braket.devices import LocalSimulator
-           device = LocalSimulator("braket_sv_v2")
-           device.run(c, shots=100)
-           c = Circuit().h(0).cnot(0, 1)
-           c.bit_flip(0, 0.1).phase_flip(0, 0.2).amplitude_damping(1, 0.1).phase_damping(0, 0.2)
-           c.two_qubit_dephasing(0, 1, 0.2).depolarizing(1, 0.2).two_qubit_depolarizing(1, 0, 0.1)
-           device = LocalSimulator("braket_dm_v2")
-           device.run(c, shots=100)
-       """
-    pyexec(py_str, pydict())
-
 end
 
 function BraketSimulator.parse_program(simulator::D, program::OpenQasmProgram, shots::Int) where {D<:AbstractSimulator}
