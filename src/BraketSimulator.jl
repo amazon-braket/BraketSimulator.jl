@@ -274,7 +274,7 @@ include("inverted_gates.jl")
 include("pow_gates.jl")
 include("sv_simulator.jl")
 include("dm_simulator.jl")
-#include("precompile.jl")
+include("precompile.jl")
 
 function __init__()
     Braket._simulator_devices[]["braket_dm_v2"] =
