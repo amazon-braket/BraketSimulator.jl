@@ -44,7 +44,7 @@ using PythonCall, BraketSimulator
 
 ## Usage Notes
 
-If you want to use this package **from Python**, see the Python wrapper package [`amazon-braket-simulator-v2-python`](), which provides a Python interaction layer and will install Julia, this package and other Julia dependencies in a sandboxed virtual environment for you.
+If you want to use this package **from Python**, see the Python wrapper package [`amazon-braket-simulator-v2-python`](https://github.com/amazon-braket/amazon-braket-simulator-v2-python), which provides a Python interaction layer and will install Julia, this package and other Julia dependencies in a sandboxed virtual environment for you.
 
 Launch Julia with the command line option `-t auto` to have Julia launch and manage threads to parallelize the simulation(s). `BraketSimulator.jl` will parallelize both across tasks within a batch and inside a single task's evolution.
 
