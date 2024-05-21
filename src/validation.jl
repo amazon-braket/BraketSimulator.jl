@@ -76,7 +76,7 @@ function _validate_ir_instructions_compatibility(
     circuit::Union{Program,Circuit},
     supported_operations,
 ) where {D<:AbstractSimulator}
-    circuit_instruction_names = map(ix->replace(lowercase(string(typeof(ix.operator))), "_"=>""), circuit.instructions)
+    circuit_instruction_names = map(ix->replace(lowercase(string(typeof(ix.operator))), "_"=>"", "braket."=>""), circuit.instructions)
     supported_instructions    = Set(map(op->replace(lowercase(op), "_"=>""), supported_operations))
     no_noise = true
     for name in circuit_instruction_names
