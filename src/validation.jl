@@ -1,5 +1,6 @@
 struct ValidationError <: Exception
-    msg::String
+    message::String
+    alternate_type::String
 end
 
 const _NOISE_INSTRUCTIONS = Set(replace(lowercase(op), "_"=>"") for op in
@@ -18,7 +19,7 @@ const _NOISE_INSTRUCTIONS = Set(replace(lowercase(op), "_"=>"") for op in
                             )
 
 function _validate_amplitude_states(states::Vector{String}, qubit_count::Int)
-    !all(length(state) == qubit_count for state in states) && error("all states in $states must have length $qubit_count.")
+    !all(length(state) == qubit_count for state in states) && throw(ValidationError("all states in $states must have length $qubit_count.", "ValueError"))
     return
 end
 
@@ -27,7 +28,7 @@ function _validate_ir_results_compatibility(
     results,
     supported_result_types,
 ) where {D<:AbstractSimulator}
-    isempty(results) && return
+    (isnothing(results) || isempty(results)) && return
     circuit_result_types_name    = [rt.type for rt in results]
     supported_result_types_names = map(supported_rt->lowercase(string(supported_rt.name)), supported_result_types)
     for name in circuit_result_types_name
@@ -40,16 +41,17 @@ _validate_ir_results_compatibility(simulator::D, results, ::Val{V}) where {D<:Ab
 
 function _validate_shots_and_ir_results(shots::Int, results, qubit_count::Int)
     if shots == 0
-        isempty(results) && throw(ValidationError("Result types must be specified in the IR when shots=0"))
+        (isnothing(results) || isempty(results)) && throw(ValidationError("Result types must be specified in the IR when shots=0", "ValueError"))
         for rt in results
-            rt.type == "sample" && error("sample can only be specified when shots>0")
+            rt.type == "sample" && throw(ValidationError("sample can only be specified when shots>0", "ValueError"))
             rt.type == "amplitude" && _validate_amplitude_states(rt.states, qubit_count)
         end
-    elseif shots > 0 && !isempty(results)
+    elseif shots > 0 && !isnothing(results) && !isempty(results)
         for rt in results
-            rt.type ∈ ["statevector", "amplitude", "densitymatrix"] && throw(
+            rt.type ∈ ["statevector", "amplitude", "densitymatrix"] && throw(ValidationError(
                 "statevector, amplitude and densitymatrix result types not available when shots>0",
-            )
+                "ValueError"
+            ))
         end
     end
 end
@@ -72,10 +74,9 @@ function _validate_input_provided(circuit)
 end
 
 function _validate_ir_instructions_compatibility(
-    simulator::D,
     circuit::Union{Program,Circuit},
     supported_operations,
-) where {D<:AbstractSimulator}
+)
     circuit_instruction_names = map(ix->replace(lowercase(string(typeof(ix.operator))), "_"=>"", "braket."=>""), circuit.instructions)
     supported_instructions    = Set(map(op->replace(lowercase(op), "_"=>""), supported_operations))
     no_noise = true
@@ -83,7 +84,7 @@ function _validate_ir_instructions_compatibility(
         if name in _NOISE_INSTRUCTIONS
             no_noise = false
             if name ∉ supported_instructions
-                throw(ErrorException("Noise instructions are not supported by $simulator (by default). You need to use the density matrix simulator: LocalSimulator(\"braket_dm_v2\")."))
+                throw(ValidationError("Noise instructions are not supported by the state vector simulator (by default). You need to use the density matrix simulator: LocalSimulator(\"braket_dm_v2\").", "TypeError"))
             end
         end
     end
@@ -92,7 +93,7 @@ function _validate_ir_instructions_compatibility(
     end
     return
 end
-_validate_ir_instructions_compatibility(simulator::D, circuit::Union{Program,Circuit}, v::Val{V}) where {D<:AbstractSimulator, V} = _validate_ir_instructions_compatibility(simulator, circuit, supported_operations(simulator, v))
+_validate_ir_instructions_compatibility(simulator::D, circuit::Union{Program,Circuit}, v::Val{V}) where {D<:AbstractSimulator, V} = _validate_ir_instructions_compatibility(circuit, supported_operations(simulator, v))
 
 _validate_result_type_qubits_exist(rt::Braket.StateVector, qubit_count::Int) = return
 _validate_result_type_qubits_exist(rt::Braket.Amplitude, qubit_count::Int) = return
@@ -124,8 +125,9 @@ function _validate_operation_qubits(operations::Vector{<:Instruction})
         max_qc = max(max_qc, targets...)
         union!(unique_qs, targets)
     end
-    max_qc >= length(unique_qs) && throw(
+    max_qc >= length(unique_qs) && throw(ValidationError(
         "Non-contiguous qubit indices supplied; qubit indices in a circuit must be contiguous. Qubits referenced: $unique_qs",
-    )
+        "ValueError"
+    ))
     return
 end
