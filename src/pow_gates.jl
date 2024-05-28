@@ -4,7 +4,8 @@ function Base.:(^)(g::Gate, n::Real)
     return Unitary(Matrix(Matrix(matrix_rep(g))^n))
 end
 
-for G in (:X, :Y, :Z, :H, :I, :Swap, :CNot, :CY, :CZ, :CCNot, :CSwap, :GPi, :ECR)
+Base.:(^)(g::I, n::Real) = I()
+for G in (:X, :Y, :Z, :H, :Swap, :CNot, :CY, :CZ, :CCNot, :CSwap, :GPi, :ECR)
     @eval begin
         function Base.:(^)(g::$G, n::Real)
             iseven(n) && return I()

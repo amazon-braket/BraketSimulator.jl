@@ -141,6 +141,7 @@ end
 Control(g::G, bitvals::NTuple{B, Int}) where {G<:Gate, B} = Control{G, B}(g, bitvals)
 Control(g::Control{G, BC}, bitvals::NTuple{B, Int}) where {G<:Gate, BC, B} = Control(g.g, (g.bitvals..., bitvals...))
 Control(g::G, bitvals::NTuple{0, Int}) where {G<:Gate} = g
+Base.copy(c::Control{G, B}) where {G<:Gate, B} = Control(copy(c.g), c.bitvals)
 Braket.qubit_count(c::Control{G, B}) where {G<:Gate, B} = qubit_count(c.g) + B
 Braket.qubit_count(c::Control{MultiQubitPhaseShift{N}, B}) where {N, B} = N
 function matrix_rep(c::Control{G, B}) where {G<:Gate, B}

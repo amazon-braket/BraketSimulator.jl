@@ -1,7 +1,6 @@
 using Test,
     Statistics,
     LinearAlgebra,
-    PythonCall,
     Braket,
     Braket.Observables,
     BraketSimulator

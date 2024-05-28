@@ -9,7 +9,8 @@ using Braket,
     Combinatorics,
     UUIDs,
     JSON3,
-    Random
+    Random,
+    PrecompileTools
 
 import Braket:
     Instruction,
@@ -25,6 +26,7 @@ import Braket:
     device_id,
     bind_value!
 
+
 export StateVector, StateVectorSimulator, DensityMatrixSimulator, evolve!, simulate, U, MultiQubitPhaseShift, MultiRZ
 
 const StateVector{T} = Vector{T}
@@ -38,6 +40,13 @@ ap_size(shots::Int, qubit_count::Int) = (shots > 0 && qubit_count < 30) ? 2^qubi
 
 include("validation.jl")
 include("custom_gates.jl")
+include("inverted_gates.jl")
+include("pow_gates.jl")
+include("gate_kernels.jl")
+include("noise_kernels.jl")
+include("Quasar.jl")
+
+using .Quasar
 
 const BuiltinGates = merge(Braket.StructTypes.subtypes(Braket.Gate), custom_gates) 
 
@@ -206,7 +215,10 @@ function simulate(
     shots::Int = 0,
     kwargs...,
 )
-    program  = parse_program(simulator, circuit_ir, shots)
+    inputs  = isnothing(circuit_ir.inputs) ? Dict{String, Float64}() : Dict{String, Any}(k=>v for (k,v) in circuit_ir.inputs)
+    circuit = Circuit(circuit_ir.source, inputs)
+    shots > 0 && Braket.basis_rotation_instructions!(circuit)
+    program = Program(circuit) 
     n_qubits = qubit_count(program)
     _validate_ir_results_compatibility(simulator, program.results, Val(:JAQCD))
     _validate_ir_instructions_compatibility(simulator, program, Val(:JAQCD))
@@ -215,9 +227,6 @@ function simulate(
     if shots > 0 && !isempty(program.basis_rotation_instructions)
         operations = vcat(operations, program.basis_rotation_instructions)
     end
-    inputs        = isnothing(circuit_ir.inputs) ? Dict{String, Float64}() : Dict{String, Float64}(k=>v for (k,v) in circuit_ir.inputs)
-    symbol_inputs = Dict{Symbol,Number}(Symbol(k) => v for (k, v) in inputs)
-    operations    = [Braket.bind_value!(operation, symbol_inputs) for operation in operations]
     _validate_operation_qubits(operations)
     reinit!(simulator, n_qubits, shots)
     stats = @timed begin
@@ -265,22 +274,149 @@ function simulate(
     return res
 end
 
-include("gate_kernels.jl")
-include("noise_kernels.jl")
 include("observables.jl")
 include("result_types.jl")
 include("properties.jl")
-include("inverted_gates.jl")
-include("pow_gates.jl")
 include("sv_simulator.jl")
 include("dm_simulator.jl")
-include("precompile.jl")
+#include("precompile.jl")
 
 function __init__()
     Braket._simulator_devices[]["braket_dm_v2"] =
         DensityMatrixSimulator{ComplexF64,DensityMatrix{ComplexF64}}
     Braket._simulator_devices[]["braket_sv_v2"] =
         StateVectorSimulator{ComplexF64,StateVector{ComplexF64}}
+end
+
+@setup_workload begin
+    custom_qasm = """
+               int[8] two = 2;
+               gate x a { U(π, 0, π) a; }
+               gate cx c, a {
+                   pow(1) @ ctrl @ x c, a;
+               }
+               gate cxx_1 c, a {
+                   pow(two) @ cx c, a;
+               }
+               gate cxx_2 c, a {
+                   pow(1/2) @ pow(4) @ cx c, a;
+               }
+               gate cxxx c, a {
+                   pow(1) @ pow(two) @ cx c, a;
+               }
+
+               qubit q1;
+               qubit q2;
+               qubit q3;
+               qubit q4;
+               qubit q5;
+
+               pow(1/2) @ x q1;       // half flip
+               pow(1/2) @ x q1;       // half flip
+               cx q1, q2;   // flip
+               cxx_1 q1, q3;    // don't flip
+               cxx_2 q1, q4;    // don't flip
+               cnot q1, q5;    // flip
+               x q3;       // flip
+               x q4;       // flip
+
+               s q1;   // sqrt z
+               s q1;   // again
+               inv @ z q1; // inv z
+               """;
+    noise_qasm = """
+        qubit[2] qs;
+
+        #pragma braket noise bit_flip(.5) qs[1]
+        #pragma braket noise phase_flip(.5) qs[0]
+        #pragma braket noise pauli_channel(.1, .2, .3) qs[0]
+        #pragma braket noise depolarizing(.5) qs[0]
+        #pragma braket noise two_qubit_depolarizing(.9) qs
+        #pragma braket noise two_qubit_depolarizing(.7) qs[1], qs[0]
+        #pragma braket noise two_qubit_dephasing(.6) qs
+        #pragma braket noise amplitude_damping(.2) qs[0]
+        #pragma braket noise generalized_amplitude_damping(.2, .3)  qs[1]
+        #pragma braket noise phase_damping(.4) qs[0]
+        #pragma braket noise kraus([[0.9486833im, 0], [0, 0.9486833im]], [[0, 0.31622777], [0.31622777, 0]]) qs[0]
+        #pragma braket noise kraus([[0.9486832980505138, 0, 0, 0], [0, 0.9486832980505138, 0, 0], [0, 0, 0.9486832980505138, 0], [0, 0, 0, 0.9486832980505138]], [[0, 0.31622776601683794, 0, 0], [0.31622776601683794, 0, 0, 0], [0, 0, 0, 0.31622776601683794], [0, 0, 0.31622776601683794, 0]]) qs[{1, 0}]
+        """
+    unitary_qasm = """
+        qubit[3] q;
+
+        x q[0];
+        h q[1];
+
+        // unitary pragma for t gate
+        #pragma braket unitary([[1.0, 0], [0, 0.70710678 + 0.70710678im]]) q[0]
+        ti q[0];
+
+        // unitary pragma for h gate (with phase shift)
+        #pragma braket unitary([[0.70710678im, 0.70710678im], [0 - -0.70710678im, -0.0 - 0.70710678im]]) q[1]
+        gphase(-π/2) q[1];
+        h q[1];
+
+        // unitary pragma for ccnot gate
+        #pragma braket unitary([[1.0, 0, 0, 0, 0, 0, 0, 0], [0, 1.0, 0, 0, 0, 0, 0, 0], [0, 0, 1.0, 0, 0, 0, 0, 0], [0, 0, 0, 1.0, 0, 0, 0, 0], [0, 0, 0, 0, 1.0, 0, 0, 0], [0, 0, 0, 0, 0, 1.0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 1.0], [0, 0, 0, 0, 0, 0, 1.0, 0]]) q
+        """
+    sv_adder_qasm = """
+        OPENQASM 3;
+
+        input uint[4] a_in;
+        input uint[4] b_in;
+
+        gate majority a, b, c {
+            cnot c, b;
+            cnot c, a;
+            ccnot a, b, c;
+        }
+
+        gate unmaj a, b, c {
+            ccnot a, b, c;
+            cnot c, a;
+            cnot a, b;
+        }
+
+        qubit cin;
+        qubit[4] a;
+        qubit[4] b;
+        qubit cout;
+
+        // set input states
+        for int[8] i in [0: 3] {
+          if(bool(a_in[i])) x a[i];
+          if(bool(b_in[i])) x b[i];
+        }
+
+        // add a to b, storing result in b
+        majority cin, b[3], a[3];
+        for int[8] i in [3: -1: 1] { majority a[i], b[i - 1], a[i - 1]; }
+        cnot a[0], cout;
+        for int[8] i in [1: 3] { unmaj a[i], b[i - 1], a[i - 1]; }
+        unmaj cin, b[3], a[3];
+
+        // todo: subtle bug when trying to get a result type for both at once
+        #pragma braket result probability cout, b
+        #pragma braket result probability cout
+        #pragma braket result probability b
+        """
+    @compile_workload begin
+        using Braket, BraketSimulator, BraketSimulator.Quasar
+        simulator = StateVectorSimulator(5, 0)
+        oq3_program = Braket.OpenQasmProgram(Braket.header_dict[Braket.OpenQasmProgram], custom_qasm, nothing)
+        simulate(simulator, oq3_program, shots=100)
+        
+        simulator = DensityMatrixSimulator(2, 0)
+        oq3_program = Braket.OpenQasmProgram(Braket.header_dict[Braket.OpenQasmProgram], noise_qasm, nothing)
+        simulate(simulator, oq3_program, shots=100)
+        
+        simulator = StateVectorSimulator(3, 0)
+        oq3_program = Braket.OpenQasmProgram(Braket.header_dict[Braket.OpenQasmProgram], unitary_qasm, nothing)
+        simulate(simulator, oq3_program, shots=100)
+        
+        simulator = StateVectorSimulator(6, 0)
+        oq3_program = Braket.OpenQasmProgram(Braket.header_dict[Braket.OpenQasmProgram], sv_adder_qasm, Dict("a_in"=>3, "b_in"=>7))
+        simulate(simulator, oq3_program, shots=0)
+    end
 end
 
 end # module BraketSimulator
