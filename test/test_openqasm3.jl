@@ -891,6 +891,44 @@ get_tol(shots::Int) = return (
         @test visitor.classical_defs["array_2"].val == zeros(Int, 10) 
         @test visitor.classical_defs["array_3"].val == [1, 2, 3, 4, 0, 6, 0, 8, 0, 10]
     end
+    @testset "Rotation parameter expressions" begin
+        @testset  "Operation: $operation" for (operation, state_vector) in
+            [
+                ["rx(π) q[0];", [0, -im]],
+                ["rx(pi) q[0];", [0, -im]],
+                ["rx(ℇ) q[0];", [0.21007866, -0.97768449im]],
+                ["rx(euler) q[0];", [0.21007866, -0.97768449im]],
+                ["rx(τ) q[0];", [-1, 0]],
+                ["rx(tau) q[0];", [-1, 0]],
+                ["rx(pi + pi) q[0];", [-1, 0]],
+                ["rx(pi - pi) q[0];", [1, 0]],
+                ["rx(-pi + pi) q[0];", [1, 0]],
+                ["rx(pi * 2) q[0];", [-1, 0]],
+                ["rx(pi / 2) q[0];", [0.70710678, -0.70710678im]],
+                ["rx(-pi / 2) q[0];", [0.70710678, 0.70710678im]],
+                ["rx(-pi) q[0];", [0, im]],
+                ["rx(pi + 2 * pi) q[0];", [0, im]],
+                ["rx(pi + pi / 2) q[0];", [-0.70710678, -0.70710678im]],
+                ["rx((pi / 4) + (pi / 2) / 2) q[0];", [0.70710678, -0.70710678im]],
+                ["rx(0) q[0];", [1, 0]],
+                ["rx(0 + 0) q[0];", [1, 0]],
+                ["rx((1.1 + 2.04) / 2) q[0];", [0.70738827, -0.70682518im]],
+                ["rx((6 - 2.86) * 0.5) q[0];", [0.70738827, -0.70682518im]],
+                ["rx(pi ** 2) q[0];", [0.22058404, 0.97536797im]],
+            ]
+            qasm = """
+            OPENQASM 3.0;
+            bit[1] b;
+            qubit[1] q;
+            $operation
+            #pragma braket result state_vector
+            """
+            circuit    = Circuit(qasm) 
+            simulation = BraketSimulator.StateVectorSimulator(1, 0)
+            BraketSimulator.evolve!(simulation, circuit.instructions)
+            @test simulation.state_vector ≈ state_vector
+        end
+    end
     @testset "No result types no shots" begin
         qasm = """
         qubit[2] q;

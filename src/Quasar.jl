@@ -27,7 +27,7 @@ include("builtin_functions.jl")
 const prefloat = re"[-+]?([0-9]+\.[0-9]*|[0-9]*\.[0-9]+)"
 const qasm_tokens = [
         :identifier   => re"[A-Za-z_][0-9A-Za-z_!]*",
-        :irrational   => re"π|τ|ℯ|ℇ",
+        :irrational   => re"π|pi|τ|tau|ℯ|ℇ|euler",
         :comma        => re",",
         :colon        => re":",
         :semicolon    => re";",
@@ -436,10 +436,13 @@ parse_bin_literal(token, qasm)     = QasmExpression(:integer_literal, tryparse(I
 parse_float_literal(token, qasm)   = QasmExpression(:float_literal, tryparse(Float64, qasm[token[1]:token[1]+token[2]-1]))
 parse_boolean_literal(token, qasm)   = QasmExpression(:boolean_literal, tryparse(Bool, qasm[token[1]:token[1]+token[2]-1]))
 function parse_irrational_literal(token, qasm)
-    raw_string = qasm[thisind(qasm, token[1])]
-    raw_string == 'π' && return QasmExpression(:irrational_literal, π)
-    raw_string == 'τ' && return QasmExpression(:irrational_literal, 2*π)
-    raw_string ∈ ('ℯ', 'ℇ') && return QasmExpression(:irrational_literal, ℯ)
+    raw_string = String(codeunits(qasm)[token[1]:token[1]+token[2]-1])
+    raw_string == "pi" && return QasmExpression(:irrational_literal, π)
+    raw_string == "euler" && return QasmExpression(:irrational_literal, ℯ)
+    raw_string == "tau" && return QasmExpression(:irrational_literal, 2*π)
+    raw_string == "π" && return QasmExpression(:irrational_literal, π)
+    raw_string == "τ" && return QasmExpression(:irrational_literal, 2*π)
+    raw_string ∈ ("ℯ", "ℇ") && return QasmExpression(:irrational_literal, ℯ)
 end
 function parse_set_expression(tokens::Vector{Tuple{Int64, Int32, Token}}, stack, start, qasm)
     interior = extract_scope(tokens, stack, start, qasm)
@@ -576,7 +579,7 @@ function parse_literal(tokens::Vector{Tuple{Int64, Int32, Token}}, stack, start,
         elseif is_complex
             parse(Complex{Int}, raw_literal_string)
         else
-            throw(QasmParseError("could not parse $raw_literal_string as Complex.", stack, start, qasm))
+            parse(Int, raw_literal_string)
         end
     if is_complex # complex float
         return QasmExpression(:complex_literal, raw_literal)
@@ -674,8 +677,10 @@ function parse_identifier_line(tokens::Vector{Tuple{Int64, Int32, Token}}, stack
         token_name = parse_hw_qubit(start_token, qasm)
     elseif start_token[end] == qubit
         token_name = parse_qubit_declaration(tokens, stack, start, qasm)
-    elseif start_token[end] == operator 
+    elseif start_token[end] == operator
         token_name = parse_identifier(start_token, qasm)
+    elseif start_token[end] == lparen # could be some kind of expression 
+        token_name = parse_paren_expression(pushfirst!(tokens, start_token), stack, start, qasm) 
     elseif start_token[end] == classical_type 
         token_name = parse_classical_type(tokens, stack, start, qasm)
     elseif start_token[end] ∈ (string, integer, float, hex, oct, bin, irrational, dot, boolean)
@@ -684,12 +689,24 @@ function parse_identifier_line(tokens::Vector{Tuple{Int64, Int32, Token}}, stack
         token_name = parse_identifier(start_token, qasm)
     end
     head(token_name) == :empty && throw(QasmParseError("unable to parse line with start token $(start_token[end])", stack, start, qasm))
+
+
     next_token = first(tokens)
     if next_token[end] == semicolon || next_token[end] == comma
         expr = token_name
     elseif start_token[end] == operator
-        unary_op_symbol = Symbol(token_name.args[1]) 
-        expr = QasmExpression(:unary_op, unary_op_symbol, parse_identifier_line(tokens, stack, start, qasm))
+        unary_op_symbol = Symbol(token_name.args[1])
+        next_expr = parse_identifier_line(tokens, stack, start, qasm)
+        # apply unary op to next_expr
+        if head(next_expr) ∈ (:identifier, :indexed_identifier, :integer_literal, :float_literal, :string_literal, :irrational_literal, :boolean_literal, :complex_literal, :function_call)
+            expr = QasmExpression(:unary_op, unary_op_symbol, next_expr)
+        elseif head(next_expr) == :binary_op
+            # replace first argument
+            left_hand_side = next_expr.args[2]
+            new_left_hand_side = QasmExpression(:unary_op, unary_op_symbol, left_hand_side)
+            next_expr.args[2] = new_left_hand_side
+            expr = next_expr
+        end
     elseif next_token[end] == classical_type && start_token[end] ∈ (mutable, readonly)
         type = parse_classical_type(tokens, stack, start, qasm)
         is_mutable = (start_token[end] == mutable)
@@ -993,7 +1010,7 @@ function parse_qasm(clean_tokens::Vector{Tuple{Int64, Int32, Token}}, qasm::Stri
             popfirst!(clean_tokens) #semicolon
         elseif token == hw_qubit
             hw_qubit_id = parse_identifier((start, len, token), qasm)
-            expr = QasmExpression(:hardware_qubit, hw_qubit_id)
+            expr = QasmExpression(:hw_qubit, hw_qubit_id)
             push!(stack, expr)
         elseif token == qubit
             closing = findfirst(triplet->triplet[end] == semicolon, clean_tokens)
