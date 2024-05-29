@@ -118,6 +118,23 @@ get_tol(shots::Int) = return (
         sv = 1/√2 * [-1; 0; 0; 1]
         @test simulation.state_vector ≈ sv 
     end
+    @testset "Numbers" begin
+        qasm = """
+        float[32] a = 1.24e-3;
+        complex[float] b = 1-0.23im;
+        bit c = "0";
+        bool d = false;
+        complex[float] e = -0.23+2im;
+        """
+        parsed  = parse_qasm(qasm)
+        visitor = QasmProgramVisitor()
+        visitor(parsed)
+        @test visitor.classical_defs["a"].val == 1.24e-3
+        @test visitor.classical_defs["b"].val == 1-0.23im
+        @test visitor.classical_defs["c"].val == falses(1)
+        @test visitor.classical_defs["d"].val == false
+        @test visitor.classical_defs["e"].val == -0.23 + 2im 
+    end
     @testset "Physical qubits" begin
         qasm = """
         h \$0;

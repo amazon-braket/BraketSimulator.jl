@@ -24,13 +24,13 @@ end
 
 include("builtin_functions.jl")
 
+const prefloat = re"[-+]?([0-9]+\.[0-9]*|[0-9]*\.[0-9]+)"
 const qasm_tokens = [
         :identifier   => re"[A-Za-z_][0-9A-Za-z_!]*",
         :irrational   => re"π|τ|ℯ|ℇ",
         :comma        => re",",
         :colon        => re":",
         :semicolon    => re";",
-        :dot          => re"\.",
         :question     => re"\?",
         :equal        => re"=",
         :lparen       => re"\(",
@@ -83,8 +83,9 @@ const qasm_tokens = [
         :oct          => re"0o[0-7]+",
         :bin          => re"(0b|0B)[0-1]+",
         :hex          => re"0x[0-9A-Fa-f]+",
-        :float        => re"[-+]?([0-9]+\.[0-9]*|[0-9]*\.[0-9]+) | (([-+]?([0-9]+\.[0-9]*|[0-9]*\.[0-9]+) | [-+]?[0-9]+) * [eE][-+]?[0-9]+)",
+        :dot          => re"\.",
         :integer      => re"[-+]?[0-9]+",
+        :float        => prefloat | ((prefloat | re"[-+]?[0-9]+") * re"[eE][-+]?[0-9]+"),
         :continue_token  => re"continue",
         :octal_integer   => re"0o([0-7]_?)* [0-7]",
         :hex_integer     => re"(0x|0X) ([0-9a-fA-F] _?)* [0-9a-fA-F]",
@@ -341,7 +342,7 @@ function parse_classical_type(tokens, stack, start, qasm)
     elseif var_type == "float"
         return QasmExpression(:classical_type, SizedFloat(size))
     elseif var_type == "complex"
-        return QasmExpression(:classical_type, SizedComplex(size))
+        return QasmExpression(:classical_type, SizedComplex(size.size))
     elseif var_type == "bool"
         return QasmExpression(:classical_type, Bool)
     end
@@ -433,6 +434,7 @@ parse_hex_literal(token, qasm)     = QasmExpression(:integer_literal, tryparse(I
 parse_oct_literal(token, qasm)     = QasmExpression(:integer_literal, tryparse(Int, qasm[token[1]:token[1]+token[2]-1]))
 parse_bin_literal(token, qasm)     = QasmExpression(:integer_literal, tryparse(Int, qasm[token[1]:token[1]+token[2]-1]))
 parse_float_literal(token, qasm)   = QasmExpression(:float_literal, tryparse(Float64, qasm[token[1]:token[1]+token[2]-1]))
+parse_boolean_literal(token, qasm)   = QasmExpression(:boolean_literal, tryparse(Bool, qasm[token[1]:token[1]+token[2]-1]))
 function parse_irrational_literal(token, qasm)
     raw_string = qasm[thisind(qasm, token[1])]
     raw_string == 'π' && return QasmExpression(:irrational_literal, π)
@@ -543,61 +545,38 @@ function parse_literal(tokens::Vector{Tuple{Int64, Int32, Token}}, stack, start,
     tokens[1][end] == oct     && return parse_oct_literal(popfirst!(tokens), qasm) 
     tokens[1][end] == bin     && return parse_bin_literal(popfirst!(tokens), qasm)
     tokens[1][end] == irrational && return parse_irrational_literal(popfirst!(tokens), qasm)
-    is_operator = tokens[2][end] == operator
-    is_plusminus = is_operator && parse_identifier(tokens[2], qasm).args[1] ∈ ("+","-")
-
-    is_float    = tokens[1][end] == float || tokens[1][end] == dot
+    tokens[1][end] == boolean && return parse_boolean_literal(popfirst!(tokens), qasm)
+    tokens[1][end] == integer && length(tokens) == 1 && return parse_integer_literal(popfirst!(tokens), qasm)
+    tokens[1][end] == float   && length(tokens) == 1 && return parse_float_literal(popfirst!(tokens), qasm)
+    
+    is_float    = tokens[1][end] == float
     is_complex  = false
-    is_terminal = (length(tokens) == 1 || tokens[2][end] == semicolon || tokens[2][end] == comma || (is_operator && !is_plusminus))
-    tokens[1][end] == integer && is_terminal && return parse_integer_literal(popfirst!(tokens), qasm)
-    if tokens[1][end] == integer && tokens[2][end] == dot && tokens[3][end] == integer
-        # parse this as a float
-        float_tokens = splice!(tokens, 1:3)
-        total_len = float_tokens[1][2] + float_tokens[2][2] + float_tokens[3][2]
-        pushfirst!(tokens, (float_tokens[1][1], total_len, float))
-        is_float = true
-    elseif tokens[1][end] == dot && tokens[2][end] == integer
-        float_tokens = splice!(tokens, 1:2)
-        total_len = float_tokens[1][2] + float_tokens[2][2]
-        pushfirst!(tokens, (float_tokens[1][1], total_len, float))
-        is_float = true
-    end
     is_operator = tokens[2][end] == operator
     is_plusminus = is_operator && parse_identifier(tokens[2], qasm).args[1] ∈ ("+","-")
+    is_terminal  = (tokens[2][end] == semicolon || tokens[2][end] == comma || (is_operator && !is_plusminus))
+    tokens[1][end] == integer && is_terminal && return parse_integer_literal(popfirst!(tokens), qasm)
+    tokens[1][end] == float && is_terminal && return parse_float_literal(popfirst!(tokens), qasm)
     splice_end = 1
     if tokens[2][end] == im_token
         is_complex = true
         splice_end = 2
-    elseif is_plusminus
-        # get second half
-        if tokens[3][end] == integer && tokens[4][end] == im_token
-            is_complex = true
-            splice_end = 4
-        elseif tokens[3][end] == integer && tokens[4][end] == dot && tokens[5][end] == integer && tokens[6][end] == im_token
-            is_complex = true
-            is_float   = true
-            splice_end = 6
-        end
+    elseif is_plusminus && tokens[3][end] ∈ (integer, float) && tokens[4][end] == im_token
+        is_complex = true
+        is_float |= tokens[3][end] == float
+        splice_end = 4
     elseif tokens[2][end] ∈ (integer, float) && tokens[3][end] == im_token # may have absorbed +/- sign
         is_complex = true
         is_float |= tokens[2][end] == float
         splice_end = 3
-    elseif tokens[2][end] == integer && tokens[3][end] == dot && tokens[4][end] == integer && tokens[5][end] == im_token # may have absorbed +/- sign
-        is_complex = true
-        is_float = true
-        splice_end = 5
     end
     literal_tokens = splice!(tokens, 1:splice_end)
     raw_literal_string = qasm[literal_tokens[1][1]:literal_tokens[end][1]+literal_tokens[end][2]-1]
-    
-    raw_literal = if is_float && is_complex
-        tryparse(ComplexF64, raw_literal_string)
-        elseif is_float
-            tryparse(Float64, raw_literal_string)
+    raw_literal = if is_float
+            parse(ComplexF64, raw_literal_string)
         elseif is_complex
-            tryparse(Complex{Int}, raw_literal_string)
+            parse(Complex{Int}, raw_literal_string)
         else
-            tryparse(Int, raw_literal_string)
+            throw(QasmParseError("could not parse $raw_literal_string as Complex.", stack, start, qasm))
         end
     if is_complex # complex float
         return QasmExpression(:complex_literal, raw_literal)
@@ -699,7 +678,7 @@ function parse_identifier_line(tokens::Vector{Tuple{Int64, Int32, Token}}, stack
         token_name = parse_identifier(start_token, qasm)
     elseif start_token[end] == classical_type 
         token_name = parse_classical_type(tokens, stack, start, qasm)
-    elseif start_token[end] ∈ (string, integer, float, hex, oct, bin, irrational, dot)
+    elseif start_token[end] ∈ (string, integer, float, hex, oct, bin, irrational, dot, boolean)
         token_name = parse_literal(pushfirst!(tokens, start_token), stack, start, qasm)
     elseif start_token[end] ∈ (mutable, readonly)
         token_name = parse_identifier(start_token, qasm)
@@ -879,11 +858,9 @@ function parse_qasm(clean_tokens::Vector{Tuple{Int64, Int32, Token}}, qasm::Stri
             closing = findfirst(triplet->triplet[end] == semicolon, clean_tokens)
             isnothing(closing) && throw(QasmParseError("missing final semicolon for OPENQASM", stack, start, qasm))
             closing == 1 && throw(QasmParseError("missing version number", stack, start, qasm))
-            version_start, version_len, version_token = popfirst!(clean_tokens)
-            version_token == integer || throw(QasmParseError("version number must be an integer", stack, version_start, qasm))
-            version_str   = qasm[version_start:(version_start + version_len) - 1]
-            popfirst!(clean_tokens) #semicolon
-            expr = QasmExpression(:version, QasmExpression(:integer_literal, tryparse(Int, version_str)))
+            version_val = parse_literal([popfirst!(clean_tokens)], stack, start, qasm)
+            isinteger(version_val.args[1]) || throw(QasmParseError("version number must be an integer", stack, version_start, qasm))
+            expr = QasmExpression(:version, QasmExpression(:float_literal, version_val.args[1]))
             push!(stack, expr)
         elseif token == pragma
             closing = findfirst(triplet->triplet[end] == newline, clean_tokens)
@@ -1364,7 +1341,7 @@ function evaluate(v::AbstractVisitor, expr::QasmExpression)
         return StepRange(start, step, stop)
     elseif head(expr) == :set
         return map(element->evaluate(v, element), expr.args)
-    elseif head(expr) ∈ (:integer_literal, :float_literal, :string_literal, :complex_literal, :irrational_literal)
+    elseif head(expr) ∈ (:integer_literal, :float_literal, :string_literal, :complex_literal, :irrational_literal, :boolean_literal)
         return expr.args[1]
     elseif head(expr) == :array_literal
         return [evaluate(v, arg) for arg in expr.args]
