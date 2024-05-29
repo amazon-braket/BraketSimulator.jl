@@ -65,7 +65,7 @@ function simulate(
             return if pyhasattr(spec, "source")
                 pyconvert(OpenQasmProgram, spec)
             else
-                Braket.parse_raw_schema(pyconvert(String, spec.json()))
+                Braket.parse_raw_schema(pyconvert(String, spec))
             end
         end
         input = nothing
