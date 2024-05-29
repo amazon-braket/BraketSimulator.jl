@@ -38,7 +38,9 @@ function __init__()
     # must set these when this code is actually loaded
     braket[]    = pyimport("braket")
     numpy[]     = pyimport("numpy")
-    pyimport("braket.default_simulator")
+    pyimport("braket.ir.openqasm.program_v1")
+    pyimport("braket.task_result.task_metadata_v1")
+    pyimport("braket.task_result.additional_metadata")
     PythonCall.pyconvert_add_rule("braket.schema_common.schema_header:BraketSchemaHeader", Braket.braketSchemaHeader, jl_convert_bsh)
     PythonCall.pyconvert_add_rule("braket.ir.openqasm.program_v1:Program", OpenQasmProgram, jl_convert_oqprogram)
 end

@@ -27,15 +27,6 @@ function jl_convert_bsh(t::Type{Braket.braketSchemaHeader}, x::Py)
     PythonCall.pyconvert_return(t(name, version))
 end
 
-function jl_convert_sim_circuit(t::Type{Braket.Circuit}, x)
-    instructions = map(ix->pyconvert(Instruction, ix), x.instructions)
-    results      = map(rt->pyconvert(Result, rt), x.results)
-    prog         = t()
-    foreach(ix->Braket.add_instruction!(prog, ix), instructions)
-    foreach(rt->push!(prog.result_types, rt), results)
-    PythonCall.pyconvert_return(prog)
-end
-
 py_obs(o::String) = pylist([pystr(o)])
 function py_obs(obs::Vector)
     raw_obs = map(obs) do o
