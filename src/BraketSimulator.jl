@@ -217,7 +217,33 @@ function simulate(
 )
     inputs  = isnothing(circuit_ir.inputs) ? Dict{String, Float64}() : Dict{String, Any}(k=>v for (k,v) in circuit_ir.inputs)
     circuit = Circuit(circuit_ir.source, inputs)
-    shots > 0 && Braket.basis_rotation_instructions!(circuit)
+    measure_ixs = splice!(circuit.instructions, findall(ix->ix.operator isa Measure, circuit.instructions))
+    if !isempty(measure_ixs)
+        measured_qubits = collect(Iterators.flatten(measure.target for measure in measure_ixs))
+    else
+        measured_qubits = Int[]
+    end
+    if shots > 0
+        observable_map = Dict()
+        for result in circuit.result_types
+            if result isa Braket.ObservableResult
+                result.observable isa Braket.Observables.I && continue
+                observable_qubits = result.targets
+                for qubit in observable_qubits, (target, previously_measured) in observable_map
+                    if qubit ∈ target
+                        # must ensure that target is the same
+                        any(t ∉ observable_qubits for t in target) && throw(ErrorException("Qubit part of incompatible results targets"))
+                        # must ensure observable is the same
+                        typeof(previously_measured) != typeof(result.observable) && throw(ErrorException("Conflicting result types applied to a single qubit"))
+                        # including matrix value for Hermitians
+                        result.observable isa Braket.Observables.HermitianObservable && !isapprox(previously_measured.matrix, result.observable.matrix) && throw(ErrorException("Conflicting result types applied to a single qubit"))
+                    end
+                end
+                observable_map[observable_qubits] = result.observable
+            end
+        end
+        Braket.basis_rotation_instructions!(circuit)
+    end
     program = Program(circuit) 
     n_qubits = qubit_count(program)
     _validate_ir_results_compatibility(simulator, program.results, Val(:JAQCD))
@@ -234,7 +260,6 @@ function simulate(
     end
     @debug "Time for evolution: $(stats.time)"
     results = shots == 0 && !isempty(program.results) ? _compute_exact_results(simulator, program, n_qubits) : [Braket.ResultTypeValue(result_type, 0.0) for result_type in program.results]
-    measured_qubits = get(kwargs, :measured_qubits, collect(0:n_qubits-1))
     isempty(measured_qubits) && (measured_qubits = collect(0:n_qubits-1))
     stats   = @timed _bundle_results(results, circuit_ir, simulator; measured_qubits=measured_qubits)
     @debug "Time for results bundling: $(stats.time)"
@@ -253,7 +278,7 @@ function simulate(
     _validate_ir_instructions_compatibility(simulator, circuit_ir, Val(:JAQCD))
     _validate_shots_and_ir_results(shots, circuit_ir.results, qubit_count)
     operations::Vector{Instruction} = circuit_ir.instructions
-    if shots > 0 && !isempty(circuit_ir.basis_rotation_instructions)
+    if shots > 0 && !isnothing(circuit_ir.basis_rotation_instructions) && !isempty(circuit_ir.basis_rotation_instructions)
         operations = vcat(operations, circuit_ir.basis_rotation_instructions)
     end
     inputs = get(kwargs, :inputs, Dict{String,Float64}())

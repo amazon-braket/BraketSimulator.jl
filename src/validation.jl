@@ -27,7 +27,7 @@ function _validate_ir_results_compatibility(
     results,
     supported_result_types,
 ) where {D<:AbstractSimulator}
-    isempty(results) && return
+    (isnothing(results) || isempty(results)) && return
     circuit_result_types_name    = [rt.type for rt in results]
     supported_result_types_names = map(supported_rt->lowercase(string(supported_rt.name)), supported_result_types)
     for name in circuit_result_types_name
@@ -40,12 +40,12 @@ _validate_ir_results_compatibility(simulator::D, results, ::Val{V}) where {D<:Ab
 
 function _validate_shots_and_ir_results(shots::Int, results, qubit_count::Int)
     if shots == 0
-        isempty(results) && throw(ValidationError("Result types must be specified in the IR when shots=0"))
+        (isnothing(results) || isempty(results)) && throw(ValidationError("Result types must be specified in the IR when shots=0"))
         for rt in results
             rt.type == "sample" && error("sample can only be specified when shots>0")
             rt.type == "amplitude" && _validate_amplitude_states(rt.states, qubit_count)
         end
-    elseif shots > 0 && !isempty(results)
+    elseif shots > 0 && !isnothing(results) && !isempty(results)
         for rt in results
             rt.type ∈ ["statevector", "amplitude", "densitymatrix"] && throw(
                 "statevector, amplitude and densitymatrix result types not available when shots>0",

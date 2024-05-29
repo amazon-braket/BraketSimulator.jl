@@ -93,7 +93,7 @@ const qasm_tokens = [
         :line_comment    => re"//",
         :block_comment   => re"/\* .*? \*/",
         :char            => '\'' * (re"[ -&(-~]" | ('\\' * re"[ -~]")) * '\'',
-        :string          => '"' * rep(re"[ !#-~]" | re"\\\\\"") * '"',
+        :string          => '"' * rep(re"[ !#-~]" | re"\\\\\"") * '"' | '\'' * rep(re"[ -&(-~]" | ('\\' * re"[ -~]")) * '\'',
         :newline         => re"\r?\n",
         :spaces          => re"[\t ]+",
         :classical_type    => re"bool|uint|int|float|angle|complex|array|bit",
@@ -1438,7 +1438,8 @@ function evaluate(v::AbstractVisitor, expr::QasmExpression)
             throw(QasmVisitorError("unable to evaluate expression $expr"))
         end
     elseif head(expr) == :measure
-        qubit_to_measure = evaluate_qubits(v, expr.args[1])
+        qubits_to_measure = evaluate_qubits(v, expr.args[1])
+        push!(v, [Instruction(Measure(), q) for q in qubits_to_measure])
         return false
     elseif head(expr) == :function_call
         function_name = name(expr)
@@ -1819,7 +1820,7 @@ function (v::AbstractVisitor)(program_expr::QasmExpression)
             elseif result_type == :amplitude
                 states = program_expr.args[3:end]
                 clean_states = map(states) do state
-                    return replace(state.args[1], "\""=>"")
+                    return replace(state.args[1], "\""=>"", "\'"=>"")
                 end
                 push!(v, Amplitude(clean_states))
             elseif result_type == :expectation
@@ -1894,7 +1895,11 @@ function Braket.Circuit(v::QasmProgramVisitor)
 end
 
 function Braket.Circuit(qasm_source::String, inputs::Dict{String, <:Any}=Dict{String, Any}())
-    parsed = parse_qasm(qasm_source)
+    if endswith(qasm_source, ".qasm") && isfile(qasm_source)
+        parsed = parse_qasm(read(qasm_source, String))
+    else
+        parsed = parse_qasm(qasm_source)
+    end
     visitor = QasmProgramVisitor(inputs)
     visitor(parsed)
     return Circuit(visitor) 

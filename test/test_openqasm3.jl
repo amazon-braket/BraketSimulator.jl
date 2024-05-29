@@ -111,12 +111,14 @@ get_tol(shots::Int) = return (
         gphase(π);
         inv @ gphase(π / 2);
         negctrl @ ctrl @ gphase(2 * π) qs[0], qs[1];
+        #pragma braket result amplitude '00', '01', '10', '11'
         """
         circuit    = Circuit(qasm) 
         simulation = BraketSimulator.StateVectorSimulator(2, 0)
         BraketSimulator.evolve!(simulation, circuit.instructions)
         sv = 1/√2 * [-1; 0; 0; 1]
         @test simulation.state_vector ≈ sv 
+        @test circuit.result_types == [Amplitude(["00", "01", "10", "11"])]
     end
     @testset "Numbers" begin
         qasm = """
@@ -167,6 +169,7 @@ get_tol(shots::Int) = return (
         braket_circ = Circuit([(H, 0), (CNot, 0, 1), (H, 2), (CNot, 2, 3),  (H, 2), (CNot, 2, 3),  (H, 2), (CNot, 2, 3),  (H, 2), (CNot, 2, 3),  (H, 2), (CNot, 2, 3)])
         inputs = Dict("theta"=>0.2)
         parsed_circ = Circuit(qasm_str, inputs)
+        deleteat!(parsed_circ.instructions, length(parsed_circ.instructions)-3:length(parsed_circ.instructions))
         @test ir(parsed_circ, Val(:JAQCD)) == Braket.Program(braket_circ)
     end
     @testset "For Loop" begin
@@ -806,6 +809,8 @@ get_tol(shots::Int) = return (
         """
         circuit        = Circuit(with_verbatim)
         sim_w_verbatim = BraketSimulator.StateVectorSimulator(2, 0)
+        pop!(circuit.instructions) 
+        pop!(circuit.instructions) 
         BraketSimulator.evolve!(sim_w_verbatim, circuit.instructions)
 
         without_verbatim = """
@@ -822,6 +827,8 @@ get_tol(shots::Int) = return (
         """
         circuit         = Circuit(without_verbatim)
         sim_wo_verbatim = BraketSimulator.StateVectorSimulator(2, 0)
+        pop!(circuit.instructions) 
+        pop!(circuit.instructions) 
         BraketSimulator.evolve!(sim_wo_verbatim, circuit.instructions)
 
         @test sim_w_verbatim.state_vector ≈ sim_wo_verbatim.state_vector

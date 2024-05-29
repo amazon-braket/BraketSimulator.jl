@@ -65,7 +65,14 @@ function simulate(
             return if pyhasattr(spec, "source")
                 pyconvert(OpenQasmProgram, spec)
             else
-                Braket.parse_raw_schema(pyconvert(String, spec))
+                program = Braket.parse_raw_schema(pyconvert(String, spec))
+                if !isnothing(program.basis_rotation_instructions) && !isempty(program.basis_rotation_instructions)
+                    bris = map(program.basis_rotation_instructions) do bri
+                        bri_json = BraketSimulator.Braket.JSON3.read(BraketSimulator.Braket.JSON3.write(bri), Instruction)
+                    end
+                    program = Program(program.braketSchemaHeader, program.instructions, program.results, bris)
+                end
+                program
             end
         end
         input = nothing
