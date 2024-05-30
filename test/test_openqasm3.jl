@@ -89,6 +89,23 @@ get_tol(shots::Int) = return (
         end
         @test visitor.results == Result[Probability(QubitSet(9, 5, 6, 7, 8)), Probability(QubitSet(9)), Probability(QubitSet(5, 6, 7, 8))]
     end
+    @testset "Randomized Benchmarking" begin
+        qasm = """
+        qubit[2] q;
+        bit[2] c;
+
+        h q[0];
+        cz q[0], q[1];
+        s q[0];
+        cz q[0], q[1];
+        s q[0];
+        z q[0];
+        h q[0];
+        measure q -> c;
+        """
+        circuit    = Circuit(qasm)
+        @test circuit.instructions == [Instruction(H(), 0), Instruction(CZ(), [0, 1]), Instruction(S(), 0), Instruction(CZ(), [0, 1]), Instruction(S(), 0), Instruction(Z(), 0), Instruction(H(), 0), Instruction(Measure(), 0), Instruction(Measure(), 1)]
+    end
     @testset "GPhase" begin
         qasm = """
         qubit[2] qs;

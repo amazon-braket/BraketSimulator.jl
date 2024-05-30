@@ -1055,8 +1055,19 @@ function parse_qasm(clean_tokens::Vector{Tuple{Int64, Int32, Token}}, qasm::Stri
         elseif token == measure 
             eol = findfirst(triplet->triplet[end] == semicolon, clean_tokens)
             measure_tokens = splice!(clean_tokens, 1:eol)
-            targets = parse_expression(measure_tokens, stack, start, qasm)
-            push!(stack, QasmExpression(:measure, targets))
+            arrow_location = findfirst(triplet->triplet[end] == arrow_token, measure_tokens)
+            if !isnothing(arrow_location) # assignment
+                targets_tokens = splice!(measure_tokens, 1:arrow_location - 1)
+                popfirst!(measure_tokens) # arrow
+                targets = parse_expression(targets_tokens, stack, start, qasm)
+                left_hand_side = parse_expression(measure_tokens, stack, start, qasm)
+                right_hand_side = QasmExpression(:measure, targets)
+                op_expression = QasmExpression(:binary_op, Symbol("="), left_hand_side, right_hand_side)
+                push!(stack, QasmExpression(:classical_assignment, op_expression))
+            else
+                targets = parse_expression(measure_tokens, stack, start, qasm)
+                push!(stack, QasmExpression(:measure, targets))
+            end
         elseif token ∈ (negctrl_mod, control_mod, inverse_mod, power_mod)
             gate_mod_tokens = pushfirst!(clean_tokens, (start, len, token))
             expr = parse_gate_mods(gate_mod_tokens, stack, start, qasm)
@@ -1083,6 +1094,9 @@ function parse_qasm(clean_tokens::Vector{Tuple{Int64, Int32, Token}}, qasm::Stri
             clean_tokens = pushfirst!(clean_tokens, (start, len, token))
             expr = parse_identifier_line(clean_tokens, stack, start, qasm)
             push!(stack, expr)
+        elseif token == forbidden_keyword
+            token_id = name(parse_identifier(token, qasm))
+            throw(QasmParseError("keyword $token_id not supported.", stack, start, qasm))
         end
     end
     return stack
@@ -1895,11 +1909,13 @@ function Braket.Circuit(v::QasmProgramVisitor)
 end
 
 function Braket.Circuit(qasm_source::String, inputs::Dict{String, <:Any}=Dict{String, Any}())
-    if endswith(qasm_source, ".qasm") && isfile(qasm_source)
-        parsed = parse_qasm(read(qasm_source, String))
+    input_qasm = if endswith(qasm_source, ".qasm") && isfile(qasm_source)
+        read(qasm_source, String)
     else
-        parsed = parse_qasm(qasm_source)
+        qasm_source
     end
+    endswith(input_qasm, "\n") || (input_qasm *= "\n")
+    parsed = parse_qasm(input_qasm)
     visitor = QasmProgramVisitor(inputs)
     visitor(parsed)
     return Circuit(visitor) 
