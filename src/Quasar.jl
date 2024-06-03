@@ -79,7 +79,9 @@ const qasm_tokens = [
         :end_token    => re"end",
         :dim_token    => re"#dim[ ]?=[ ]?[0-7]",
         :im_token     => re"im",
-        :keyword      => re"case|default|creg|qreg|include",
+        :case         => re"case",
+        :default      => re"default",
+        :keyword      => re"creg|qreg|include",
         :oct          => re"0o[0-7]+",
         :bin          => re"(0b|0B)[0-1]+",
         :hex          => re"0x[0-9A-Fa-f]+",
@@ -183,6 +185,50 @@ function parse_block_body(expr, tokens, stack, start, qasm)
         body = parse_expression(body_tokens, stack, start, qasm)
         push!(expr, body)
     end
+end
+
+function parse_switch_block(tokens, stack, start, qasm)
+    expr = QasmExpression(:switch)
+    cond_tokens = extract_parensed(tokens, stack, start, qasm)
+    push!(cond_tokens, (-1, Int32(-1), semicolon))
+    push!(expr, parse_identifier_line(cond_tokens, stack, start, qasm))
+    interior_tokens = extract_scope(tokens, stack, start, qasm)
+    met_default = false
+    while !isempty(interior_tokens)
+        next_token = popfirst!(interior_tokens)
+        if next_token[end] == case
+            !met_default || throw(QasmParserError("case statement cannot occur after default in switch block.", stack, start, qasm))
+            case_expr = QasmExpression(:case)
+            val_list = QasmExpression[]
+            brace_loc = findfirst(triplet->triplet[end] == lbrace, interior_tokens)
+            isnothing(brace_loc) && throw(QasmParserError("case statement missing opening {", stack, start, qasm))
+            val_tokens = splice!(interior_tokens, 1:brace_loc-1)
+            push!(val_tokens, (-1, Int32(-1), semicolon))
+            while first(val_tokens)[end] != semicolon 
+                next_val = parse_identifier_line(val_tokens, stack, start, qasm)
+                push!(val_list, next_val)
+                first(val_tokens)[end] == comma && popfirst!(val_tokens)
+            end
+            if length(val_list) == 1
+                push!(case_expr, only(val_list))
+            else
+                push!(case_expr, QasmExpression(:array_literal, val_list...))
+            end
+            parse_block_body(case_expr, interior_tokens, stack, start, qasm)
+            push!(expr, case_expr)
+        elseif next_token[end] == default
+            !met_default || throw(QasmParserError("only one default statement allowed in switch block.", stack, start, qasm))
+            default_expr = QasmExpression(:default)
+            parse_block_body(default_expr, interior_tokens, stack, start, qasm)
+            push!(expr, default_expr)
+            met_default = true
+        elseif next_token[end] == newline
+            continue
+        else
+            throw(QasmParseError("invalid switch-case statement.", stack, start, qasm))
+        end
+    end
+    return expr
 end
 
 function parse_if_block(tokens, condition_value, stack, start, qasm)
@@ -1046,8 +1092,7 @@ function parse_qasm(clean_tokens::Vector{Tuple{Int64, Int32, Token}}, qasm::Stri
         elseif token == continue_token
             push!(stack, QasmExpression(:continue))
         elseif token == switch_block
-            cond_tokens = parse_expression(clean_tokens, stack, start, qasm)
-            expr = parse_switch_block(clean_tokens, cond_tokens, stack, start, qasm)
+            expr = parse_switch_block(clean_tokens, stack, start, qasm)
             push!(stack, expr)
         elseif token == line_comment
             eol = findfirst(triplet->triplet[end] == newline, clean_tokens)
@@ -1679,6 +1724,22 @@ function (v::AbstractVisitor)(program_expr::QasmExpression)
             for_v(loop_body)
         end
         delete!(classical_defs(v), loop_variable_name)
+    elseif head(program_expr) == :switch
+        case_val = evaluate(v, program_expr.args[1])
+        all_cases = program_expr.args[2:end]
+        default = findfirst(expr->head(expr) == :default, all_cases)
+        case_found = false
+        for case in all_cases
+            if head(case) == :case && case_val ∈ evaluate(v, case.args[1])
+                case_found = true
+                foreach(v, convert(Vector{QasmExpression}, case.args[2:end]))
+                break
+            end
+        end
+        if !case_found
+            isnothing(default) && throw(QasmVisitorError("no case matched and no default defined."))
+            foreach(v, convert(Vector{QasmExpression}, all_cases[default].args))
+        end
     elseif head(program_expr) == :if
         condition_value = evaluate(v, program_expr.args[1]) > 0
         has_else  = findfirst(expr->head(expr) == :else, program_expr.args)

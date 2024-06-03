@@ -397,6 +397,29 @@ get_tol(shots::Int) = return (
         @test visitor.classical_defs["not"].val == false
         @test visitor.classical_defs["not_zero"].val == true
     end
+    @testset "Switch/case" begin
+        qasm = """
+        input int[8] x;
+        switch (x + 1) {
+            case 0b00 {}
+            default { z \$0; }
+        }
+        """
+        circ = Circuit(qasm, Dict("x"=> -1))
+        @test isempty(circ.instructions)
+        circ = Circuit(qasm, Dict("x"=> 0))
+        @test circ.instructions == [Instruction(Z(), 0)]
+        qasm = """
+        input int[8] x;
+        switch (x) { case 0 {} case 1, 2 { z \$0; }  }
+        """
+        circ = Circuit(qasm, Dict("x"=> 0))
+        @test isempty(circ.instructions)
+        circ = Circuit(qasm, Dict("x"=> 1))
+        @test circ.instructions == [Instruction(Z(), 0)]
+        circ = Circuit(qasm, Dict("x"=> 2))
+        @test circ.instructions == [Instruction(Z(), 0)]
+    end
     @testset "If" begin
         qasm = """
         int[8] two = 2;
