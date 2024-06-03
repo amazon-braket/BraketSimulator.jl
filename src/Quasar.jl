@@ -128,22 +128,14 @@ Base.copy(qasm_expr::QasmExpression) = QasmExpression(qasm_expr.head, deepcopy(q
 
 head(qasm_expr::QasmExpression) = qasm_expr.head
 
-AbstractTrees.children(qasm_expr::QasmExpression) = isleaf(qasm_expr) ? QasmExpression[] : qasm_expr.args
-isleaf(qasm_expr::QasmExpression) = qasm_expr.head in (:char, :delimiter, :digit, :punctuation, :symbol)
-isleaf(::Nothing) = true
-function AbstractTrees.printnode(io::IO, qasm_expr::QasmExpression)
-    if isleaf(qasm_expr)
-        print(io, "QasmExpression :$(qasm_expr.head) '$(only(qasm_expr.args))'")
-    else
-        print(io, "QasmExpression :$(qasm_expr.head)")
-    end
-end
+AbstractTrees.children(qasm_expr::QasmExpression) = qasm_expr.args
+AbstractTrees.printnode(io::IO, qasm_expr::QasmExpression) = print(io, "QasmExpression :$(qasm_expr.head)")
 
 function Base.:(==)(qasm_a::QasmExpression, qasm_b::QasmExpression)
     a_children = children(qasm_a)
     b_children = children(qasm_b)
     length(a_children) != length(b_children) && return false
-    return all(==, a_children, b_children)
+    return a_children == b_children
 end
 
 parse_hw_qubit(token, qasm)   = QasmExpression(:hw_qubit, qasm[token[1]:token[1]+token[2]-1])
@@ -197,11 +189,11 @@ function parse_switch_block(tokens, stack, start, qasm)
     while !isempty(interior_tokens)
         next_token = popfirst!(interior_tokens)
         if next_token[end] == case
-            !met_default || throw(QasmParserError("case statement cannot occur after default in switch block.", stack, start, qasm))
+            !met_default || throw(QasmParseError("case statement cannot occur after default in switch block.", stack, start, qasm))
             case_expr = QasmExpression(:case)
             val_list = QasmExpression[]
             brace_loc = findfirst(triplet->triplet[end] == lbrace, interior_tokens)
-            isnothing(brace_loc) && throw(QasmParserError("case statement missing opening {", stack, start, qasm))
+            isnothing(brace_loc) && throw(QasmParseError("case statement missing opening {", stack, start, qasm))
             val_tokens = splice!(interior_tokens, 1:brace_loc-1)
             push!(val_tokens, (-1, Int32(-1), semicolon))
             while first(val_tokens)[end] != semicolon 
@@ -217,7 +209,7 @@ function parse_switch_block(tokens, stack, start, qasm)
             parse_block_body(case_expr, interior_tokens, stack, start, qasm)
             push!(expr, case_expr)
         elseif next_token[end] == default
-            !met_default || throw(QasmParserError("only one default statement allowed in switch block.", stack, start, qasm))
+            !met_default || throw(QasmParseError("only one default statement allowed in switch block.", stack, start, qasm))
             default_expr = QasmExpression(:default)
             parse_block_body(default_expr, interior_tokens, stack, start, qasm)
             push!(expr, default_expr)
@@ -357,7 +349,7 @@ function SizedArray(eltype::QasmExpression, size::QasmExpression)
     end
     return SizedArray(eltype.args[1], arr_size)
 end
-Base.show(io::IO, s::SizedArray{T, N}) where {T, N} = print(io, "SizedArray{$(s.type), $N}")
+Base.show(io::IO, s::SizedArray{T, N}) where {T, N} = print(io, "SizedArray{$(sprint(show, s.type)), $N}")
 Base.size(a::SizedArray{T, N}, dim::Int=0) where {T, N} = a.size[dim+1]
 
 const SizedNumber = Union{SizedComplex, SizedAngle, SizedFloat, SizedInt, SizedUInt}
@@ -559,19 +551,6 @@ function parse_paren_expression(tokens::Vector{Tuple{Int64, Int32, Token}}, stac
     return parse_expression(interior_tokens, stack, start, qasm)
 end
 
-function parse_array_argument(tokens::Vector{Tuple{Int64, Int32, Token}}, stack, start, qasm)
-    is_mutable = popfirst!(tokens)
-    type       = parse_classical_type(tokens, stack, start, qasm)
-    header = if is_mutable[end] == mutable
-        :classical_declaration
-    elseif is_mutable[end] == readonly
-        :const_declaration
-    end
-    expr = QasmExpression(header, type)
-    push!(expr, only(parse_expression(tokens, stack, start, qasm)))
-    return expr
-end
-
 function parse_list_expression(tokens::Vector{Tuple{Int64, Int32, Token}}, stack, start, qasm)
     # careful due to bracing!
     next_comma = findfirst(triplet->triplet[end] == comma, tokens)
@@ -640,14 +619,11 @@ function parse_expression(tokens::Vector{Tuple{Int64, Int32, Token}}, stack, sta
     first_comma  = findfirst(triplet->triplet[end] == comma, tokens)
     first_colon  = findfirst(triplet->triplet[end] == colon, tokens)
     first_delim  = findfirst(triplet->triplet[end] ∈ (lparen, lbracket, lbrace), tokens)
-    
+
     tokens[1][end] == lparen   && return parse_paren_expression(tokens, stack, start, qasm)
     tokens[1][end] == lbracket && return parse_index_operator(tokens, stack, start, qasm)
     tokens[1][end] == lbrace   && return parse_set_expression(tokens, stack, start, qasm)
-    
-    is_array_argument = tokens[1][end] == mutable || tokens[1][end] == readonly
-    is_array_argument && return parse_array_argument(tokens, stack, start, qasm) 
-    
+
     is_range_expr = !isnothing(first_colon) && (isnothing(first_delim) || first_delim > first_colon)
     is_range_expr && return parse_range_expression(tokens, stack, start, qasm)
     has_operator = (tokens[1][end] == operator) || (length(tokens) > 1 && tokens[2][end] == operator)
@@ -931,7 +907,7 @@ function parse_qasm(clean_tokens::Vector{Tuple{Int64, Int32, Token}}, qasm::Stri
             pragma_tokens = splice!(clean_tokens, 1:closing-1)
             prefix    = popfirst!(pragma_tokens)
             prefix_id = parse_identifier(prefix, qasm)
-            prefix_id.args[1] == "braket" || throw(QasmParserError("pragma expression must begin with `#pragma braket`", stack, start, qasm))
+            prefix_id.args[1] == "braket" || throw(QasmParseError("pragma expression must begin with `#pragma braket`", stack, start, qasm))
             expr      = QasmExpression(:pragma)
             pragma_type = parse_identifier(popfirst!(pragma_tokens), qasm).args[1]
             if pragma_type == "result"
@@ -991,7 +967,7 @@ function parse_qasm(clean_tokens::Vector{Tuple{Int64, Int32, Token}}, qasm::Stri
                 # check that the next non-newline is a box token 
                 push!(expr, :verbatim)
             else
-                throw(QasmParserError("invalid type $pragma_type for pragma", stack, start, qasm))
+                throw(QasmParseError("invalid type $pragma_type for pragma", stack, start, qasm))
             end
             push!(stack, expr)
         elseif token == include
@@ -1003,7 +979,7 @@ function parse_qasm(clean_tokens::Vector{Tuple{Int64, Int32, Token}}, qasm::Stri
             push!(stack, expr)
             popfirst!(clean_tokens) #semicolon
         elseif token == reset 
-            throw(QasmParserError("reset operation not supported", stack, start, qasm))
+            throw(QasmParseError("reset operation not supported", stack, start, qasm))
         elseif token == extern
             closing       = findfirst(triplet->triplet[end] == semicolon, clean_tokens)
             isnothing(closing) && throw(QasmParseError("missing final semicolon for extern", stack, start, qasm))
@@ -1140,7 +1116,7 @@ function parse_qasm(clean_tokens::Vector{Tuple{Int64, Int32, Token}}, qasm::Stri
             expr = parse_identifier_line(clean_tokens, stack, start, qasm)
             push!(stack, expr)
         elseif token == forbidden_keyword
-            token_id = name(parse_identifier(token, qasm))
+            token_id = name(parse_identifier((start, len, token), qasm))
             throw(QasmParseError("keyword $token_id not supported.", stack, start, qasm))
         end
     end
