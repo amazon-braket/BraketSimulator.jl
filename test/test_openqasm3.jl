@@ -397,6 +397,19 @@ get_tol(shots::Int) = return (
         @test visitor.classical_defs["not"].val == false
         @test visitor.classical_defs["not_zero"].val == true
     end
+    @testset "End statement" begin
+        qasm = """
+        z \$0;
+        x \$1;
+        h \$2;
+        y \$3;
+        end;
+        y \$2;
+        h \$3;
+        """
+        circ = Circuit(qasm)
+        @test circ.instructions == [Instruction(Z(), 0), Instruction(X(), 1), Instruction(H(), 2), Instruction(Y(), 3)]
+    end
     @testset "Switch/case" begin
         qasm = """
         input int[8] x;

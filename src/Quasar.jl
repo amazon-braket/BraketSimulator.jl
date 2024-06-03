@@ -1699,10 +1699,9 @@ function (v::AbstractVisitor)(program_expr::QasmExpression)
     var_name::String = ""
     if head(program_expr) == :program || head(program_expr) == :scope
         for expr in program_expr.args
+            head(expr) == :end && return
             v(expr)
         end
-    elseif head(program_expr) == :end
-        return v
     elseif head(program_expr) == :version
         return v
     elseif head(program_expr) == :input
