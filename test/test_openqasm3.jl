@@ -6,6 +6,48 @@ get_tol(shots::Int) = return (
     shots > 0 ? Dict("atol" => 0.1, "rtol" => 0.15) : Dict("atol" => 0.01, "rtol" => 0)
 )
 @testset "Quasar" begin
+    @testset "QasmExpression" begin
+        @testset "Printing" begin
+            expr = Quasar.QasmExpression(:head, Quasar.QasmExpression(:integer_literal, 2))
+            @test sprint(show, expr) == "QasmExpression :head\n└─ QasmExpression :integer_literal\n   └─ 2\n"
+        end
+        @testset "Equality" begin
+            expr_a = Quasar.QasmExpression(:head, Quasar.QasmExpression(:integer_literal, 2))
+            expr_b = Quasar.QasmExpression(:head, Quasar.QasmExpression(:float_literal, 2.2))
+            @test expr_a != expr_b
+            expr_a = Quasar.QasmExpression(:head, Quasar.QasmExpression(:integer_literal, 2))
+            @test expr_a == copy(expr_a) 
+        end
+        @testset "Name undefined" begin
+            expr = Quasar.QasmExpression(:undef, Quasar.QasmExpression(:integer_literal, 2))
+            @test_throws Quasar.QasmVisitorError("name not defined for expressions of type undef") Quasar.name(expr)
+        end
+    end
+    @testset "Visiting an invalid expression" begin
+        visitor = Quasar.QasmProgramVisitor()
+        bad_expression = Quasar.QasmExpression(:invalid_expression, Quasar.QasmExpression(:error))
+        @test_throws Quasar.QasmVisitorError("cannot visit expression $bad_expression.") visitor(bad_expression)
+    end
+    @testset "Sized types" begin
+        for (t_string, T) in (("SizedBitVector", Quasar.SizedBitVector),
+                              ("SizedInt", Quasar.SizedInt), 
+                              ("SizedUInt", Quasar.SizedUInt),
+                              ("SizedFloat", Quasar.SizedFloat),
+                              ("SizedAngle", Quasar.SizedAngle),
+                              ("SizedComplex", Quasar.SizedComplex))
+            object = T(4)
+            @test sprint(show, object) == t_string * "{4}"
+            object = T(Quasar.QasmExpression(:integer_literal, 4))
+            @test sprint(show, object) == t_string * "{4}"
+            array_object = Quasar.SizedArray(object, (10,))
+            @test sprint(show, array_object) == "SizedArray{" * t_string * "{4}, 1}"
+            @test_throws BoundsError size(array_object, 1)
+            @test size(array_object, 0) == 10
+        end
+        bitvector = Quasar.SizedBitVector(10)
+        @test length(bitvector) == 10
+        @test size(bitvector) == (10,)
+    end
     @testset "Adder" begin
         sv_adder_qasm = """
         OPENQASM 3;
@@ -141,9 +183,11 @@ get_tol(shots::Int) = return (
         qasm = """
         float[32] a = 1.24e-3;
         complex[float] b = 1-0.23im;
-        bit c = "0";
+        const bit c = "0";
         bool d = false;
         complex[float] e = -0.23+2im;
+        uint f = 0x123456789abcdef;
+        int g = 0o010;
         """
         parsed  = parse_qasm(qasm)
         visitor = QasmProgramVisitor()
@@ -152,7 +196,9 @@ get_tol(shots::Int) = return (
         @test visitor.classical_defs["b"].val == 1-0.23im
         @test visitor.classical_defs["c"].val == falses(1)
         @test visitor.classical_defs["d"].val == false
-        @test visitor.classical_defs["e"].val == -0.23 + 2im 
+        @test visitor.classical_defs["e"].val == -0.23 + 2im
+        @test visitor.classical_defs["f"].val == 0x123456789abcdef
+        @test visitor.classical_defs["g"].val == 0o010
     end
     @testset "Physical qubits" begin
         qasm = """
@@ -208,6 +254,20 @@ get_tol(shots::Int) = return (
         visitor(parsed)
         @test visitor.classical_defs["x"].val == sum((0, 2, 4, 6))
         @test visitor.classical_defs["y"].val == sum((-100, 2, 4, 6))
+        # without scoping { } 
+        qasm = """
+        int[8] x = 0;
+        int[8] y = -100;
+        int[8] ten = 10;
+
+        for uint[8] i in [0:2:ten - 3] x += i;
+        for int[8] i in {2, 4, 6} y += i;
+        """
+        parsed  = parse_qasm(qasm)
+        visitor = QasmProgramVisitor()
+        visitor(parsed)
+        @test visitor.classical_defs["x"].val == sum((0, 2, 4, 6))
+        @test visitor.classical_defs["y"].val == sum((-100, 2, 4, 6))
     end
     @testset "While Loop" begin
         qasm = """
@@ -223,6 +283,82 @@ get_tol(shots::Int) = return (
         visitor = QasmProgramVisitor()
         visitor(parsed)
         @test visitor.classical_defs["x"].val == sum(0:6)
+        # without scoping { }
+        qasm = """
+        int[8] i = 0;
+
+        while (i < 7) i += 1;
+        """
+        parsed  = parse_qasm(qasm)
+        visitor = QasmProgramVisitor()
+        visitor(parsed)
+        @test visitor.classical_defs["i"].val == 7
+    end
+    @testset "Break and continue" begin
+        @testset for str in ("continue;", "{ continue; }")
+            qasm = """
+            int[8] x = 0;
+            for int[8] i in [0: 3] {
+                if (mod(i, 2) == 0) $str
+                x += i;
+            }
+            """
+            parsed  = parse_qasm(qasm)
+            visitor = QasmProgramVisitor()
+            visitor(parsed)
+            @test visitor.classical_defs["x"].val == 4
+            qasm = """
+            int[8] x = 0;
+            int[8] i = 0;
+
+            while (i < 7) {
+                i += 1;
+                if (i == 5) $str
+                x += i;
+            }
+            """
+            parsed  = parse_qasm(qasm)
+            visitor = QasmProgramVisitor()
+            visitor(parsed)
+            @test visitor.classical_defs["x"].val == sum(0:7) - 5
+        end
+        @testset for str in ("break;", "{ break; }")
+            qasm = """
+            int[8] x = 0;
+            for int[8] i in [0: 3] {
+                x += i;
+                if (mod(i, 2) == 1) $str
+            }
+            """
+            parsed  = parse_qasm(qasm)
+            visitor = QasmProgramVisitor()
+            visitor(parsed)
+            @test visitor.classical_defs["x"].val == 1
+            qasm = """
+            int[8] x = 0;
+            int[8] i = 0;
+
+            while (i < 7) {
+                x += i;
+                i += 1;
+                if (i == 5) $str
+            }
+            """
+            parsed  = parse_qasm(qasm)
+            visitor = QasmProgramVisitor()
+            visitor(parsed)
+            @test visitor.classical_defs["x"].val == sum(0:4)
+        end
+        @testset for str in ("continue", "break")
+            qasm = """
+            int[8] x = 0;
+            int[8] i = 0;
+            $str;
+            """
+            parsed  = parse_qasm(qasm)
+            visitor = QasmProgramVisitor()
+            @test_throws Quasar.QasmVisitorError("$str statement encountered outside a loop.") visitor(parsed)
+        end
     end
     @testset "Builtin functions" begin
         qasm = """
@@ -236,8 +372,13 @@ get_tol(shots::Int) = return (
             const float[64] log_result = log(ℇ);
             const int[64] mod_int_result = mod(4, 3);
             const float[64] mod_float_result = mod(5.2, 2.5);
+            const int[64] popcount_bool_result = popcount(true);
             const int[64] popcount_bit_result = popcount("1001110");
             const int[64] popcount_int_result = popcount(78);
+            const int[64] popcount_uint_result = popcount(0x78);
+            bit[2] bitvec;
+            bitvec = "11";
+            const int[64] popcount_bitvec_result = popcount(bitvec);
             // parser gets confused by pow
             // const int[64] pow_int_result = pow(3, 3);
             // const float[64] pow_float_result = pow(2.5, 2.5);
@@ -259,8 +400,11 @@ get_tol(shots::Int) = return (
         @test visitor.classical_defs["log_result"].val == 1.0
         @test visitor.classical_defs["mod_int_result"].val == 1
         @test visitor.classical_defs["mod_float_result"].val == mod(5.2, 2.5)
+        @test visitor.classical_defs["popcount_bool_result"].val == 1
         @test visitor.classical_defs["popcount_bit_result"].val == 4
         @test visitor.classical_defs["popcount_int_result"].val == 4
+        @test visitor.classical_defs["popcount_uint_result"].val == 4
+        @test visitor.classical_defs["popcount_bitvec_result"].val == 2
         @test visitor.classical_defs["sin_result"].val == sin(1)
         @test visitor.classical_defs["sqrt_result"].val == sqrt(2)
         @test visitor.classical_defs["tan_result"].val == tan(1)
@@ -306,6 +450,37 @@ get_tol(shots::Int) = return (
             end
             @test parsed_circ == c
         end
+    end
+    @testset "Bad pragma" begin
+        qasm = """
+        qubit[4] q;
+        #pragma braket fake_pragma
+        """
+        @test_throws Quasar.QasmParseError parse_qasm(qasm)
+    end
+    @testset "Reset" begin
+        qasm = """
+        qubit[4] q;
+        x q[0];
+        reset q[0];
+        """
+        @test_throws Quasar.QasmParseError parse_qasm(qasm)
+    end
+    @testset "Gate call missing/extra args" begin
+        qasm = """
+        qubit[4] q;
+        rx q[0];
+        """
+        parsed  = parse_qasm(qasm)
+        visitor = QasmProgramVisitor()
+        @test_throws Quasar.QasmVisitorError("gate rx requires arguments but none were provided.") visitor(parsed)
+        qasm = """
+        qubit[4] q;
+        x(0.1) q[0];
+        """
+        parsed  = parse_qasm(qasm)
+        visitor = QasmProgramVisitor()
+        @test_throws Quasar.QasmVisitorError("gate x does not accept arguments but arguments were provided.") visitor(parsed)
     end
     #=@testset "Adjoint Gradient pragma" begin
         qasm = """
@@ -432,8 +607,23 @@ get_tol(shots::Int) = return (
         @test circ.instructions == [Instruction(Z(), 0)]
         circ = Circuit(qasm, Dict("x"=> 2))
         @test circ.instructions == [Instruction(Z(), 0)]
+        qasm = """
+        input int[8] x;
+        switch (x) { case 0 {} default { z \$0; } default { x \$0; } }
+        """
+        @test_throws Quasar.QasmParseError Circuit(qasm, Dict("x"=>0))
+        qasm = """
+        input int[8] x;
+        switch (x) { default { z \$0; } case 0 {} }
+        """
+        @test_throws Quasar.QasmParseError Circuit(qasm, Dict("x"=>0))
+        qasm = """
+        input int[8] x;
+        switch (x) { case 0 { z \$0; } true {} }
+        """
+        @test_throws Quasar.QasmParseError Circuit(qasm, Dict("x"=>0))
     end
-    @testset "If" begin
+    @testset "If/Else" begin
         qasm = """
         int[8] two = 2;
         bit[3] m = "000";
@@ -453,6 +643,39 @@ get_tol(shots::Int) = return (
         visitor(parsed)
         bit_vec = BitVector([1,0,1])
         @test visitor.classical_defs["m"].val == bit_vec
+        qasm = """
+        int[8] two = -2;
+        bit[3] m = "000";
+
+        if (two + 1) {
+            m[0] = 1;
+        } else {
+            m[1] = 1;
+        }
+
+        if (!bool(two - 2)) {
+            m[2] = 1;
+        }
+        """
+        parsed  = parse_qasm(qasm)
+        visitor = QasmProgramVisitor()
+        visitor(parsed)
+        bit_vec = BitVector([0,1,1])
+        @test visitor.classical_defs["m"].val == bit_vec
+        qasm = """
+        input bool which_gate;
+        qubit q;
+
+        if (which_gate) {
+            x q;
+        } else {
+            y q;
+        }
+        """
+        for (flag, which_gate) in ((true, X()), (false, Y()))
+            circuit = Circuit(qasm, Dict("which_gate"=>flag))
+            @test circuit.instructions == [Instruction(which_gate, 0)]
+        end
     end
     @testset "Global gate control" begin
         qasm = """
@@ -629,6 +852,37 @@ get_tol(shots::Int) = return (
         end
         @test canonical_simulation.state_vector ≈ sv rtol=1e-10
         @test simulation.state_vector ≈ sv rtol=1e-10
+        qasm = """
+        gate cccx c1, c2, c3, a {
+            ctrl(3) @ x c1, c2, c3, a;
+        }
+        gate ncccx c1, c2, c3, a {
+            negctrl(3) @ x c1, c2, c3, a;
+        }
+
+        qubit q1;
+        qubit q2;
+        qubit q3;
+        qubit q4;
+        qubit q5;
+        
+        h q1;
+        h q2;
+        h q3;
+        h q4;
+        h q5;
+        cccx q1, q2, q5, q3;
+        ncccx q4, q2, q5, q3;
+        """
+        circuit    = Circuit(qasm)
+        @test circuit.instructions == [Instruction(H(), 0),
+                                       Instruction(H(), 1),
+                                       Instruction(H(), 2),
+                                       Instruction(H(), 3),
+                                       Instruction(H(), 4),
+                                       Instruction(Control(X(), (1, 1, 1)), [0, 1, 4, 2]),
+                                       Instruction(Control(X(), (0, 0, 0)), [3, 1, 4, 2]),
+                                      ]
     end
     @testset "Gate inverses" begin
         qasm = """
@@ -1138,6 +1392,27 @@ get_tol(shots::Int) = return (
                     @test j_v == p_v
                 end
             end
+        end
+    end
+    @testset "GRCS 16" begin
+        simulator = BraketSimulator.StateVectorSimulator(16, 0)
+        circuit   = Circuit(joinpath(@__DIR__, "grcs_16.qasm")) 
+        BraketSimulator.evolve!(simulator, circuit.instructions)
+        probs     = BraketSimulator.probabilities(simulator)        
+        @test first(probs) ≈ 0.0000062 atol=1e-7
+    end
+    @testset "Include" begin
+        mktempdir() do dir_path
+            inc_path = joinpath(dir_path, "new_gate.inc")
+            write(inc_path, """\ngate u3(a, b, c) q { gphase(-(b+c)/2); U(a, b, c) q; }\n""")
+            qasm = """
+            OPENQASM 3;
+            include "$inc_path";
+            """
+            parsed  = parse_qasm(qasm)
+            visitor = QasmProgramVisitor()
+            visitor(parsed)
+            @test haskey(visitor.gate_defs, "u3")
         end
     end
 end
