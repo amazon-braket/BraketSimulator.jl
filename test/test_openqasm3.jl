@@ -23,10 +23,41 @@ get_tol(shots::Int) = return (
             @test_throws Quasar.QasmVisitorError("name not defined for expressions of type undef") Quasar.name(expr)
         end
     end
-    @testset "Visiting an invalid expression" begin
+    @testset "Visiting/evaluating an invalid expression" begin
         visitor = Quasar.QasmProgramVisitor()
         bad_expression = Quasar.QasmExpression(:invalid_expression, Quasar.QasmExpression(:error))
         @test_throws Quasar.QasmVisitorError("cannot visit expression $bad_expression.") visitor(bad_expression)
+        @test_throws Quasar.QasmVisitorError("unable to evaluate expression $bad_expression") Quasar.evaluate(visitor, bad_expression)
+        bad_expression = Quasar.QasmExpression(:invalid_expression, Quasar.QasmExpression(:error))
+    end
+    @testset "Visitors and parents" begin
+        qasm = """
+               def flip(qubit q) {
+                 x q;
+               }
+               qubit[2] qs;
+               flip(qs[0]);
+               """
+        parsed = parse_qasm(qasm)
+        visitor = Quasar.QasmProgramVisitor()
+        visitor(parsed)
+        for_visitor = Quasar.QasmForLoopVisitor(visitor)
+        @test Quasar.function_defs(for_visitor) == Quasar.function_defs(visitor)
+        @test Quasar.qubit_defs(for_visitor) == Quasar.qubit_defs(visitor)
+        @test Braket.qubit_count(for_visitor) == Quasar.qubit_count(visitor)
+        push!(for_visitor, Amplitude("00"))
+        @test visitor.results[1] == Amplitude("00")
+        push!(for_visitor, [Braket.StateVector(), Probability()])
+        @test visitor.results[2] == Braket.StateVector()
+        @test visitor.results[3] == Probability()
+        push!(for_visitor, [Instruction(X(), 0), Instruction(Y(), 1)])
+        @test visitor.instructions == [Instruction(X(), 0), Instruction(X(), 0), Instruction(Y(), 1)]
+        gate_visitor = Quasar.QasmGateDefVisitor(visitor, Dict{String, FreeParameter}(), Dict{String, Quasar.Qubit}(), Dict{String, Vector{Int}}(), 0, Instruction[])
+        push!(gate_visitor, [Instruction(X(), 0), Instruction(Y(), 1)])
+        @test gate_visitor.instructions == [Instruction(X(), 0), Instruction(Y(), 1)]
+        function_visitor = Quasar.QasmFunctionVisitor(visitor, Quasar.QasmExpression[], Quasar.QasmExpression[])
+        push!(function_visitor, [Instruction(X(), 0), Instruction(Y(), 1)])
+        @test function_visitor.instructions == [Instruction(X(), 0), Instruction(Y(), 1)]
     end
     @testset "Sized types" begin
         for (t_string, T) in (("SizedBitVector", Quasar.SizedBitVector),
