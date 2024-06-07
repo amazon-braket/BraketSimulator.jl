@@ -1435,7 +1435,7 @@ get_tol(shots::Int) = return (
     @testset "Include" begin
         mktempdir() do dir_path
             inc_path = joinpath(dir_path, "new_gate.inc")
-            write(inc_path, """\ngate u3(a, b, c) q { gphase(-(b+c)/2); U(a, b, c) q; }\n""")
+            write(inc_path, """\ngate u3(θ, ϕ, λ) q { gphase(-(ϕ+λ)/2); U(θ, ϕ, λ) q; }\n""")
             qasm = """
             OPENQASM 3;
             include "$inc_path";

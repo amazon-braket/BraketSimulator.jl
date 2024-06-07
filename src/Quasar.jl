@@ -23,10 +23,14 @@ function Base.showerror(io::IO, err::QasmParseError)
 end
 
 include("builtin_functions.jl")
+const unicode = Automa.RE(read(joinpath(@__DIR__, "unicode_re.dat"), String))
+const first_letter   = re"[A-Za-z_]" | unicode
+const general_letter = first_letter | re"[0-9]" 
 
 const prefloat = re"[-+]?([0-9]+\.[0-9]*|[0-9]*\.[0-9]+)"
+
 const qasm_tokens = [
-        :identifier   => re"[A-Za-z_][0-9A-Za-z_!]*",
+        :identifier   => first_letter * rep(general_letter),
         :irrational   => re"π|pi|τ|tau|ℯ|ℇ|euler",
         :comma        => re",",
         :colon        => re":",
@@ -139,7 +143,7 @@ function Base.:(==)(qasm_a::QasmExpression, qasm_b::QasmExpression)
 end
 
 parse_hw_qubit(token, qasm)   = QasmExpression(:hw_qubit, qasm[token[1]:token[1]+token[2]-1])
-parse_identifier(token, qasm) = QasmExpression(:identifier, qasm[token[1]:token[1]+token[2]-1])
+parse_identifier(token, qasm) = QasmExpression(:identifier, String(codeunits(qasm)[token[1]:token[1]+token[2]-1]))
 function extract_scope(tokens, stack, start, qasm)
     # a "scope" begins with an { and ends with an }
     # but we may have nested scope!

@@ -1,8 +1,4 @@
 # OpenQASM 3 Braket Standard Gates
-
-# not in this file: unitary
-# #pragma braket unitary(<matrix>) target
-
 const builtin_gates = Dict{String, GateDefinition}(
     # identity gate
     "i"=>GateDefinition("i", String[], ["a"], [Instruction(Braket.I(), 0)]),
