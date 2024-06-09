@@ -1,7 +1,7 @@
 using Test, Logging, Braket, BraketSimulator, DataStructures
 
 using Braket: Instruction
-using BraketSimulator: DoubleExcitation, SingleExcitation, matrix_rep, Control
+using BraketSimulator: DoubleExcitation, DoubleExcitationPlus, DoubleExcitationMinus, SingleExcitation, SingleExcitationPlus, SingleExcitationMinus,  matrix_rep, Control, FermionicSWAP, OrbitalRotation
 
 @testset "Custom gates" begin
     @testset "Double excitation" begin
@@ -168,5 +168,47 @@ using BraketSimulator: DoubleExcitation, SingleExcitation, matrix_rep, Control
                       collect(BraketSimulator.probabilities(simulation))
             end
         end
+    end
+
+    @testset "Single excitation plus" begin
+        ϕ  = 3.56
+        nq = 2
+        instructions = [Instruction(H(), [0]), Instruction(H(), [1]), Instruction(SingleExcitationPlus(ϕ), [0, 1])]
+        de_instructions = [Instruction(H(), [0]), Instruction(H(), [1]), Instruction(Ti(), [0]), Instruction(H(), [0]), Instruction(S(), [0]), Instruction(Ti(), [1]), Instruction(Si(), [1]), Instruction(H(), [1]), Instruction(CNot(), [1, 0]), Instruction(Rz(-ϕ/2), [0]), Instruction(Ry(ϕ/2), [1]), Instruction(CNot(), [1, 0]), Instruction(Si(), [0]), Instruction(H(), [0]), Instruction(T(), [0]), Instruction(H(), [1]), Instruction(S(), [1]), Instruction(T(), [1])]
+    u_instructions = [Instruction(H(), [0]), Instruction(H(), [1]), Instruction(Unitary(Matrix(matrix_rep(SingleExcitationPlus(ϕ)))), [1, 0])]
+        state_vector = 0.5 * [exp(im*ϕ/2), cos(ϕ/2) - sin(ϕ/2), cos(ϕ/2) + sin(ϕ/2), exp(im*ϕ/2)]
+        probability_amplitudes = 0.25*[exp(im*ϕ/2), (cos(ϕ/2) - sin(ϕ/2))^2, (cos(ϕ/2) + sin(ϕ/2))^2, exp(im*ϕ/2)]
+        @testset "Simulator $sim, instruction set $ix_label" for sim in (StateVectorSimulator, DensityMatrixSimulator),
+            (ix_label, ixs) in (("raw", instructions), ("decomp", de_instructions), ("unitary", u_instructions))
+            simulation = sim(nq, 0)
+            simulation = evolve!(simulation, ixs)
+            if sim == StateVectorSimulator
+                @test state_vector ≈ collect(BraketSimulator.state_vector(simulation))
+            end
+            @test probability_amplitudes ≈ collect(BraketSimulator.probabilities(simulation))
+        end
+        @test qubit_count(SingleExcitationPlus(ϕ)) == 2
+        @test inv(SingleExcitationPlus(ϕ)) == SingleExcitationPlus(-ϕ)
+    end
+
+    @testset "Single excitation minus" begin
+        ϕ  = 3.56
+        nq = 2
+        instructions = [Instruction(H(), [0]), Instruction(H(), [1]), Instruction(SingleExcitationMinus(ϕ), [0, 1])]
+    de_instructions = [Instruction(H(), [0]), Instruction(H(), [1]), Instruction(Ti(), [0]), Instruction(H(), [0]), Instruction(S(), [0]), Instruction(Ti(), [1]), Instruction(Si(), [1]), Instruction(H(), [1]), Instruction(CNot(), [1, 0]), Instruction(Rz(-ϕ/2), [0]), Instruction(Ry(ϕ/2), [1]), Instruction(CNot(), [1, 0]), Instruction(Si(), [0]), Instruction(H(), [0]), Instruction(T(), [0]), Instruction(H(), [1]), Instruction(S(), [1]), Instruction(T(), [1])]
+    u_instructions = [Instruction(H(), [0]), Instruction(H(), [1]), Instruction(Unitary(Matrix(matrix_rep(SingleExcitationMinus(ϕ)))), [1, 0])]
+        state_vector = 0.5 * [exp(-im*ϕ/2), cos(ϕ/2) - sin(ϕ/2), cos(ϕ/2) + sin(ϕ/2), exp(-im*ϕ/2)]
+        probability_amplitudes = 0.25*[exp(-im*ϕ/2), (cos(ϕ/2) - sin(ϕ/2))^2, (cos(ϕ/2) + sin(ϕ/2))^2, exp(-im*ϕ/2)]
+        @testset "Simulator $sim, instruction set $ix_label" for sim in (StateVectorSimulator, DensityMatrixSimulator),
+        (ix_label, ixs) in (("raw", instructions), ("decomp", de_instructions), ("unitary", u_instructions))
+            simulation = sim(nq, 0)
+            simulation = evolve!(simulation, ixs)
+            if sim == StateVectorSimulator
+                @test state_vector ≈ collect(BraketSimulator.state_vector(simulation))
+            end
+            @test probability_amplitudes ≈ collect(BraketSimulator.probabilities(simulation))
+        end
+        @test qubit_count(SingleExcitationMinus(ϕ)) == 2
+        @test inv(SingleExcitationMinus(ϕ)) == SingleExcitationMinus(-ϕ)
     end
 end

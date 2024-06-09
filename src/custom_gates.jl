@@ -18,6 +18,49 @@ function matrix_rep(g::DoubleExcitation)
     return SMatrix{16,16,ComplexF64}(mat)
 end
 
+struct DoubleExcitationPlus <: AngledGate{1}
+    angle::NTuple{1,Union{Float64,FreeParameter}}
+    DoubleExcitationPlus(angle::T) where {T<:NTuple{1,Union{Float64,FreeParameter}}} =
+        new(angle)
+end
+Braket.chars(::Type{DoubleExcitationPlus}) = "G2+(ang)"
+Braket.qubit_count(::Type{DoubleExcitationPlus}) = 4
+Base.inv(g::DoubleExcitationPlus) = DoubleExcitationPlus(-g.angle[1])
+function matrix_rep(g::DoubleExcitationPlus)
+    cosᵩ = cos(g.angle[1] / 2.0)
+    sinᵩ = sin(g.angle[1] / 2.0)
+    eᵢᵩ₂ = exp(im * g.angle[1] / 2.0)
+ 
+    mat = diagm(fill(eᵢᵩ₂, 16))
+    mat[4, 4]   = cosᵩ
+    mat[13, 13] = cosᵩ
+    mat[4, 13]  = -sinᵩ
+    mat[13, 4]  = sinᵩ
+    return SMatrix{16,16,ComplexF64}(mat)
+end
+
+struct DoubleExcitationMinus <: AngledGate{1}
+    angle::NTuple{1,Union{Float64,FreeParameter}}
+    DoubleExcitationMinus(angle::T) where {T<:NTuple{1,Union{Float64,FreeParameter}}} =
+        new(angle)
+end
+Braket.chars(::Type{DoubleExcitationMinus}) = "G2-(ang)"
+Braket.qubit_count(::Type{DoubleExcitationMinus}) = 4
+Base.inv(g::DoubleExcitationMinus) = DoubleExcitationMinus(-g.angle[1])
+function matrix_rep(g::DoubleExcitationMinus)
+    cosᵩ = cos(g.angle[1] / 2.0)
+    sinᵩ = sin(g.angle[1] / 2.0)
+    eᵢᵩ₂ = exp(-im * g.angle[1] / 2.0)
+
+    mat = diagm(fill(eᵢᵩ₂, 16))
+    mat[4, 4]   = cosᵩ
+    mat[13, 13] = cosᵩ
+    mat[4, 13]  = -sinᵩ
+    mat[13, 4]  = sinᵩ
+    return SMatrix{16,16,ComplexF64}(mat)
+end
+
+
 struct SingleExcitation <: AngledGate{1}
     angle::NTuple{1,Union{Float64,FreeParameter}}
     SingleExcitation(angle::T) where {T<:NTuple{1,Union{Float64,FreeParameter}}} =
@@ -31,6 +74,85 @@ function matrix_rep(g::SingleExcitation)
     sinϕ = sin(g.angle[1] / 2.0)
     return SMatrix{4,4,ComplexF64}([1.0 0 0 0; 0 cosϕ sinϕ 0; 0 -sinϕ cosϕ 0; 0 0 0 1.0])
 end
+
+struct SingleExcitationPlus <: AngledGate{1}
+    angle::NTuple{1,Union{Float64,FreeParameter}}
+    SingleExcitationPlus(angle::T) where {T<:NTuple{1,Union{Float64,FreeParameter}}} =
+        new(angle)
+end
+Braket.chars(::Type{SingleExcitationPlus}) = "G+(ang)"
+Braket.qubit_count(::Type{SingleExcitationPlus}) = 2
+Base.inv(g::SingleExcitationPlus) = SingleExcitationPlus(-g.angle[1])
+function matrix_rep(g::SingleExcitationPlus)
+    cosᵩ = cos(g.angle[1] / 2.0)
+    sinᵩ = sin(g.angle[1] / 2.0)
+    eᵢᵩ₂ = exp(im * g.angle[1] / 2.0)
+    return SMatrix{4,4,ComplexF64}([eᵢᵩ₂ 0 0 0; 0 cosᵩ sinᵩ 0; 0 -sinᵩ cosᵩ 0; 0 0 0 eᵢᵩ₂])
+end
+
+struct SingleExcitationMinus <: AngledGate{1}
+    angle::NTuple{1,Union{Float64,FreeParameter}}
+    SingleExcitationMinus(angle::T) where {T<:NTuple{1,Union{Float64,FreeParameter}}} =
+        new(angle)
+end
+Braket.chars(::Type{SingleExcitationMinus}) = "G-(ang)"
+Braket.qubit_count(::Type{SingleExcitationMinus}) = 2
+Base.inv(g::SingleExcitationMinus) = SingleExcitationMinus(-g.angle[1])
+function matrix_rep(g::SingleExcitationMinus)
+    cosᵩ = cos(g.angle[1] / 2.0)
+    sinᵩ = sin(g.angle[1] / 2.0)
+    eᵢᵩ₂ = exp(-im * g.angle[1] / 2.0)
+    return SMatrix{4,4,ComplexF64}([eᵢᵩ₂ 0 0 0; 0 cosᵩ sinᵩ 0; 0 -sinᵩ cosᵩ 0; 0 0 0 eᵢᵩ₂])
+end
+
+struct OrbitalRotation <: AngledGate{1}
+    angle::NTuple{1,Union{Float64,FreeParameter}}
+    OrbitalRotation(angle::T) where {T<:NTuple{1,Union{Float64,FreeParameter}}} =
+        new(angle)
+end
+Braket.chars(::Type{OrbitalRotation}) = "O(ang)"
+Braket.qubit_count(::Type{OrbitalRotation}) = 4
+Base.inv(g::OrbitalRotation) = OrbitalRotation(-g.angle[1])
+function matrix_rep(g::OrbitalRotation)
+    cosᵩ = cos(g.angle[1] / 2.0)
+    sinᵩ = sin(g.angle[1] / 2.0)
+    # This transformation applies to the two neighboring spatial orbitals.
+    mat = SMatrix{16,16,ComplexF64}(I) # Identity matrix
+    # Define the subspace transformation
+    mat[1, 1] = cosᵩ
+    mat[2, 2] = cosᵩ
+    mat[1, 2] = -sinᵩ
+    mat[2, 1] = sinᵩ
+    mat[15, 15] = cosᵩ
+    mat[16, 16] = cosᵩ
+    mat[15, 16] = -sinᵩ
+    mat[16, 15] = sinᵩ
+    return mat
+end
+
+struct FermionicSWAP <: AngledGate{1}
+    angle::NTuple{1,Union{Float64,FreeParameter}}
+    FermionicSWAP(angle::T) where {T<:NTuple{1,Union{Float64,FreeParameter}}} =
+        new(angle)
+end
+Braket.chars(::Type{FermionicSWAP}) = "FSWAP(ang)"
+Braket.qubit_count(::Type{FermionicSWAP}) = 2
+Base.inv(g::FermionicSWAP) = FermionicSWAP(-g.angle[1])
+function matrix_rep(g::FermionicSWAP)
+    cosᵩ = cos(g.angle[1] / 2.0)
+    sinᵩ = sin(g.angle[1] / 2.0)
+    eᵢᵩ₂ = exp(im * g.angle[1] / 2.0)
+    eᵢᵩ = exp(im * g.angle[1])
+    ieiϕ2 = im * eiϕ2
+   
+    return SMatrix{4,4,ComplexF64}([
+        1 0 0 0 0;
+        0 eᵢᵩ₂*cosᵩ -im*eᵢᵩ₂ * sinᵩ 0;
+        0 -im*eᵢᵩ₂ * sinᵩ eᵢᵩ₂ * cosᵩ 0;
+        0 0 0 eᵢᵩ
+    ])
+end
+
 struct MultiRZ <: AngledGate{1}
     angle::NTuple{1,Union{Float64,FreeParameter}}
     MultiRZ(angle::T) where {T<:NTuple{1,Union{Float64,FreeParameter}}} = new(angle)
