@@ -174,40 +174,48 @@ using BraketSimulator: DoubleExcitation, DoubleExcitationPlus, DoubleExcitationM
         ϕ  = 3.56
         nq = 2
         instructions = [Instruction(H(), [0]), Instruction(H(), [1]), Instruction(SingleExcitationPlus(ϕ), [0, 1])]
-        de_instructions = [Instruction(H(), [0]), Instruction(H(), [1]), Instruction(Ti(), [0]), Instruction(H(), [0]), Instruction(S(), [0]), Instruction(Ti(), [1]), Instruction(Si(), [1]), Instruction(H(), [1]), Instruction(CNot(), [1, 0]), Instruction(Rz(-ϕ/2), [0]), Instruction(Ry(ϕ/2), [1]), Instruction(CNot(), [1, 0]), Instruction(Si(), [0]), Instruction(H(), [0]), Instruction(T(), [0]), Instruction(H(), [1]), Instruction(S(), [1]), Instruction(T(), [1])]
-    u_instructions = [Instruction(H(), [0]), Instruction(H(), [1]), Instruction(Unitary(Matrix(matrix_rep(SingleExcitationPlus(ϕ)))), [1, 0])]
-        state_vector = 0.5 * [exp(im*ϕ/2), cos(ϕ/2) - sin(ϕ/2), cos(ϕ/2) + sin(ϕ/2), exp(im*ϕ/2)]
-        probability_amplitudes = 0.25*[exp(im*ϕ/2), (cos(ϕ/2) - sin(ϕ/2))^2, (cos(ϕ/2) + sin(ϕ/2))^2, exp(im*ϕ/2)]
+        # instructions for the gate decomposition (from PennyLane)
+        de_instructions = [Instruction(H(), [0]), Instruction(H(), [1]), Instruction(X(), [0]), Instruction(X(), [1]), Instruction(CPhaseShift(1.78), [1, 0]), Instruction(X(), [0]), Instruction(X(), [1]), Instruction(CPhaseShift(1.78), [0, 1]), Instruction(CNot(), [0, 1]), Instruction(Ry(1.78), [0]), Instruction(CNot(), [1, 0]), Instruction(Ry(-1.78), [0]), Instruction(CNot(), [1, 0]), Instruction(CNot(), [0, 1])]
+        # instructions for the matrix representation
+        u_instructions = [Instruction(H(), [0]), Instruction(H(), [1]), Instruction(Unitary(Matrix(matrix_rep(SingleExcitationPlus(ϕ)))), [1, 0])]
+        
+        state_vector = 0.5 * [exp(im*ϕ/2),  cos(ϕ/2) - sin(ϕ/2), cos(ϕ/2) + sin(ϕ/2), exp(im*ϕ/2)]
+        probability_amplitudes = [0.2499999999999999, 0.35157642553610396, 0.14842357446389573, 0.2499999999999999]
         @testset "Simulator $sim, instruction set $ix_label" for sim in (StateVectorSimulator, DensityMatrixSimulator),
-            (ix_label, ixs) in (("raw", instructions), ("decomp", de_instructions), ("unitary", u_instructions))
+           (ix_label, ixs) in (("raw", instructions), ("decomp", de_instructions), ("unitary", u_instructions))
             simulation = sim(nq, 0)
             simulation = evolve!(simulation, ixs)
             if sim == StateVectorSimulator
                 @test state_vector ≈ collect(BraketSimulator.state_vector(simulation))
             end
-            @test probability_amplitudes ≈ collect(BraketSimulator.probabilities(simulation))
-        end
+            @test probability_amplitudes ≈
+                  collect(BraketSimulator.probabilities(simulation))
+       end
         @test qubit_count(SingleExcitationPlus(ϕ)) == 2
         @test inv(SingleExcitationPlus(ϕ)) == SingleExcitationPlus(-ϕ)
     end
-
+	
     @testset "Single excitation minus" begin
         ϕ  = 3.56
         nq = 2
         instructions = [Instruction(H(), [0]), Instruction(H(), [1]), Instruction(SingleExcitationMinus(ϕ), [0, 1])]
-    de_instructions = [Instruction(H(), [0]), Instruction(H(), [1]), Instruction(Ti(), [0]), Instruction(H(), [0]), Instruction(S(), [0]), Instruction(Ti(), [1]), Instruction(Si(), [1]), Instruction(H(), [1]), Instruction(CNot(), [1, 0]), Instruction(Rz(-ϕ/2), [0]), Instruction(Ry(ϕ/2), [1]), Instruction(CNot(), [1, 0]), Instruction(Si(), [0]), Instruction(H(), [0]), Instruction(T(), [0]), Instruction(H(), [1]), Instruction(S(), [1]), Instruction(T(), [1])]
-    u_instructions = [Instruction(H(), [0]), Instruction(H(), [1]), Instruction(Unitary(Matrix(matrix_rep(SingleExcitationMinus(ϕ)))), [1, 0])]
-        state_vector = 0.5 * [exp(-im*ϕ/2), cos(ϕ/2) - sin(ϕ/2), cos(ϕ/2) + sin(ϕ/2), exp(-im*ϕ/2)]
-        probability_amplitudes = 0.25*[exp(-im*ϕ/2), (cos(ϕ/2) - sin(ϕ/2))^2, (cos(ϕ/2) + sin(ϕ/2))^2, exp(-im*ϕ/2)]
+        # instructions for the gate decomposition (from PennyLane)
+        de_instructions = [Instruction(H(), [0]), Instruction(H(), [1]), Instruction(X(), [0]), Instruction(X(), [1]), Instruction(CPhaseShift(-1.78), [1, 0]), Instruction(X(), [0]), Instruction(X(), [1]), Instruction(CPhaseShift(-1.78), [0, 1]), Instruction(CNot(), [0, 1]), Instruction(Ry(1.78), [0]), Instruction(CNot(), [1, 0]), Instruction(Ry(-1.78), [0]), Instruction(CNot(), [1, 0]), Instruction(CNot(), [0, 1])]
+        # instructions for the matrix representation
+        u_instructions = [Instruction(H(), [0]), Instruction(H(), [1]), Instruction(Unitary(Matrix(matrix_rep(SingleExcitationMinus(ϕ)))), [1, 0])]
+        
+        state_vector = 0.5 * [exp(-im*ϕ/2),  cos(ϕ/2) - sin(ϕ/2), cos(ϕ/2) + sin(ϕ/2), exp(-im*ϕ/2)]
+        probability_amplitudes = [0.2499999999999999, 0.35157642553610396, 0.14842357446389573, 0.2499999999999999]
         @testset "Simulator $sim, instruction set $ix_label" for sim in (StateVectorSimulator, DensityMatrixSimulator),
-        (ix_label, ixs) in (("raw", instructions), ("decomp", de_instructions), ("unitary", u_instructions))
+           (ix_label, ixs) in (("raw", instructions), ("decomp", de_instructions), ("unitary", u_instructions))
             simulation = sim(nq, 0)
             simulation = evolve!(simulation, ixs)
             if sim == StateVectorSimulator
                 @test state_vector ≈ collect(BraketSimulator.state_vector(simulation))
             end
-            @test probability_amplitudes ≈ collect(BraketSimulator.probabilities(simulation))
-        end
+            @test probability_amplitudes ≈
+                  collect(BraketSimulator.probabilities(simulation))
+       end
         @test qubit_count(SingleExcitationMinus(ϕ)) == 2
         @test inv(SingleExcitationMinus(ϕ)) == SingleExcitationMinus(-ϕ)
     end
