@@ -1,3 +1,15 @@
+@doc raw"""
+    DoubleExcitation(ϕ)
+
+Generate the matrix representation of the [DoubleExcitation](https://docs.pennylane.ai/en/stable/code/api/pennylane.DoubleExcitation.html) gate.
+
+This operation performs an SO(2) rotation in the two-dimensional subspace {|1100\rangle, |0011\rangle}. More precisely, it performs the transformation:
+
+```math
+|0011\rangle & \rightarrow \cos\left(\frac{\phi}{2}\right)|0011\rangle + \sin\left(\frac{\phi}{2}\right)|1100\rangle \\
+|1100\rangle & \rightarrow \cos\left(\frac{\phi}{2}\right)|1100\rangle - \sin\left(\frac{\phi}{2}\right)|0011\rangle
+```
+"""
 struct DoubleExcitation <: AngledGate{1}
     angle::NTuple{1,Union{Float64,FreeParameter}}
     DoubleExcitation(angle::T) where {T<:NTuple{1,Union{Float64,FreeParameter}}} =
@@ -18,6 +30,20 @@ function matrix_rep(g::DoubleExcitation)
     return SMatrix{16,16,ComplexF64}(mat)
 end
 
+@doc raw"""
+    DoubleExcitationPlus(ϕ)
+
+Generate the matrix representation of the [DoubleExcitationPlus](https://docs.pennylane.ai/en/stable/code/api/pennylane.DoubleExcitationPlus.html) gate.
+
+This operation performs an SO(2) rotation in the two-dimensional subspace {|1100\rangle, |0011\rangle}
+while applying a phase-shift on other states. More precisely, it performs the transformation:
+
+```math
+|0011\rangle & \rightarrow \cos\left(\frac{\phi}{2}\right)|0011\rangle - \sin\left(\frac{\phi}{2}\right)|1100\rangle \\
+|1100\rangle & \rightarrow \cos\left(\frac{\phi}{2}\right)|1100\rangle + \sin\left(\frac{\phi}{2}\right)|0011\rangle \\
+|x\rangle & \rightarrow e^{\frac{i\phi}{2}}|x\rangle \quad \text{for all other basis states } |x\rangle
+```
+"""
 struct DoubleExcitationPlus <: AngledGate{1}
     angle::NTuple{1,Union{Float64,FreeParameter}}
     DoubleExcitationPlus(angle::T) where {T<:NTuple{1,Union{Float64,FreeParameter}}} =
@@ -39,6 +65,20 @@ function matrix_rep(g::DoubleExcitationPlus)
     return SMatrix{16,16,ComplexF64}(mat)
 end
 
+@doc raw"""
+    DoubleExcitationMinus(ϕ)
+
+Generate the matrix representation of the [DoubleExcitationMinus](https://docs.pennylane.ai/en/stable/code/api/pennylane.DoubleExcitationMinus.html) gate.
+
+This operation performs an SO(2) rotation in the two-dimensional subspace {|1100\rangle, |0011\rangle}
+while applying a phase-shift on other states. More precisely, it performs the transformation:
+
+```math
+|0011\rangle & \rightarrow \cos\left(\frac{\phi}{2}\right)|0011\rangle - \sin\left(\frac{\phi}{2}\right)|1100\rangle \\
+|1100\rangle & \rightarrow \cos\left(\frac{\phi}{2}\right)|1100\rangle + \sin\left(\frac{\phi}{2}\right)|0011\rangle \\
+|x\rangle & \rightarrow e^{-\frac{i\phi}{2}}|x\rangle \quad \text{for all other basis states } |x\rangle
+```
+"""
 struct DoubleExcitationMinus <: AngledGate{1}
     angle::NTuple{1,Union{Float64,FreeParameter}}
     DoubleExcitationMinus(angle::T) where {T<:NTuple{1,Union{Float64,FreeParameter}}} =
@@ -60,7 +100,22 @@ function matrix_rep(g::DoubleExcitationMinus)
     return SMatrix{16,16,ComplexF64}(mat)
 end
 
+@doc raw"""
+    SingleExcitation(ϕ)
 
+Generate the matrix representation of the [SingleExcitation](https://docs.pennylane.ai/en/stable/code/api/pennylane.SingleExcitation.html) gate.
+
+This gate performs a rotation in the two-dimensional subspace {|01\rangle, |10\rangle}, applying the following transformation:
+
+```math
+U(\phi) = \begin{pmatrix}
+1 & 0 & 0 & 0 \\
+0 & \cos\left(\frac{\phi}{2}\right) & -\sin\left(\frac{\phi}{2}\right) & 0 \\
+0 & \sin\left(\frac{\phi}{2}\right) & \cos\left(\frac{\phi}{2}\right) & 0 \\
+0 & 0 & 0 & 1 \\
+\end{pmatrix}
+```
+"""
 struct SingleExcitation <: AngledGate{1}
     angle::NTuple{1,Union{Float64,FreeParameter}}
     SingleExcitation(angle::T) where {T<:NTuple{1,Union{Float64,FreeParameter}}} =
@@ -75,6 +130,23 @@ function matrix_rep(g::SingleExcitation)
     return SMatrix{4,4,ComplexF64}([1.0 0 0 0; 0 cosϕ sinϕ 0; 0 -sinϕ cosϕ 0; 0 0 0 1.0])
 end
 
+
+@doc raw"""
+    SingleExcitationPlus(ϕ)
+
+Generate the matrix representation of the [SingleExcitationPlus](https://docs.pennylane.ai/en/stable/code/api/pennylane.SingleExcitationPlus.html) gate.
+
+This gate performs a rotation in the two-dimensional subspace {|01\rangle, |10\rangle}, applying the following transformation:
+
+```math
+U^+(\phi) = \begin{pmatrix}
+\exp\left(\frac{i\phi}{2}\right) & 0 & 0 & 0 \\
+0 & \cos\left(\frac{\phi}{2}\right) & -\sin\left(\frac{\phi}{2}\right) & 0 \\
+0 & \sin\left(\frac{\phi}{2}\right) & \cos\left(\frac{\phi}{2}\right) & 0 \\
+0 & 0 & 0 & \exp\left(\frac{i\phi}{2}\right) \\
+\end{pmatrix}
+```
+"""
 struct SingleExcitationPlus <: AngledGate{1}
     angle::NTuple{1,Union{Float64,FreeParameter}}
     SingleExcitationPlus(angle::T) where {T<:NTuple{1,Union{Float64,FreeParameter}}} =
@@ -90,6 +162,23 @@ function matrix_rep(g::SingleExcitationPlus)
     return SMatrix{4,4,ComplexF64}([eiϕ2 0 0 0; 0 cosϕ sinϕ 0; 0 -sinϕ cosϕ 0; 0 0 0 eiϕ2])
 end
 
+
+@doc raw"""
+    SingleExcitationMinus(ϕ)
+
+Generate the matrix representation of the [SingleExcitationMinus](https://docs.pennylane.ai/en/stable/code/api/pennylane.SingleExcitationMinus.html) gate.
+
+This gate performs a rotation in the two-dimensional subspace {|01\rangle, |10\rangle}, applying the following transformation:
+
+```math
+U^-(\phi) = \begin{pmatrix}
+\exp\left(\frac{-i\phi}{2}\right) & 0 & 0 & 0 \\
+0 & \cos\left(\frac{\phi}{2}\right) & -\sin\left(\frac{\phi}{2}\right) & 0 \\
+0 & \sin\left(\frac{\phi}{2}\right) & \cos\left(\frac{\phi}{2}\right) & 0 \\
+0 & 0 & 0 & \exp\left(\frac{-i\phi}{2}\right) \\
+\end{pmatrix}
+```
+"""
 struct SingleExcitationMinus <: AngledGate{1}
     angle::NTuple{1,Union{Float64,FreeParameter}}
     SingleExcitationMinus(angle::T) where {T<:NTuple{1,Union{Float64,FreeParameter}}} =
@@ -105,6 +194,20 @@ function matrix_rep(g::SingleExcitationMinus)
     return SMatrix{4,4,ComplexF64}([eiϕ2 0 0 0; 0 cosϕ sinϕ 0; 0 -sinϕ cosϕ 0; 0 0 0 eiϕ2])
 end
 
+@doc raw"""
+    OrbitalRotation(ϕ)
+
+Generate the matrix representation of the [OrbitalRotation](https://docs.pennylane.ai/en/stable/code/api/pennylane.OrbitalRotation.html) gate.
+
+This gate performs a spin-adapted spatial orbital rotation for two neighboring spatial orbitals {|\Phi_0\rangle, |\Phi_1\rangle}, applying the following transformation:
+
+```math
+|\Phi_0\rangle = \cos\left(\frac{\phi}{2}\right)|\Phi_0\rangle - \sin\left(\frac{\phi}{2}\right)|\Phi_1\rangle \\
+|\Phi_1\rangle = \cos\left(\frac{\phi}{2}\right)|\Phi_0\rangle + \sin\left(\frac{\phi}{2}\right)|\Phi_1\rangle
+```
+
+The same orbital operation is applied in the α and β spin orbitals. This results in the transformation of specific subspaces in the 16-dimensional space.
+"""
 struct OrbitalRotation <: AngledGate{1}
     angle::NTuple{1,Union{Float64,FreeParameter}}
     OrbitalRotation(angle::T) where {T<:NTuple{1,Union{Float64,FreeParameter}}} =
@@ -114,22 +217,38 @@ Braket.chars(::Type{OrbitalRotation}) = "O(ang)"
 Braket.qubit_count(::Type{OrbitalRotation}) = 4
 Base.inv(g::OrbitalRotation) = OrbitalRotation(-g.angle[1])
 function matrix_rep(g::OrbitalRotation)
-    cosϕ = cos(g.angle[1] / 2.0)
-    sinϕ = sin(g.angle[1] / 2.0)
-    # This transformation applies to the two neighboring spatial orbitals.
-    mat = diagm(ones(ComplexF64, 16))
-    # Define the subspace transformation
-    mat[1, 1] = cosϕ
-    mat[2, 2] = cosϕ
-    mat[1, 2] = -sinϕ
-    mat[2, 1] = sinϕ
-    mat[15, 15] = cosϕ
-    mat[16, 16] = cosϕ
-    mat[15, 16] = -sinϕ
-    mat[16, 15] = sinϕ
-    return SMatrix{16,16,ComplexF64}(mat)
+    ϕ = g.angle[1]
+    cosϕ = cos(ϕ / 2.0)
+    sinϕ = sin(ϕ / 2.0)
+    mat = SMatrix{16,16,ComplexF64}(I) # Identity matrix
+    # Define the subspace transformations
+    subspace_indices = [(1, 2), (3, 4), (13, 14), (15, 16)]
+    for (i, j) in subspace_indices
+        mat[i, i] = cosϕ
+        mat[j, j] = cosϕ
+        mat[i, j] = -sinϕ
+        mat[j, i] = sinϕ
+    end
+    return mat
 end
 
+@doc raw"""
+    FermionicSWAP(ϕ)
+
+[Fermionic SWAP](https://docs.pennylane.ai/en/stable/code/api/pennylane.FermionicSWAP.html) rotation.
+
+This operation performs a rotation in the adjacent fermionic modes under the Jordan-Wigner mapping, and is realized by the following transformation of basis states:
+
+```math
+|00\rangle & \rightarrow |00\rangle \\
+|01\rangle & \rightarrow e^{\frac{i\phi}{2}}\cos\left(\frac{\phi}{2}\right)|01\rangle - ie^{\frac{i\phi}{2}}\sin\left(\frac{\phi}{2}\right)|10\rangle \\
+|10\rangle & \rightarrow -ie^{\frac{i\phi}{2}}\sin\left(\frac{\phi}{2}\right)|01\rangle + e^{\frac{i\phi}{2}}\cos\left(\frac{\phi}{2}\right)|10\rangle \\
+|11\rangle & \rightarrow e^{i\phi}|11\rangle
+```
+
+where qubits in |0\rangle and |1\rangle states represent a hole and a fermion in the orbital, respectively. It preserves anti-symmetrization of orbitals by applying a phase factor of e^{i*/phi/2} to the state for each qubit initially in |1\rangle state. Consequently, for \phi=\pi, the given rotation will essentially perform a SWAP operation on the qubits while applying a global phase of -1 if both qubits are |1\rangle.
+
+"""
 struct FermionicSWAP <: AngledGate{1}
     angle::NTuple{1,Union{Float64,FreeParameter}}
     FermionicSWAP(angle::T) where {T<:NTuple{1,Union{Float64,FreeParameter}}} =
