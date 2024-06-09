@@ -27,15 +27,15 @@ Braket.chars(::Type{DoubleExcitationPlus}) = "G2+(ang)"
 Braket.qubit_count(::Type{DoubleExcitationPlus}) = 4
 Base.inv(g::DoubleExcitationPlus) = DoubleExcitationPlus(-g.angle[1])
 function matrix_rep(g::DoubleExcitationPlus)
-    cosᵩ = cos(g.angle[1] / 2.0)
-    sinᵩ = sin(g.angle[1] / 2.0)
-    eᵢᵩ₂ = exp(im * g.angle[1] / 2.0)
+    cosϕ = cos(g.angle[1] / 2.0)
+    sinϕ = sin(g.angle[1] / 2.0)
+    eiϕ2 = exp(im * g.angle[1] / 2.0)
  
-    mat = diagm(fill(eᵢᵩ₂, 16))
-    mat[4, 4]   = cosᵩ
-    mat[13, 13] = cosᵩ
-    mat[4, 13]  = -sinᵩ
-    mat[13, 4]  = sinᵩ
+    mat = diagm(fill(eiϕ2, 16))
+    mat[4, 4]   = cosϕ
+    mat[13, 13] = cosϕ
+    mat[4, 13]  = -sinϕ
+    mat[13, 4]  = sinϕ
     return SMatrix{16,16,ComplexF64}(mat)
 end
 
@@ -48,15 +48,15 @@ Braket.chars(::Type{DoubleExcitationMinus}) = "G2-(ang)"
 Braket.qubit_count(::Type{DoubleExcitationMinus}) = 4
 Base.inv(g::DoubleExcitationMinus) = DoubleExcitationMinus(-g.angle[1])
 function matrix_rep(g::DoubleExcitationMinus)
-    cosᵩ = cos(g.angle[1] / 2.0)
-    sinᵩ = sin(g.angle[1] / 2.0)
-    eᵢᵩ₂ = exp(-im * g.angle[1] / 2.0)
+    cosϕ = cos(g.angle[1] / 2.0)
+    sinϕ = sin(g.angle[1] / 2.0)
+    eiϕ2 = exp(-im * g.angle[1] / 2.0)
 
-    mat = diagm(fill(eᵢᵩ₂, 16))
-    mat[4, 4]   = cosᵩ
-    mat[13, 13] = cosᵩ
-    mat[4, 13]  = -sinᵩ
-    mat[13, 4]  = sinᵩ
+    mat = diagm(fill(eiϕ2, 16))
+    mat[4, 4]   = cosϕ
+    mat[13, 13] = cosϕ
+    mat[4, 13]  = -sinϕ
+    mat[13, 4]  = sinϕ
     return SMatrix{16,16,ComplexF64}(mat)
 end
 
@@ -84,10 +84,10 @@ Braket.chars(::Type{SingleExcitationPlus}) = "G+(ang)"
 Braket.qubit_count(::Type{SingleExcitationPlus}) = 2
 Base.inv(g::SingleExcitationPlus) = SingleExcitationPlus(-g.angle[1])
 function matrix_rep(g::SingleExcitationPlus)
-    cosᵩ = cos(g.angle[1] / 2.0)
-    sinᵩ = sin(g.angle[1] / 2.0)
-    eᵢᵩ₂ = exp(im * g.angle[1] / 2.0)
-    return SMatrix{4,4,ComplexF64}([eᵢᵩ₂ 0 0 0; 0 cosᵩ sinᵩ 0; 0 -sinᵩ cosᵩ 0; 0 0 0 eᵢᵩ₂])
+    cosϕ = cos(g.angle[1] / 2.0)
+    sinϕ = sin(g.angle[1] / 2.0)
+    eiϕ2 = exp(im * g.angle[1] / 2.0)
+    return SMatrix{4,4,ComplexF64}([eiϕ2 0 0 0; 0 cosϕ sinϕ 0; 0 -sinϕ cosϕ 0; 0 0 0 eiϕ2])
 end
 
 struct SingleExcitationMinus <: AngledGate{1}
@@ -99,10 +99,10 @@ Braket.chars(::Type{SingleExcitationMinus}) = "G-(ang)"
 Braket.qubit_count(::Type{SingleExcitationMinus}) = 2
 Base.inv(g::SingleExcitationMinus) = SingleExcitationMinus(-g.angle[1])
 function matrix_rep(g::SingleExcitationMinus)
-    cosᵩ = cos(g.angle[1] / 2.0)
-    sinᵩ = sin(g.angle[1] / 2.0)
-    eᵢᵩ₂ = exp(-im * g.angle[1] / 2.0)
-    return SMatrix{4,4,ComplexF64}([eᵢᵩ₂ 0 0 0; 0 cosᵩ sinᵩ 0; 0 -sinᵩ cosᵩ 0; 0 0 0 eᵢᵩ₂])
+    cosϕ = cos(g.angle[1] / 2.0)
+    sinϕ = sin(g.angle[1] / 2.0)
+    eiϕ2 = exp(-im * g.angle[1] / 2.0)
+    return SMatrix{4,4,ComplexF64}([eiϕ2 0 0 0; 0 cosϕ sinϕ 0; 0 -sinϕ cosϕ 0; 0 0 0 eiϕ2])
 end
 
 struct OrbitalRotation <: AngledGate{1}
@@ -114,19 +114,19 @@ Braket.chars(::Type{OrbitalRotation}) = "O(ang)"
 Braket.qubit_count(::Type{OrbitalRotation}) = 4
 Base.inv(g::OrbitalRotation) = OrbitalRotation(-g.angle[1])
 function matrix_rep(g::OrbitalRotation)
-    cosᵩ = cos(g.angle[1] / 2.0)
-    sinᵩ = sin(g.angle[1] / 2.0)
+    cosϕ = cos(g.angle[1] / 2.0)
+    sinϕ = sin(g.angle[1] / 2.0)
     # This transformation applies to the two neighboring spatial orbitals.
     mat = SMatrix{16,16,ComplexF64}(I) # Identity matrix
     # Define the subspace transformation
-    mat[1, 1] = cosᵩ
-    mat[2, 2] = cosᵩ
-    mat[1, 2] = -sinᵩ
-    mat[2, 1] = sinᵩ
-    mat[15, 15] = cosᵩ
-    mat[16, 16] = cosᵩ
-    mat[15, 16] = -sinᵩ
-    mat[16, 15] = sinᵩ
+    mat[1, 1] = cosϕ
+    mat[2, 2] = cosϕ
+    mat[1, 2] = -sinϕ
+    mat[2, 1] = sinϕ
+    mat[15, 15] = cosϕ
+    mat[16, 16] = cosϕ
+    mat[15, 16] = -sinϕ
+    mat[16, 15] = sinϕ
     return mat
 end
 
@@ -139,17 +139,18 @@ Braket.chars(::Type{FermionicSWAP}) = "FSWAP(ang)"
 Braket.qubit_count(::Type{FermionicSWAP}) = 2
 Base.inv(g::FermionicSWAP) = FermionicSWAP(-g.angle[1])
 function matrix_rep(g::FermionicSWAP)
-    cosᵩ = cos(g.angle[1] / 2.0)
-    sinᵩ = sin(g.angle[1] / 2.0)
-    eᵢᵩ₂ = exp(im * g.angle[1] / 2.0)
-    eᵢᵩ = exp(im * g.angle[1])
+    ϕ = g.angle[1]
+    cosϕ = cos(ϕ / 2.0)
+    sinϕ = sin(ϕ / 2.0)
+    eiϕ2 = exp(im * ϕ / 2.0)
+    eiϕ = exp(im * ϕ)
     ieiϕ2 = im * eiϕ2
    
     return SMatrix{4,4,ComplexF64}([
-        1 0 0 0 0;
-        0 eᵢᵩ₂*cosᵩ -im*eᵢᵩ₂ * sinᵩ 0;
-        0 -im*eᵢᵩ₂ * sinᵩ eᵢᵩ₂ * cosᵩ 0;
-        0 0 0 eᵢᵩ
+        1.0 0 0 0;
+        0 eiϕ2 * cosϕ -ieiϕ2 * sinϕ 0;
+        0 -ieiϕ2 * sinϕ eiϕ2 * cosϕ 0;
+        0 0 0 eiϕ
     ])
 end
 
