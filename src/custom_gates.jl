@@ -217,12 +217,11 @@ Braket.chars(::Type{OrbitalRotation}) = "O(ang)"
 Braket.qubit_count(::Type{OrbitalRotation}) = 4
 Base.inv(g::OrbitalRotation) = OrbitalRotation(-g.angle[1])
 function matrix_rep(g::OrbitalRotation)
-    ϕ = g.angle[1]
-    cosϕ = cos(ϕ / 2.0)
-    sinϕ = sin(ϕ / 2.0)
+    cosϕ = cos(g.angle[1] / 2.0)
+    sinϕ = sin(g.angle[1] / 2.0)
     mat = SMatrix{16,16,ComplexF64}(I) # Identity matrix
     # Define the subspace transformations
-    subspace_indices = [(1, 2), (3, 4), (13, 14), (15, 16)]
+    subspace_indices = [(2*i-1, 2*i) for i in 1:8]
     for (i, j) in subspace_indices
         mat[i, i] = cosϕ
         mat[j, j] = cosϕ
