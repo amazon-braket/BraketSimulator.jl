@@ -117,7 +117,7 @@ function matrix_rep(g::OrbitalRotation)
     cosϕ = cos(g.angle[1] / 2.0)
     sinϕ = sin(g.angle[1] / 2.0)
     # This transformation applies to the two neighboring spatial orbitals.
-    mat = SMatrix{16,16,ComplexF64}(I) # Identity matrix
+    mat = diagm(ones(ComplexF64, 16))
     # Define the subspace transformation
     mat[1, 1] = cosϕ
     mat[2, 2] = cosϕ
@@ -127,7 +127,7 @@ function matrix_rep(g::OrbitalRotation)
     mat[16, 16] = cosϕ
     mat[15, 16] = -sinϕ
     mat[16, 15] = sinϕ
-    return mat
+    return SMatrix{16,16,ComplexF64}(mat)
 end
 
 struct FermionicSWAP <: AngledGate{1}
@@ -139,19 +139,13 @@ Braket.chars(::Type{FermionicSWAP}) = "FSWAP(ang)"
 Braket.qubit_count(::Type{FermionicSWAP}) = 2
 Base.inv(g::FermionicSWAP) = FermionicSWAP(-g.angle[1])
 function matrix_rep(g::FermionicSWAP)
-    ϕ = g.angle[1]
-    cosϕ = cos(ϕ / 2.0)
-    sinϕ = sin(ϕ / 2.0)
-    eiϕ2 = exp(im * ϕ / 2.0)
-    eiϕ = exp(im * ϕ)
+    cosϕ = cos(g.angle[1] / 2.0)
+    sinϕ = sin(g.angle[1] / 2.0)
+    eiϕ2 = exp(im * g.angle[1] / 2.0)
+    eiϕ = exp(im * g.angle[1])
     ieiϕ2 = im * eiϕ2
-   
-    return SMatrix{4,4,ComplexF64}([
-        1.0 0 0 0;
-        0 eiϕ2 * cosϕ -ieiϕ2 * sinϕ 0;
-        0 -ieiϕ2 * sinϕ eiϕ2 * cosϕ 0;
-        0 0 0 eiϕ
-    ])
+
+    return SMatrix{4,4,ComplexF64}([1.0 0 0 0; 0 eiϕ2 * cosϕ -ieiϕ2 * sinϕ 0; 0 -ieiϕ2 * sinϕ eiϕ2 * cosϕ 0; 0 0 0 eiϕ])
 end
 
 struct MultiRZ <: AngledGate{1}
