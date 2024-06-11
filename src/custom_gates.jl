@@ -120,7 +120,6 @@ function matrix_rep(g::SingleExcitation)
     return SMatrix{4,4,ComplexF64}([1.0 0 0 0; 0 cosϕ sinϕ 0; 0 -sinϕ cosϕ 0; 0 0 0 1.0])
 end
 
-
 @doc raw"""
     SingleExcitationPlus(ϕ)
 
@@ -143,7 +142,6 @@ function matrix_rep(g::SingleExcitationPlus)
     return SMatrix{4,4,ComplexF64}([eiϕ2 0 0 0; 0 cosϕ sinϕ 0; 0 -sinϕ cosϕ 0; 0 0 0 eiϕ2])
 end
 
-
 @doc raw"""
     SingleExcitationMinus(ϕ)
 
@@ -164,43 +162,6 @@ function matrix_rep(g::SingleExcitationMinus)
     sinϕ = sin(g.angle[1] / 2.0)
     eiϕ2 = exp(-im * g.angle[1] / 2.0)
     return SMatrix{4,4,ComplexF64}([eiϕ2 0 0 0; 0 cosϕ sinϕ 0; 0 -sinϕ cosϕ 0; 0 0 0 eiϕ2])
-end
-
-@doc raw"""
-    OrbitalRotation(ϕ)
-
-Generate the matrix representation of the [OrbitalRotation](https://docs.pennylane.ai/en/stable/code/api/pennylane.OrbitalRotation.html) gate.
-
-This gate performs a rotation in the spatial orbital subspace {|\Phi_0⟩, |\Phi_1⟩}: 
-
-```math
-|\Phi_0\rangle = \cos\left(\frac{\phi}{2}\right)|\Phi_0\rangle - \sin\left(\frac{\phi}{2}\right)|\Phi_1\rangle \\
-|\Phi_1\rangle = \cos\left(\frac{\phi}{2}\right)|\Phi_0\rangle + \sin\left(\frac{\phi}{2}\right)|\Phi_1\rangle
-```
-
-The same rotation applies to both α and β spin orbitals in the 16-dimensional space.
-"""
-struct OrbitalRotation <: AngledGate{1}
-    angle::NTuple{1,Union{Float64,FreeParameter}}
-    OrbitalRotation(angle::T) where {T<:NTuple{1,Union{Float64,FreeParameter}}} =
-        new(angle)
-end
-Braket.chars(::Type{OrbitalRotation}) = "O(ang)"
-Braket.qubit_count(::Type{OrbitalRotation}) = 4
-Base.inv(g::OrbitalRotation) = OrbitalRotation(-g.angle[1])
-function matrix_rep(g::OrbitalRotation)
-    cosϕ = cos(g.angle[1] / 2.0)
-    sinϕ = sin(g.angle[1] / 2.0)
-    mat = SMatrix{16,16,ComplexF64}(I) # Identity matrix
-    # Define the subspace transformations
-    subspace_indices = [(2*i-1, 2*i) for i in 1:8]
-    for (i, j) in subspace_indices
-        mat[i, i] = cosϕ
-        mat[j, j] = cosϕ
-        mat[i, j] = -sinϕ
-        mat[j, i] = sinϕ
-    end
-    return mat
 end
 
 @doc raw"""

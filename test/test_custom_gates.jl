@@ -1,7 +1,7 @@
 using Test, Logging, Braket, BraketSimulator, DataStructures
 
 using Braket: Instruction
-using BraketSimulator: DoubleExcitation, DoubleExcitationPlus, DoubleExcitationMinus, SingleExcitation, SingleExcitationPlus, SingleExcitationMinus,  matrix_rep, Control, FermionicSWAP, OrbitalRotation
+using BraketSimulator: DoubleExcitation, DoubleExcitationPlus, DoubleExcitationMinus, SingleExcitation, SingleExcitationPlus, SingleExcitationMinus,  matrix_rep, Control, FermionicSWAP
 
 @testset "Custom gates" begin
     @testset "Double excitation" begin
@@ -265,8 +265,8 @@ using BraketSimulator: DoubleExcitation, DoubleExcitationPlus, DoubleExcitationM
     @testset "FermionicSWAP" begin
         ϕ  = 3.56
         nq = 2
-        # instructions for the matrix representation
         instructions = [Instruction(H(), [0]), Instruction(H(), [1]), Instruction(FermionicSWAP(ϕ), [0, 1])]
+        # instructions for the matrix representation
         u_instructions = [Instruction(H(), [0]), Instruction(H(), [1]), Instruction(Unitary(Matrix(matrix_rep(FermionicSWAP(ϕ)))), [1, 0])]
         state_vector = 0.5 * [1, exp(im*ϕ/2.0)*cos(ϕ / 2.0) - im*exp(im*ϕ/2.0)*sin(ϕ/2.0), 
                               - im*exp(im*ϕ/2.0)*sin(ϕ/2.0) + exp(im*ϕ/2.0)*cos(ϕ/2.0), exp(im * ϕ)]
