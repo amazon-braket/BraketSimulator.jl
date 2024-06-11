@@ -55,12 +55,17 @@ function matrix_rep(g::DoubleExcitationPlus)
     cosϕ = cos(g.angle[1] / 2.0)
     sinϕ = sin(g.angle[1] / 2.0)
     eiϕ2 = exp(im * g.angle[1] / 2.0)
- 
-    mat = diagm(fill(eiϕ2, 16))
+    mat = diagm(ones(ComplexF64, 16))
     mat[4, 4]   = cosϕ
     mat[13, 13] = cosϕ
     mat[4, 13]  = -sinϕ
     mat[13, 4]  = sinϕ
+    # Apply phase-shift to states outside rotation subspace
+    for i in 1:16
+        if i != 4 && i != 13
+            mat[i, i] *= eiϕ2
+        end
+    end
     return SMatrix{16,16,ComplexF64}(mat)
 end
 
@@ -89,12 +94,17 @@ function matrix_rep(g::DoubleExcitationMinus)
     cosϕ = cos(g.angle[1] / 2.0)
     sinϕ = sin(g.angle[1] / 2.0)
     eiϕ2 = exp(-im * g.angle[1] / 2.0)
-
-    mat = diagm(fill(eiϕ2, 16))
+    mat = diagm(ones(ComplexF64, 16))
     mat[4, 4]   = cosϕ
     mat[13, 13] = cosϕ
     mat[4, 13]  = -sinϕ
     mat[13, 4]  = sinϕ
+    # Apply phase-shift to states outside rotation subspace
+    for i in 1:16
+        if i != 4 && i != 13
+            mat[i, i] *= eiϕ2
+        end
+    end
     return SMatrix{16,16,ComplexF64}(mat)
 end
 
