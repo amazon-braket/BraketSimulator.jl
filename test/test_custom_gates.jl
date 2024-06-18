@@ -30,6 +30,11 @@ using BraketSimulator: DoubleExcitation, DoubleExcitationPlus, DoubleExcitationM
         end
         @test qubit_count(DoubleExcitation(ϕ)) == 4
         @test inv(DoubleExcitation(ϕ)) == DoubleExcitation(-ϕ)
+        @test DoubleExcitation(ϕ) ^ 0 == DoubleExcitation(0.0)
+        @test DoubleExcitation(ϕ) ^ 2 == DoubleExcitation(2*ϕ)
+        @test DoubleExcitation(ϕ) ^ -1 == DoubleExcitation(-ϕ)
+        @test DoubleExcitation(ϕ) ^ - 3 == DoubleExcitation(-3*ϕ)
+        
     end
     @testset "Single excitation" begin
         ϕ  = 3.56
@@ -56,6 +61,10 @@ using BraketSimulator: DoubleExcitation, DoubleExcitationPlus, DoubleExcitationM
         end
         @test qubit_count(SingleExcitation(ϕ)) == 2
         @test inv(SingleExcitation(ϕ)) == SingleExcitation(-ϕ)
+        @test SingleExcitation(ϕ) ^ 0 == SingleExcitation(0.0)
+        @test SingleExcitation(ϕ) ^ 2 == SingleExcitation(2*ϕ)
+        @test SingleExcitation(ϕ) ^ -1 == SingleExcitation(-ϕ)
+        @test SingleExcitation(ϕ) ^ - 3 == SingleExcitation(-3*ϕ)
     end
     @testset "3-angle U" begin
         θ = 1.34
@@ -193,6 +202,10 @@ using BraketSimulator: DoubleExcitation, DoubleExcitationPlus, DoubleExcitationM
         end
         @test qubit_count(SingleExcitationPlus(ϕ)) == 2
         @test inv(SingleExcitationPlus(ϕ)) == SingleExcitationPlus(-ϕ)
+        @test SingleExcitationPlus(ϕ) ^ 0 == SingleExcitationPlus(0.0)
+        @test SingleExcitationPlus(ϕ) ^ 2 == SingleExcitationPlus(2*ϕ)
+        @test SingleExcitationPlus(ϕ) ^ -1 == SingleExcitationPlus(-ϕ)
+        @test SingleExcitationPlus(ϕ) ^ - 3 == SingleExcitationPlus(-3*ϕ)
     end
 	
     @testset "Single excitation minus" begin
@@ -218,6 +231,10 @@ using BraketSimulator: DoubleExcitation, DoubleExcitationPlus, DoubleExcitationM
         end
         @test qubit_count(SingleExcitationMinus(ϕ)) == 2
         @test inv(SingleExcitationMinus(ϕ)) == SingleExcitationMinus(-ϕ)
+        @test SingleExcitationMinus(ϕ) ^ 0 == SingleExcitationMinus(0.0)
+        @test SingleExcitationMinus(ϕ) ^ 2 == SingleExcitationMinus(2*ϕ)
+        @test SingleExcitationMinus(ϕ) ^ -1 == SingleExcitationMinus(-ϕ)
+        @test SingleExcitationMinus(ϕ) ^ - 3 == SingleExcitationMinus(-3*ϕ)
     end
 
     @testset "Double excitation minus" begin
@@ -240,6 +257,10 @@ using BraketSimulator: DoubleExcitation, DoubleExcitationPlus, DoubleExcitationM
         end
         @test qubit_count(DoubleExcitationMinus(ϕ)) == 4
         @test inv(DoubleExcitationMinus(ϕ)) == DoubleExcitationMinus(-ϕ)
+        @test DoubleExcitationMinus(ϕ) ^ 0 == DoubleExcitationMinus(0.0)
+        @test DoubleExcitationMinus(ϕ) ^ 2 == DoubleExcitationMinus(2*ϕ)
+        @test DoubleExcitationMinus(ϕ) ^ -1 == DoubleExcitationMinus(-ϕ)
+        @test DoubleExcitationMinus(ϕ) ^ - 3 == DoubleExcitationMinus(-3*ϕ)
     end
 
     @testset "Double excitation plus" begin
@@ -262,6 +283,10 @@ using BraketSimulator: DoubleExcitation, DoubleExcitationPlus, DoubleExcitationM
         end
         @test qubit_count(DoubleExcitationPlus(ϕ)) == 4
         @test inv(DoubleExcitationPlus(ϕ)) == DoubleExcitationPlus(-ϕ)
+        @test DoubleExcitationPlus(ϕ) ^ 0 == DoubleExcitationPlus(0.0)
+        @test DoubleExcitationPlus(ϕ) ^ 2 == DoubleExcitationPlus(2*ϕ)
+        @test DoubleExcitationPlus(ϕ) ^ -1 == DoubleExcitationPlus(-ϕ)
+        @test DoubleExcitationPlus(ϕ) ^ - 3 == DoubleExcitationPlus(-3*ϕ)
     end
 
     @testset "FermionicSWAP" begin
@@ -287,5 +312,9 @@ using BraketSimulator: DoubleExcitation, DoubleExcitationPlus, DoubleExcitationM
         end
         @test qubit_count(FermionicSWAP(ϕ)) == 2
         @test inv(FermionicSWAP(ϕ)) == FermionicSWAP(-ϕ)
+        @test FermionicSWAP(ϕ) ^ 0 == FermionicSWAP(0.0)
+        @test FermionicSWAP(ϕ) ^ 2 == FermionicSWAP(2*ϕ)
+        @test FermionicSWAP(ϕ) ^ -1 == FermionicSWAP(-ϕ)
+        @test FermionicSWAP(ϕ) ^ - 3 == FermionicSWAP(-3*ϕ)
     end
 end
