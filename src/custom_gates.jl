@@ -271,10 +271,10 @@ This gate performs a rotation in adjacent fermionic modes under the Jordan-Wigne
 julia> ϕ = 3.56;
 julia> gate_matrix =  FermionicSWAP(ϕ);
 julia> m  = matrix_rep(gate_matrix);
-julia> eq1 = m * [0, 0, 0, 0]
-julia> eq2 = m * [0, 1, 0, 0]
-julia> eq3 = m * [0, 0, 1, 0]
-julia> eq4 = m * [0, 0, 0, 1]
+julia> eq1 = m * [0, 0, 0, 0];
+julia> eq2 = m * [0, 1, 0, 0];
+julia> eq3 = m * [0, 0, 1, 0];
+julia> eq4 = m * [0, 0, 0, 1];
 julia> eq1 == [0, 0, 0, 0]
 true 
 julia> eq2 == [0, exp(im*ϕ/2.0)*cos(ϕ / 2.0), - im*exp(im*ϕ/2.0)*sin(ϕ/2.0), 0]
