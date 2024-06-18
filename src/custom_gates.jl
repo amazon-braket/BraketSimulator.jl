@@ -180,7 +180,7 @@ function matrix_rep(g::SingleExcitation)
     return SMatrix{4,4,ComplexF64}([1.0 0 0 0; 0 cosϕ sinϕ 0; 0 -sinϕ cosϕ 0; 0 0 0 1.0])
 end
 
-raw"""
+"""
     SingleExcitationPlus(ϕ)
 
 Generate the matrix representation of the [SingleExcitationPlus](https://docs.pennylane.ai/en/stable/code/api/pennylane.SingleExcitationPlus.html) gate.
