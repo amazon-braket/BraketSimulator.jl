@@ -1,13 +1,25 @@
-@doc raw"""
+"""
     DoubleExcitation(ϕ)
 
 Generate the matrix representation of the [DoubleExcitation](https://docs.pennylane.ai/en/stable/code/api/pennylane.DoubleExcitation.html) gate.
 
 This gate performs an SO(2) rotation in the subspace {|1100⟩, |0011⟩}, transforming the states as follows:
 
-```math
-|0011\rangle & \rightarrow \cos\left(\frac{\phi}{2}\right)|0011\rangle + \sin\left(\frac{\phi}{2}\right)|1100\rangle \\
-|1100\rangle & \rightarrow \cos\left(\frac{\phi}{2}\right)|1100\rangle - \sin\left(\frac{\phi}{2}\right)|0011\rangle
+- |0011⟩ ⟼ cos(φ/2)|0011⟩ + sin(φ/2)|1100⟩
+- |1100⟩ ⟼ cos(φ/2)|1100⟩ - sin(φ/2)|0011⟩
+
+# Examples
+
+```jldoctest
+julia> ϕ = 3.56;
+julia> gate_matrix = DoubleExcitation(ϕ);
+julia> m  = matrix_rep(gate_matrix);
+julia> eq1 = m * [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+julia> eq2 = m * [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0];
+julia> eq1 ==  [0, 0, 0, cos(ϕ/2), 0, 0, 0, 0, 0, 0, 0, 0, sin(ϕ/2), 0, 0, 0]
+true
+julia> eq2 ==  [0, 0, 0, -sin(ϕ/2), 0, 0, 0, 0, 0, 0, 0, 0, cos(ϕ/2), 0, 0, 0]
+true
 ```
 """
 struct DoubleExcitation <: AngledGate{1}
@@ -30,18 +42,31 @@ function matrix_rep(g::DoubleExcitation)
     return SMatrix{16,16,ComplexF64}(mat)
 end
 
-@doc raw"""
+"""
     DoubleExcitationPlus(ϕ)
 
 Generate the matrix representation of the [DoubleExcitationPlus](https://docs.pennylane.ai/en/stable/code/api/pennylane.DoubleExcitationPlus.html) gate.
 
 This gate performs an SO(2) rotation in the subspace {|1100⟩, |0011⟩} with a phase-shift on other states:
 
-```math
-|0011\rangle & \rightarrow \cos\left(\frac{\phi}{2}\right)|0011\rangle - \sin\left(\frac{\phi}{2}\right)|1100\rangle \\
-|1100\rangle & \rightarrow \cos\left(\frac{\phi}{2}\right)|1100\rangle + \sin\left(\frac{\phi}{2}\right)|0011\rangle \\
-|x\rangle & \rightarrow e^{\frac{i\phi}{2}}|x\rangle \quad \text{for all other basis states } |x\rangle
+- |0011⟩ ⟼ cos(φ/2)|0011⟩ - sin(φ/2)|1100⟩
+- |1100⟩ ⟼ cos(φ/2)|1100⟩ + sin(φ/2)|0011⟩
+- |x⟩ ⟼ e^{iφ/2}|x⟩   for all other basis states |x⟩
+
+# Examples
+
+```jldoctest
+julia> ϕ = 3.56;
+julia> gate_matrix = DoubleExcitationPlus(ϕ);
+julia> m  = matrix_rep(gate_matrix);
+julia> eq1 = m * [1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
+julia> eq2 = m * [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1];
+julia> eq1 ==  [exp(im*ϕ/2), 0, 0, cos(ϕ/2), 0, 0, 0, 0, 0, 0, 0, 0, sin(ϕ/2), 0, 0, exp(im*ϕ/2)]
+true
+julia> eq2 ==  [exp(im*ϕ/2), 0, 0, -sin(ϕ/2), 0, 0, 0, 0, 0, 0, 0, 0, cos(ϕ/2), 0, 0, exp(im*ϕ/2)]
+true
 ```
+
 """
 struct DoubleExcitationPlus <: AngledGate{1}
     angle::NTuple{1,Union{Float64,FreeParameter}}
@@ -55,32 +80,44 @@ function matrix_rep(g::DoubleExcitationPlus)
     cosϕ = cos(g.angle[1] / 2.0)
     sinϕ = sin(g.angle[1] / 2.0)
     eiϕ2 = exp(im * g.angle[1] / 2.0)
-    mat = diagm(ones(ComplexF64, 16))
+    mat = diagm(eiϕ2 * ones(ComplexF64, 16))
+
+    mat[4, :] .= 0
+    mat[:, 4] .= 0
+    mat[13, :] .= 0
+    mat[:, 13] .= 0
+    # Apply phase-shift to states outside rotation subspace
     mat[4, 4]   = cosϕ
     mat[13, 13] = cosϕ
     mat[4, 13]  = -sinϕ
     mat[13, 4]  = sinϕ
-    # Apply phase-shift to states outside rotation subspace
-    for i in 1:16
-        if i != 4 && i != 13
-            mat[i, i] *= eiϕ2
-        end
-    end
-    return SMatrix{16,16,ComplexF64}(mat)
+    return SMatrix{16, 16, ComplexF64}(mat)
 end
-
-@doc raw"""
+"""
     DoubleExcitationMinus(ϕ)
 
 Generate the matrix representation of the [DoubleExcitationMinus](https://docs.pennylane.ai/en/stable/code/api/pennylane.DoubleExcitationMinus.html) gate.
 
 This gate performs an SO(2) rotation in the subspace {|1100⟩, |0011⟩} with a phase-shift on other states:
 
-```math
-|0011\rangle & \rightarrow \cos\left(\frac{\phi}{2}\right)|0011\rangle - \sin\left(\frac{\phi}{2}\right)|1100\rangle \\
-|1100\rangle & \rightarrow \cos\left(\frac{\phi}{2}\right)|1100\rangle + \sin\left(\frac{\phi}{2}\right)|0011\rangle \\
-|x\rangle & \rightarrow e^{-\frac{i\phi}{2}}|x\rangle \quad \text{for all other basis states } |x\rangle
+- |0011⟩ ⟼ cos(φ/2)|0011⟩ - sin(φ/2)|1100⟩
+- |1100⟩ ⟼ cos(φ/2)|1100⟩ + sin(φ/2)|0011⟩
+- |x⟩ ⟼ e^{-iφ/2}|x⟩   for all other basis states |x⟩
+
+# Examples
+
+```jldoctest
+julia> ϕ = 3.56;
+julia> gate_matrix = DoubleExcitationMinus(ϕ);
+julia> m  = matrix_rep(gate_matrix);
+julia> eq1 = m * [1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
+julia> eq2 = m * [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1];
+julia> eq1 ==  [exp(-im*ϕ/2), 0, 0, cos(ϕ/2), 0, 0, 0, 0, 0, 0, 0, 0, sin(ϕ/2), 0, 0, exp(-im*ϕ/2)]
+true
+julia> eq2 ==  [exp(-im*ϕ/2), 0, 0, -sin(ϕ/2), 0, 0, 0, 0, 0, 0, 0, 0, cos(ϕ/2), 0, 0, exp(-im*ϕ/2)]
+true
 ```
+
 """
 struct DoubleExcitationMinus <: AngledGate{1}
     angle::NTuple{1,Union{Float64,FreeParameter}}
@@ -94,26 +131,39 @@ function matrix_rep(g::DoubleExcitationMinus)
     cosϕ = cos(g.angle[1] / 2.0)
     sinϕ = sin(g.angle[1] / 2.0)
     eiϕ2 = exp(-im * g.angle[1] / 2.0)
-    mat = diagm(ones(ComplexF64, 16))
+    mat = diagm(eiϕ2 * ones(ComplexF64, 16))
+    
+    mat[4, :] .= 0
+    mat[:, 4] .= 0
+    mat[13, :] .= 0
+    mat[:, 13] .= 0
+    # Apply phase-shift to states outside rotation subspace
     mat[4, 4]   = cosϕ
     mat[13, 13] = cosϕ
     mat[4, 13]  = -sinϕ
     mat[13, 4]  = sinϕ
-    # Apply phase-shift to states outside rotation subspace
-    for i in 1:16
-        if i != 4 && i != 13
-            mat[i, i] *= eiϕ2
-        end
-    end
-    return SMatrix{16,16,ComplexF64}(mat)
+    return SMatrix{16, 16, ComplexF64}(mat)
 end
 
-@doc raw"""
+"""
     SingleExcitation(ϕ)
 
 Generate the matrix representation of the [SingleExcitation](https://docs.pennylane.ai/en/stable/code/api/pennylane.SingleExcitation.html) gate. 
 
 This gate performs a rotation in the subspace {|01⟩, |10⟩}.
+
+# Examples
+
+```jldoctest
+julia> ϕ = 3.56;
+julia> gate_matrix = SingleExcitation(ϕ);
+julia> m  = matrix_rep(gate_matrix);
+julia> eq1 = m * [0, 1, 0, 0];
+julia> eq2 = m * [0, 0, 1, 0];
+julia> eq1 == [0, cos(ϕ/2), - sin(ϕ/2), 0]
+true 
+julia> eq2 == [0, sin(ϕ/2), cos(ϕ/2), 0]
+true
 ```
 """
 struct SingleExcitation <: AngledGate{1}
@@ -130,12 +180,26 @@ function matrix_rep(g::SingleExcitation)
     return SMatrix{4,4,ComplexF64}([1.0 0 0 0; 0 cosϕ sinϕ 0; 0 -sinϕ cosϕ 0; 0 0 0 1.0])
 end
 
-@doc raw"""
+raw"""
     SingleExcitationPlus(ϕ)
 
 Generate the matrix representation of the [SingleExcitationPlus](https://docs.pennylane.ai/en/stable/code/api/pennylane.SingleExcitationPlus.html) gate.
 
 This gate performs a rotation in the subspace {|01⟩, |10⟩} with a phase-shift.
+
+# Examples
+
+```jldoctest
+julia> ϕ = 3.56;
+julia> gate_matrix = SingleExcitationPlus(ϕ);
+julia> m  = matrix_rep(gate_matrix);
+julia> eq1 = m * [1, 1, 0, 0];
+julia> eq2 = m * [1, 0, 1, 0];
+julia> eq1 == [exp(im*ϕ/2), cos(ϕ/2), - sin(ϕ/2), 0]
+true 
+julia> eq2 == [exp(im*ϕ/2), sin(ϕ/2), cos(ϕ/2), 0]
+true
+```
 """
 struct SingleExcitationPlus <: AngledGate{1}
     angle::NTuple{1,Union{Float64,FreeParameter}}
@@ -152,12 +216,27 @@ function matrix_rep(g::SingleExcitationPlus)
     return SMatrix{4,4,ComplexF64}([eiϕ2 0 0 0; 0 cosϕ sinϕ 0; 0 -sinϕ cosϕ 0; 0 0 0 eiϕ2])
 end
 
-@doc raw"""
+"""
     SingleExcitationMinus(ϕ)
 
 Generate the matrix representation of the [SingleExcitationMinus](https://docs.pennylane.ai/en/stable/code/api/pennylane.SingleExcitationMinus.html) gate.
 
 This gate performs a rotation in the subspace {|01⟩, |10⟩} with a phase-shift.
+
+# Examples
+
+```jldoctest
+julia> ϕ = 3.56;
+julia> gate_matrix = SingleExcitationMinus(ϕ);
+julia> m  = matrix_rep(gate_matrix);
+julia> eq1 = m * [1, 1, 0, 0];
+julia> eq2 = m * [1, 0, 1, 0];
+julia> eq1 == [exp(-im*ϕ/2), cos(ϕ/2), - sin(ϕ/2), 0]
+true 
+julia> eq2 == [exp(-im*ϕ/2), sin(ϕ/2), cos(ϕ/2), 0]
+true
+```
+
 """
 struct SingleExcitationMinus <: AngledGate{1}
     angle::NTuple{1,Union{Float64,FreeParameter}}
@@ -174,18 +253,36 @@ function matrix_rep(g::SingleExcitationMinus)
     return SMatrix{4,4,ComplexF64}([eiϕ2 0 0 0; 0 cosϕ sinϕ 0; 0 -sinϕ cosϕ 0; 0 0 0 eiϕ2])
 end
 
-@doc raw"""
+"""
     FermionicSWAP(ϕ)
 
 Generate the matrix representation of the [FermionicSWAP](https://docs.pennylane.ai/en/stable/code/api/pennylane.FermionicSWAP.html) gate.
 
 This gate performs a rotation in adjacent fermionic modes under the Jordan-Wigner mapping, transforming states as follows:
 
-```math
-|00\rangle & \rightarrow |00\rangle \\
-|01\rangle & \rightarrow e^{\frac{i\phi}{2}}\cos\left(\frac{\phi}{2}\right)|01\rangle - ie^{\frac{i\phi}{2}}\sin\left(\frac{\phi}{2}\right)|10\rangle \\
-|10\rangle & \rightarrow -ie^{\frac{i\phi}{2}}\sin\left(\frac{\phi}{2}\right)|01\rangle + e^{\frac{i\phi}{2}}\cos\left(\frac{\phi}{2}\right)|10\rangle \\
-|11\rangle & \rightarrow e^{i\phi}|11\rangle
+- |00⟩ ⟼ |00⟩
+- |01⟩ ⟼ e^{iφ/2}cos(φ/2)|01⟩ - ie^{iφ/2}sin(φ/2)|10⟩
+- |10⟩ ⟼ -ie^{iφ/2}sin(φ/2)|01⟩ + e^{iφ/2}cos(φ/2)|10⟩
+- |11⟩ ⟼ e^{iφ}|11⟩
+
+# Examples
+
+```jldoctest
+julia> ϕ = 3.56;
+julia> gate_matrix =  FermionicSWAP(ϕ);
+julia> m  = matrix_rep(gate_matrix);
+julia> eq1 = m * [0, 0, 0, 0]
+julia> eq2 = m * [0, 1, 0, 0]
+julia> eq3 = m * [0, 0, 1, 0]
+julia> eq4 = m * [0, 0, 0, 1]
+julia> eq1 == [0, 0, 0, 0]
+true 
+julia> eq2 == [0, exp(im*ϕ/2.0)*cos(ϕ / 2.0), - im*exp(im*ϕ/2.0)*sin(ϕ/2.0), 0]
+true
+julia> eq3 == [0, - im*exp(im*ϕ/2.0)*sin(ϕ/2.0), exp(im*ϕ/2.0)*cos(ϕ/2.0), 0]
+true
+julia> eq4 == [0, 0, 0, exp(im * ϕ)]
+true
 ```
 """
 struct FermionicSWAP <: AngledGate{1}
