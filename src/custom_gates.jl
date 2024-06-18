@@ -5,8 +5,8 @@ Generate the matrix representation of the [DoubleExcitation](https://docs.pennyl
 
 This gate performs an SO(2) rotation in the subspace {|1100⟩, |0011⟩}, transforming the states as follows:
 
-- |0011⟩ ⟼ cos(φ/2)|0011⟩ + sin(φ/2)|1100⟩
-- |1100⟩ ⟼ cos(φ/2)|1100⟩ - sin(φ/2)|0011⟩
+- |0011⟩ ⟼ cos(ϕ/2)|0011⟩ + sin(ϕ/2)|1100⟩
+- |1100⟩ ⟼ cos(ϕ/2)|1100⟩ - sin(ϕ/2)|0011⟩
 
 # Examples
 
@@ -49,9 +49,9 @@ Generate the matrix representation of the [DoubleExcitationPlus](https://docs.pe
 
 This gate performs an SO(2) rotation in the subspace {|1100⟩, |0011⟩} with a phase-shift on other states:
 
-- |0011⟩ ⟼ cos(φ/2)|0011⟩ - sin(φ/2)|1100⟩
-- |1100⟩ ⟼ cos(φ/2)|1100⟩ + sin(φ/2)|0011⟩
-- |x⟩ ⟼ e^{iφ/2}|x⟩   for all other basis states |x⟩
+- |0011⟩ ⟼ cos(ϕ/2)|0011⟩ - sin(ϕ/2)|1100⟩
+- |1100⟩ ⟼ cos(ϕ/2)|1100⟩ + sin(ϕ/2)|0011⟩
+- |x⟩ ⟼ e^{iϕ/2}|x⟩   for all other basis states |x⟩
 
 # Examples
 
@@ -100,9 +100,9 @@ Generate the matrix representation of the [DoubleExcitationMinus](https://docs.p
 
 This gate performs an SO(2) rotation in the subspace {|1100⟩, |0011⟩} with a phase-shift on other states:
 
-- |0011⟩ ⟼ cos(φ/2)|0011⟩ - sin(φ/2)|1100⟩
-- |1100⟩ ⟼ cos(φ/2)|1100⟩ + sin(φ/2)|0011⟩
-- |x⟩ ⟼ e^{-iφ/2}|x⟩   for all other basis states |x⟩
+- |0011⟩ ⟼ cos(ϕ/2)|0011⟩ - sin(ϕ/2)|1100⟩
+- |1100⟩ ⟼ cos(ϕ/2)|1100⟩ + sin(ϕ/2)|0011⟩
+- |x⟩ ⟼ e^{-iϕ/2}|x⟩   for all other basis states |x⟩
 
 # Examples
 
@@ -261,9 +261,9 @@ Generate the matrix representation of the [FermionicSWAP](https://docs.pennylane
 This gate performs a rotation in adjacent fermionic modes under the Jordan-Wigner mapping, transforming states as follows:
 
 - |00⟩ ⟼ |00⟩
-- |01⟩ ⟼ e^{iφ/2}cos(φ/2)|01⟩ - ie^{iφ/2}sin(φ/2)|10⟩
-- |10⟩ ⟼ -ie^{iφ/2}sin(φ/2)|01⟩ + e^{iφ/2}cos(φ/2)|10⟩
-- |11⟩ ⟼ e^{iφ}|11⟩
+- |01⟩ ⟼ e^{iϕ/2}cos(ϕ/2)|01⟩ - ie^{iϕ/2}sin(ϕ/2)|10⟩
+- |10⟩ ⟼ -ie^{iϕ/2}sin(ϕ/2)|01⟩ + e^{iϕ/2}cos(ϕ/2)|10⟩
+- |11⟩ ⟼ e^{iϕ}|11⟩
 
 # Examples
 
