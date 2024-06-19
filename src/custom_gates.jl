@@ -30,7 +30,7 @@ end
 Braket.chars(::Type{DoubleExcitation}) = "G2(ang)"
 Braket.qubit_count(::Type{DoubleExcitation}) = 4
 Base.inv(g::DoubleExcitation) = DoubleExcitation(-g.angle[1])
-Base.:^(g::DoubleExcitation, power::Integer) = power == -1 ? inv(g) : (power == 0 ? DoubleExcitation((0.0,)) : (power < 0 ? inv(g^(-power)) : DoubleExcitation((g.angle[1] * power,))))
+Base.:^(g::DoubleExcitation, power::Integer) = power == -1 ? inv(g) : (iszero(power) ? DoubleExcitation((0.0,)) : (power < 0 ? inv(g^(-power)) : DoubleExcitation((g.angle[1] * power,))))
 function matrix_rep(g::DoubleExcitation)
     cosϕ = cos(g.angle[1] / 2.0)
     sinϕ = sin(g.angle[1] / 2.0)
@@ -77,7 +77,7 @@ end
 Braket.chars(::Type{DoubleExcitationPlus}) = "G2+(ang)"
 Braket.qubit_count(::Type{DoubleExcitationPlus}) = 4
 Base.inv(g::DoubleExcitationPlus) = DoubleExcitationPlus(-g.angle[1])
-Base.:^(g::DoubleExcitationPlus, power::Integer) = power == -1 ? inv(g) : (power == 0 ? DoubleExcitationPlus((0.0,)) : (power < 0 ? inv(g^(-power)) : DoubleExcitationPlus((g.angle[1] * power,))))
+Base.:^(g::DoubleExcitationPlus, power::Integer) = power == -1 ? inv(g) : (iszero(power) ? DoubleExcitationPlus((0.0,)) : (power < 0 ? inv(g^(-power)) : DoubleExcitationPlus((g.angle[1] * power,))))
 function matrix_rep(g::DoubleExcitationPlus)
     cosϕ = cos(g.angle[1] / 2.0)
     sinϕ = sin(g.angle[1] / 2.0)
@@ -129,7 +129,7 @@ end
 Braket.chars(::Type{DoubleExcitationMinus}) = "G2-(ang)"
 Braket.qubit_count(::Type{DoubleExcitationMinus}) = 4
 Base.inv(g::DoubleExcitationMinus) = DoubleExcitationMinus(-g.angle[1])
-Base.:^(g::DoubleExcitationMinus, power::Integer) = power == -1 ? inv(g) : (power == 0 ? DoubleExcitationMinus((0.0,)) : (power < 0 ? inv(g^(-power)) : DoubleExcitationMinus((g.angle[1] * power,))))
+Base.:^(g::DoubleExcitationMinus, power::Integer) = power == -1 ? inv(g) : (iszero(power) ? DoubleExcitationMinus((0.0,)) : (power < 0 ? inv(g^(-power)) : DoubleExcitationMinus((g.angle[1] * power,))))
 function matrix_rep(g::DoubleExcitationMinus)
     cosϕ = cos(g.angle[1] / 2.0)
     sinϕ = sin(g.angle[1] / 2.0)
@@ -177,7 +177,7 @@ end
 Braket.chars(::Type{SingleExcitation}) = "G(ang)"
 Braket.qubit_count(::Type{SingleExcitation}) = 2
 Base.inv(g::SingleExcitation) = SingleExcitation(-g.angle[1])
-Base.:^(g::SingleExcitation, power::Integer) = power == -1 ? inv(g) : (power == 0 ? SingleExcitation((0.0,)) : (power < 0 ? inv(g^(-power)) : SingleExcitation((g.angle[1] * power,))))
+Base.:^(g::SingleExcitation, power::Integer) = power == -1 ? inv(g) : (iszero(power) ? SingleExcitation((0.0,)) : (power < 0 ? inv(g^(-power)) : SingleExcitation((g.angle[1] * power,))))
 function matrix_rep(g::SingleExcitation)
     cosϕ = cos(g.angle[1] / 2.0)
     sinϕ = sin(g.angle[1] / 2.0)
@@ -213,7 +213,7 @@ end
 Braket.chars(::Type{SingleExcitationPlus}) = "G+(ang)"
 Braket.qubit_count(::Type{SingleExcitationPlus}) = 2
 Base.inv(g::SingleExcitationPlus) = SingleExcitationPlus(-g.angle[1])
-Base.:^(g::SingleExcitationPlus, power::Integer) = power == -1 ? inv(g) : (power == 0 ? SingleExcitationPlus((0.0,)) : (power < 0 ? inv(g^(-power)) : SingleExcitationPlus((g.angle[1] * power,))))
+Base.:^(g::SingleExcitationPlus, power::Integer) = power == -1 ? inv(g) : (iszero(power) ? SingleExcitationPlus((0.0,)) : (power < 0 ? inv(g^(-power)) : SingleExcitationPlus((g.angle[1] * power,))))
 function matrix_rep(g::SingleExcitationPlus)
     cosϕ = cos(g.angle[1] / 2.0)
     sinϕ = sin(g.angle[1] / 2.0)
@@ -251,7 +251,7 @@ end
 Braket.chars(::Type{SingleExcitationMinus}) = "G-(ang)"
 Braket.qubit_count(::Type{SingleExcitationMinus}) = 2
 Base.inv(g::SingleExcitationMinus) = SingleExcitationMinus(-g.angle[1])
-Base.:^(g::SingleExcitationMinus, power::Integer) = power == -1 ? inv(g) : (power == 0 ? SingleExcitationMinus((0.0,)) : (power < 0 ? inv(g^(-power)) : SingleExcitationMinus((g.angle[1] * power,))))
+Base.:^(g::SingleExcitationMinus, power::Integer) = power == -1 ? inv(g) : (iszero(power) ? SingleExcitationMinus((0.0,)) : (power < 0 ? inv(g^(-power)) : SingleExcitationMinus((g.angle[1] * power,))))
 function matrix_rep(g::SingleExcitationMinus)
     cosϕ = cos(g.angle[1] / 2.0)
     sinϕ = sin(g.angle[1] / 2.0)
@@ -451,4 +451,3 @@ function matrix_rep(c::Control{MultiQubitPhaseShift{N}, B}) where {N, B}
 end
 
 const custom_gates = (doubleexcitation=DoubleExcitation, singleexcitation=SingleExcitation, multirz=MultiRZ, u=U,) 
-
