@@ -451,3 +451,4 @@ function matrix_rep(c::Control{MultiQubitPhaseShift{N}, B}) where {N, B}
 end
 
 const custom_gates = (doubleexcitation=DoubleExcitation, singleexcitation=SingleExcitation, multirz=MultiRZ, u=U,) 
+
