@@ -2,29 +2,14 @@ convert_targets(::Nothing)       = PythonCall.pybuiltins.None
 convert_targets(ts::Vector{Int}) = pylist(ts)
 
 function inputs_to_jl(x)
-    if pyis(x, pybuiltins.None)
-        return nothing
-    else
-        jl_inputs = map(x.items()) do x_
-            k, v = x_
-            jl_k = pyconvert(String, k)
-            jl_v = pyisinstance(v, pybuiltins.int) ? pyconvert(Int, v) : pyconvert(Float64, v)
-            return jl_k=>jl_v
-        end
-        return Dict(jl_inputs)
+    pyis(x, pybuiltins.None) && return nothing
+    jl_inputs = map(x.items()) do x_
+        k, v = x_
+        jl_k = pyconvert(String, k)
+        jl_v = pyisinstance(v, pybuiltins.int) ? pyconvert(Int, v) : pyconvert(Float64, v)
+        return jl_k=>jl_v
     end
-end
-function jl_convert_oqprogram(t::Type{OpenQasmProgram}, x::Py)
-    bsh    = pyconvert(Braket.braketSchemaHeader, x.braketSchemaHeader)
-    source = pyconvert(String, x.source)
-    inputs = inputs_to_jl(x.inputs) 
-    PythonCall.pyconvert_return(t(bsh, source, inputs))
-end
-
-function jl_convert_bsh(t::Type{Braket.braketSchemaHeader}, x::Py)
-    name    = pyconvert(String, x.name)
-    version = pyconvert(String, x.version)
-    PythonCall.pyconvert_return(t(name, version))
+    return Dict(jl_inputs)
 end
 
 py_obs(o::String) = pylist([pystr(o)])
@@ -60,13 +45,9 @@ function Py(rt::Braket.ResultTypeValue)
     end
     return braket[].task_result.gate_model_task_result_v1.ResultTypeValue(type=py_typ, value=py_val)
 end
-function Py(ir::OpenQasmProgram)
-    py_inputs = isnothing(ir.inputs) ? PythonCall.pybuiltins.None : pydict(ir.inputs)
-    return braket[].ir.openqasm.program_v1.Program(source=pystr(ir.source), inputs=py_inputs)
-end
 
 function Py(r::GateModelTaskResult)
-    py_measurements  = (isnothing(r.measurements) || isempty(r.measurements)) ? PythonCall.pybuiltins.None : pylist(pylist(meas) for meas in r.measurements)
+    py_measurements  = (isnothing(r.measurements) || isempty(r.measurements)) ? PythonCall.pybuiltins.None : pyrowlist(transpose(reduce(hcat, r.measurements)))
     py_probabilities = !isnothing(r.measurementProbabilities) ? pydict(Dict(pystr(k)=>v for (k,v) in r.measurementProbabilities)) : PythonCall.pybuiltins.None
     py_qubits        = !isnothing(r.measuredQubits) ? pylist(r.measuredQubits) : PythonCall.pybuiltins.None
     py_results       = pylist(Py(rtv) for rtv in r.resultTypes)

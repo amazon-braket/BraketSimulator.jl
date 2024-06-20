@@ -1,7 +1,6 @@
 module BraketSimulator
 
-using Braket,
-    Braket.Observables,
+using
     Dates,
     LinearAlgebra,
     StaticArrays,
@@ -11,6 +10,10 @@ using Braket,
     JSON3,
     Random,
     PrecompileTools
+
+@recompile_invalidations begin
+    using Braket, Braket.Observables
+end
 
 import Braket:
     Instruction,
@@ -25,7 +28,6 @@ import Braket:
     simulate,
     device_id,
     bind_value!
-
 
 export StateVector, StateVectorSimulator, DensityMatrixSimulator, evolve!, simulate, U, MultiQubitPhaseShift, MultiRZ
 
@@ -74,7 +76,7 @@ end
 function _bundle_results(
     results::Vector{Braket.ResultTypeValue},
     circuit_ir::Program,
-    simulator::D;
+    simulator::D,
     measured_qubits::Vector{Int} = collect(0:qubit_count(simulator)-1)
 ) where {D<:AbstractSimulator}
     task_mtd = Braket.TaskMetadata(
@@ -113,7 +115,7 @@ end
 function _bundle_results(
     results::Vector{Braket.ResultTypeValue},
     circuit_ir::OpenQasmProgram,
-    simulator::D;
+    simulator::D,
     measured_qubits::Vector{Int} = collect(0:qubit_count(simulator)-1)
 ) where {D<:AbstractSimulator}
     task_mtd = Braket.TaskMetadata(
@@ -157,9 +159,11 @@ function _generate_results(
     result_values = map(result_type -> calculate(result_type, simulator), result_types)
     result_values =
         [val isa Matrix ? Braket.complex_matrix_to_ir(val) : val for val in result_values]
-    return map(zip(results, result_values)) do (result, result_value)
-        Braket.ResultTypeValue(result, result_value)
+    final_results = Vector{Braket.ResultTypeValue}(undef, length(result_values))
+    for r_ix in 1:length(final_results)
+        final_results[r_ix] = Braket.ResultTypeValue(results[r_ix], result_values[r_ix])
     end
+    return final_results
 end
 
 _translate_result_type(r::Braket.IR.Amplitude, qc::Int)     = Braket.Amplitude(r.states)
@@ -199,104 +203,154 @@ function _compute_exact_results(d::AbstractSimulator, program::Program, qc::Int)
     return _generate_results(program.results, result_types, d)
 end
 
-"""
-    simulate(simulator::AbstractSimulator, circuit_ir; shots::Int = 0, kwargs...) -> GateModelTaskResult
+@recompile_invalidations begin
+    """
+        simulate(simulator::AbstractSimulator, circuit_ir; shots::Int = 0, kwargs...) -> GateModelTaskResult
 
-Simulate the evolution of a statevector or density matrix using the passed in `simulator`.
-The instructions to apply (gates and noise channels) and measurements to make are
-encoded in `circuit_ir`. Supported IR formats are `OpenQASMProgram` (OpenQASM3)
-and `Program` (JAQCD). Returns a `GateModelTaskResult` containing the individual shot
-measurements (if `shots > 0`), final calculated results, circuit IR, and metadata
-about the task.
-"""
-function simulate(
-    simulator::AbstractSimulator,
-    circuit_ir::OpenQasmProgram;
-    shots::Int = 0,
-    kwargs...,
-)
-    inputs  = isnothing(circuit_ir.inputs) ? Dict{String, Float64}() : Dict{String, Any}(k=>v for (k,v) in circuit_ir.inputs)
-    circuit = Circuit(circuit_ir.source, inputs)
-    measure_ixs = splice!(circuit.instructions, findall(ix->ix.operator isa Measure, circuit.instructions))
-    if !isempty(measure_ixs)
-        measured_qubits = collect(Iterators.flatten(measure.target for measure in measure_ixs))
-    else
-        measured_qubits = Int[]
-    end
-    if shots > 0
-        observable_map = Dict()
-        for result in circuit.result_types
-            if result isa Braket.ObservableResult
-                result.observable isa Braket.Observables.I && continue
-                observable_qubits = result.targets
-                for qubit in observable_qubits, (target, previously_measured) in observable_map
-                    if qubit ∈ target
-                        # must ensure that target is the same
-                        any(t ∉ observable_qubits for t in target) && throw(ErrorException("Qubit part of incompatible results targets"))
-                        # must ensure observable is the same
-                        typeof(previously_measured) != typeof(result.observable) && throw(ErrorException("Conflicting result types applied to a single qubit"))
-                        # including matrix value for Hermitians
-                        result.observable isa Braket.Observables.HermitianObservable && !isapprox(previously_measured.matrix, result.observable.matrix) && throw(ErrorException("Conflicting result types applied to a single qubit"))
+    Simulate the evolution of a statevector or density matrix using the passed in `simulator`.
+    The instructions to apply (gates and noise channels) and measurements to make are
+    encoded in `circuit_ir`. Supported IR formats are `OpenQASMProgram` (OpenQASM3)
+    and `Program` (JAQCD). Returns a `GateModelTaskResult` containing the individual shot
+    measurements (if `shots > 0`), final calculated results, circuit IR, and metadata
+    about the task.
+    """
+    function simulate(
+        simulator::AbstractSimulator,
+        circuit_ir::OpenQasmProgram,
+        shots::Int = 0;
+        kwargs...,
+    )
+        inputs  = isnothing(circuit_ir.inputs) ? Dict{String, Float64}() : Dict{String, Any}(k=>v for (k,v) in circuit_ir.inputs)
+        circuit = Circuit(circuit_ir.source, inputs)
+        measure_ixs = splice!(circuit.instructions, findall(ix->ix.operator isa Measure, circuit.instructions))
+        if !isempty(measure_ixs)
+            measured_qubits = collect(Iterators.flatten(measure.target for measure in measure_ixs))
+        else
+            measured_qubits = Int[]
+        end
+        if shots > 0
+            observable_map = Dict()
+            for result in circuit.result_types
+                if result isa Braket.ObservableResult
+                    result.observable isa Braket.Observables.I && continue
+                    observable_qubits = result.targets
+                    for qubit in observable_qubits, (target, previously_measured) in observable_map
+                        if qubit ∈ target
+                            # must ensure that target is the same
+                            any(t ∉ observable_qubits for t in target) && throw(ErrorException("Qubit $qubit part of incompatible results targets $target"))
+                            # must ensure observable is the same
+                            typeof(previously_measured) != typeof(result.observable) && throw(ErrorException("Conflicting result types applied to a single qubit"))
+                            # including matrix value for Hermitians
+                            result.observable isa Braket.Observables.HermitianObservable && !isapprox(previously_measured.matrix, result.observable.matrix) && throw(ErrorException("Conflicting result types applied to a single qubit"))
+                        end
                     end
+                    observable_map[observable_qubits] = result.observable
                 end
-                observable_map[observable_qubits] = result.observable
+            end
+            Braket.basis_rotation_instructions!(circuit)
+        end
+        program = Program(circuit) 
+        n_qubits = qubit_count(program)
+        _validate_ir_results_compatibility(simulator, program.results, Val(:JAQCD))
+        _validate_ir_instructions_compatibility(simulator, program, Val(:JAQCD))
+        _validate_shots_and_ir_results(shots, program.results, n_qubits)
+        operations = program.instructions
+        if shots > 0 && !isempty(program.basis_rotation_instructions)
+            operations = vcat(operations, program.basis_rotation_instructions)
+        end
+        _validate_operation_qubits(operations)
+        reinit!(simulator, n_qubits, shots)
+        simulator = evolve!(simulator, operations)
+        analytic_results = shots == 0 && !isnothing(program.results) && !isempty(program.results)
+        results = if analytic_results
+            _compute_exact_results(simulator, program, n_qubits)
+        elseif isnothing(program.results) || isempty(program.results)
+            Braket.ResultTypeValue[]
+        else
+            Braket.ResultTypeValue[Braket.ResultTypeValue(result_type, 0.0) for result_type in program.results]
+        end
+        isempty(measured_qubits) && (measured_qubits = collect(0:n_qubits-1))
+        res = _bundle_results(results, circuit_ir, simulator, measured_qubits)
+        return res
+    end
+
+    function simulate(
+        simulator::AbstractSimulator,
+        circuit_ir::Program,
+        qubit_count::Int,
+        shots::Int;
+        kwargs...,
+    )
+        _validate_ir_results_compatibility(simulator, circuit_ir.results, Val(:JAQCD))
+        _validate_ir_instructions_compatibility(simulator, circuit_ir, Val(:JAQCD))
+        _validate_shots_and_ir_results(shots, circuit_ir.results, qubit_count)
+        operations::Vector{Instruction} = circuit_ir.instructions
+        if shots > 0 && !isnothing(circuit_ir.basis_rotation_instructions) && !isempty(circuit_ir.basis_rotation_instructions)
+            operations = vcat(operations, circuit_ir.basis_rotation_instructions)
+        end
+        inputs = get(kwargs, :inputs, Dict{String,Float64}())
+        symbol_inputs = Dict{Symbol,Number}(Symbol(k) => v for (k, v) in inputs)
+        operations = [bind_value!(Instruction(operation), symbol_inputs) for operation in operations]
+        _validate_operation_qubits(operations)
+        reinit!(simulator, qubit_count, shots)
+        simulator = evolve!(simulator, operations)
+        analytic_results = shots == 0 && !isnothing(circuit_ir.results) && !isempty(circuit_ir.results)
+        results = if analytic_results
+            _compute_exact_results(simulator, circuit_ir, qubit_count)
+        else
+            Braket.ResultTypeValue[]
+        end
+        measured_qubits = get(kwargs, :measured_qubits, collect(0:qubit_count-1))
+        isempty(measured_qubits) && (measured_qubits = collect(0:qubit_count-1))
+        res = _bundle_results(results, circuit_ir, simulator, measured_qubits)
+        return res
+    end
+    simulate(simulator::AbstractSimulator, circuit_ir::Program, shots::Int; kwargs...) = simulate(simulator, circuit_ir, qubit_count(circuit_ir), shots; kwargs...)
+    function simulate(simulator::AbstractSimulator,
+                      task_specs::Vector{<:Union{Program, OpenQasmProgram}},
+                      shots::Int;
+                      max_parallel::Int=-1,
+                      inputs::Union{Vector{Dict{String, Float64}}, Dict{String, Float64}} = Dict{String, Float64}(),
+                      kwargs...
+                     )
+        is_single_task  = length(task_specs) == 1
+        is_single_input = inputs isa Dict{String, Float64} || length(inputs) == 1
+        if is_single_input
+            is_single_task && return simulate(d, only(task_specs), shots; inputs=inputs, kwargs...)
+            if inputs isa Dict{String, Float64}
+                inputs = [deepcopy(inputs) for ix in 1:length(task_specs)]
+            else
+                inputs = [deepcopy(only(inputs)) for ix in 1:length(task_specs)]
             end
         end
-        Braket.basis_rotation_instructions!(circuit)
+        !is_single_task && !is_single_input && length(task_specs) != length(inputs) && throw(ArgumentError("number of inputs ($(length(inputs))) and task specifications ($(length(task_specs))) must be equal."))
+        tasks_and_inputs = zip(1:length(task_specs), task_specs, inputs)
+        todo_tasks_ch = Channel(length(tasks_and_inputs))
+        for (ix, spec, input) in tasks_and_inputs
+            put!(todo_tasks_ch, (ix, spec, input))
+        end
+        sims     = Channel(Inf)
+        foreach(i -> put!(sims, copy(simulator)), 1:max(Threads.nthreads(), length(task_specs)))
+        n_task_threads = min(32, length(task_specs))
+        done_tasks_ch = Channel(length(tasks_and_inputs)) do ch
+            function task_processor(input_tup)
+                ix, spec, input = input_tup
+                sim = take!(sims)
+                res = simulate(sim, spec, shots; inputs=input, kwargs...)
+                put!(ch, (ix, res))
+                put!(sims, sim)
+            end
+            Threads.foreach(task_processor, todo_tasks_ch, ntasks=n_task_threads)
+        end
+	    r_ix = 1
+	    results = Vector{Braket.GateModelTaskResult}(undef, length(task_specs))
+	    while r_ix <= length(task_specs)
+            ix, res = take!(done_tasks_ch)
+            results[ix] = res
+            r_ix += 1
+	    end
+        return results
     end
-    program = Program(circuit) 
-    n_qubits = qubit_count(program)
-    _validate_ir_results_compatibility(simulator, program.results, Val(:JAQCD))
-    _validate_ir_instructions_compatibility(simulator, program, Val(:JAQCD))
-    _validate_shots_and_ir_results(shots, program.results, n_qubits)
-    operations = program.instructions
-    if shots > 0 && !isempty(program.basis_rotation_instructions)
-        operations = vcat(operations, program.basis_rotation_instructions)
-    end
-    _validate_operation_qubits(operations)
-    reinit!(simulator, n_qubits, shots)
-    stats = @timed begin
-        simulator = evolve!(simulator, operations)
-    end
-    @debug "Time for evolution: $(stats.time)"
-    results = shots == 0 && !isempty(program.results) ? _compute_exact_results(simulator, program, n_qubits) : [Braket.ResultTypeValue(result_type, 0.0) for result_type in program.results]
-    isempty(measured_qubits) && (measured_qubits = collect(0:n_qubits-1))
-    stats   = @timed _bundle_results(results, circuit_ir, simulator; measured_qubits=measured_qubits)
-    @debug "Time for results bundling: $(stats.time)"
-    res = stats.value
-    return res
-end
-
-function simulate(
-    simulator::AbstractSimulator,
-    circuit_ir::Program,
-    qubit_count::Int;
-    shots::Int = 0,
-    kwargs...,
-)
-    _validate_ir_results_compatibility(simulator, circuit_ir.results, Val(:JAQCD))
-    _validate_ir_instructions_compatibility(simulator, circuit_ir, Val(:JAQCD))
-    _validate_shots_and_ir_results(shots, circuit_ir.results, qubit_count)
-    operations::Vector{Instruction} = circuit_ir.instructions
-    if shots > 0 && !isnothing(circuit_ir.basis_rotation_instructions) && !isempty(circuit_ir.basis_rotation_instructions)
-        operations = vcat(operations, circuit_ir.basis_rotation_instructions)
-    end
-    inputs = get(kwargs, :inputs, Dict{String,Float64}())
-    symbol_inputs = Dict{Symbol,Number}(Symbol(k) => v for (k, v) in inputs)
-    operations = [bind_value!(Instruction(operation), symbol_inputs) for operation in operations]
-    _validate_operation_qubits(operations)
-    reinit!(simulator, qubit_count, shots)
-    stats = @timed begin
-        simulator = evolve!(simulator, operations)
-    end
-    @debug "Time for evolution: $(stats.time)"
-    results = shots == 0 && !isempty(circuit_ir.results) ? _compute_exact_results(simulator, circuit_ir, qubit_count) : Braket.ResultTypeValue[]
-    measured_qubits = get(kwargs, :measured_qubits, collect(0:qubit_count-1))
-    isempty(measured_qubits) && (measured_qubits = collect(0:qubit_count-1))
-    stats = @timed _bundle_results(results, circuit_ir, simulator; measured_qubits=measured_qubits)
-    @debug "Time for results bundling: $(stats.time)"
-    res = stats.value
-    return res
 end
 
 include("observables.jl")
@@ -304,7 +358,6 @@ include("result_types.jl")
 include("properties.jl")
 include("sv_simulator.jl")
 include("dm_simulator.jl")
-#include("precompile.jl")
 
 function __init__()
     Braket._simulator_devices[]["braket_dm_v2"] =
@@ -428,19 +481,22 @@ end
         using Braket, BraketSimulator, BraketSimulator.Quasar
         simulator = StateVectorSimulator(5, 0)
         oq3_program = Braket.OpenQasmProgram(Braket.header_dict[Braket.OpenQasmProgram], custom_qasm, nothing)
-        simulate(simulator, oq3_program, shots=100)
+        simulate(simulator, oq3_program, 100)
         
         simulator = DensityMatrixSimulator(2, 0)
         oq3_program = Braket.OpenQasmProgram(Braket.header_dict[Braket.OpenQasmProgram], noise_qasm, nothing)
-        simulate(simulator, oq3_program, shots=100)
+        simulate(simulator, oq3_program, 100)
+        simulate(simulator, [oq3_program, oq3_program], 100)
         
         simulator = StateVectorSimulator(3, 0)
         oq3_program = Braket.OpenQasmProgram(Braket.header_dict[Braket.OpenQasmProgram], unitary_qasm, nothing)
-        simulate(simulator, oq3_program, shots=100)
+        simulate(simulator, oq3_program, 100)
+        
+        simulate(simulator, [oq3_program, oq3_program], 100)
         
         simulator = StateVectorSimulator(6, 0)
         oq3_program = Braket.OpenQasmProgram(Braket.header_dict[Braket.OpenQasmProgram], sv_adder_qasm, Dict("a_in"=>3, "b_in"=>7))
-        simulate(simulator, oq3_program, shots=0)
+        simulate(simulator, oq3_program, 0)
     end
 end
 

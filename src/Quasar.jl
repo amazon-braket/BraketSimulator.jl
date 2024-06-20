@@ -490,7 +490,7 @@ function parse_list_expression(tokens::Vector{Tuple{Int64, Int32, Token}}, stack
     if length(expr_list) == 1
         return only(expr_list)
     else
-        return QasmExpression(:array_literal, expr_list...)
+        return QasmExpression(:array_literal, expr_list)
     end
 end
 
@@ -1842,6 +1842,8 @@ function (v::AbstractVisitor)(program_expr::QasmExpression)
             end
         elseif pragma_type == :verbatim
         end
+    elseif head(program_expr) == :measure
+        evaluate(v, program_expr)
     elseif head(program_expr) == :output
         throw(QasmVisitorError("Output not supported."))
     else
@@ -1946,6 +1948,7 @@ end
 
         // unitary pragma for ccnot gate
         #pragma braket unitary([[1.0, 0, 0, 0, 0, 0, 0, 0], [0, 1.0, 0, 0, 0, 0, 0, 0], [0, 0, 1.0, 0, 0, 0, 0, 0], [0, 0, 0, 1.0, 0, 0, 0, 0], [0, 0, 0, 0, 1.0, 0, 0, 0], [0, 0, 0, 0, 0, 1.0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 1.0], [0, 0, 0, 0, 0, 0, 1.0, 0]]) q
+        measure q;
         """
     @compile_workload begin
         using Braket, BraketSimulator, BraketSimulator.Quasar
