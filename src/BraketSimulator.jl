@@ -316,7 +316,7 @@ end
         is_single_task  = length(task_specs) == 1
         is_single_input = inputs isa Dict{String, Float64} || length(inputs) == 1
         if is_single_input
-            is_single_task && return simulate(d, only(task_specs), shots; inputs=inputs, kwargs...)
+            is_single_task && return simulate(simulator, only(task_specs), shots; inputs=inputs, kwargs...)
             if inputs isa Dict{String, Float64}
                 inputs = [deepcopy(inputs) for ix in 1:length(task_specs)]
             else

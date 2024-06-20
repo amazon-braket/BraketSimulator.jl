@@ -1284,7 +1284,7 @@ get_tol(shots::Int) = return (
         circuit    = Circuit(qasm)
         program    = Braket.Program(circuit)
         simulation = BraketSimulator.StateVectorSimulator(2, 0)
-        @test_throws BraketSimulator.ValidationError simulate(simulation, program, 2)
+        @test_throws BraketSimulator.ValidationError simulate(simulation, program, 2, 0)
     end
     @testset "Parsing Hermitian observables" begin
         three_qubit_circuit(

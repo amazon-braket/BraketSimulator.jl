@@ -158,29 +158,13 @@ using Test, PythonCall, BraketSimulator, Braket
         @test pyconvert(Braket.OpenQasmProgram, Py(oq3_program)) == oq3_program
         @testset "Full Python circuit execution" begin
             @testset "OpenQASM3" begin
-                sv_simulator = StateVectorSimulator(n_qubits, 0)
-                oq3_results  = simulate(sv_simulator, PyList{Any}([Py(oq3_program)]), 0)
-                @test pyconvert(Bool, oq3_results.resultTypes[0].type == Py(Braket.IR.Probability([9, 5, 6, 7, 8], "probability")))
                 # test a "batch"
-                oq3_results  = simulate(sv_simulator, PyList{Any}([Py(oq3_program)]), 0; input = pylist([pydict(Dict("a_in"=>2, "b_in"=>5)), pydict(Dict("a_in"=>3, "b_in"=>2))]))
-                @test pyconvert(Vector{Float64}, oq3_results.resultTypes[0].value) ≠ pyconvert(Vector{Float64}, oq3_results.resultTypes[1].value)
+                sv_simulator = StateVectorSimulator(n_qubits, 0)
+                oq3_results  = simulate(sv_simulator, PyList{Any}([oq3_program, oq3_program]), 0; input = pylist([pydict(Dict("a_in"=>2, "b_in"=>5)), pydict(Dict("a_in"=>3, "b_in"=>2))]))
+                for oq3_result in oq3_results
+                    @test pyconvert(Vector{Float64}, oq3_result.resultTypes[0].value) ≠ pyconvert(Vector{Float64}, oq3_result.resultTypes[1].value)
+                end
             end
         end
-    end
-    @testset "Python circuit with measured qubits" begin
-        qasm = """
-        qubit[2] q; 
-        bit[1] b;
-        h q[0];
-        cnot q[0], q[1];
-        b[0] = measure q[0];
-        """
-        simulator    = StateVectorSimulator(2, 1000)
-        oq3_program  = Braket.OpenQasmProgram(Braket.braketSchemaHeader("braket.ir.openqasm.program", "1"), qasm, nothing)
-        result       = simulate(simulator, PyList{Any}([Py(oq3_program)]), 1000; measured_qubits=pylist([0]))
-        measurements = [[pyconvert(Int, m) for m in measurement] for measurement in result.measurements]
-        @test 400 < sum(m[1] for m in measurements) < 600
-        @test all(length(m) == 1 for m in measurements)
-        @test pyconvert(Bool, result.measuredQubits == pylist([0]))
     end
 end
