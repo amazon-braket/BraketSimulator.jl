@@ -299,7 +299,6 @@ function simulate(
     stats   = @timed _bundle_results(results, circuit_ir, simulator; measured_qubits=measured_qubits)
     @debug "Time for results bundling: $(stats.time)"
     res = stats.value
-    flush(stdout)
     return res
 >>>>>>> 113cca4 (change: adding error types)
 end
