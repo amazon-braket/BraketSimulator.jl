@@ -845,8 +845,14 @@ function parse_qasm(clean_tokens::Vector{Tuple{Int64, Int32, Token}}, qasm::Stri
                     states = parse_list_expression(pragma_tokens, stack, start, qasm)
                     push!(expr, :amplitude, states)
                 elseif result_type ∈ ("expectation", "variance", "sample")
-                    obs, targets = parse_pragma_observables(pragma_tokens, stack, start, qasm)
-                    push!(expr, Symbol(result_type), obs, targets)
+                    try
+                        obs, targets = parse_pragma_observables(pragma_tokens, stack, start, qasm)
+                        push!(expr, Symbol(result_type), obs, targets)
+                    catch
+                        throw(QasmVisitorError("Invalid observable specified for '$result_type' result.", "ValueError"))
+                    end
+                elseif result_type == "adjoint_gradient"
+                    throw(QasmVisitorError("Result type adjoint_gradient is not supported.", "TypeError"))
                 end
             elseif pragma_type == "unitary"
                 push!(expr, :unitary)
@@ -1042,6 +1048,7 @@ FunctionDefinition(name::String, arguments::QasmExpression, body::QasmExpression
 
 struct QasmVisitorError <: Exception
     message::String
+    python_exception::String
 end
 function Base.showerror(io::IO, err::QasmVisitorError)
     print(io, "QasmVisitorError: ")
@@ -1431,10 +1438,12 @@ function evaluate_qubits(v::AbstractVisitor, qubit_targets)::Vector{Int}
     qubits = Iterators.flatmap(qubit_targets) do qubit_expr
         if head(qubit_expr) == :identifier
             qubit_name = name(qubit_expr)
+            haskey(mapping, qubit_name) || throw(QasmVisitorError("Missing input variable '$qubit_name'.", "NameError"))
             return mapping[qubit_name]
         elseif head(qubit_expr) == :indexed_identifier
             qubit_name = name(qubit_expr)
             qubit_ix   = evaluate(v, qubit_expr.args[2])
+            haskey(mapping, qubit_name * "[$qubit_ix]") || throw(QasmVisitorError("Invalid qubit index '$qubit_ix' in '$qubit_name'.", "IndexError"))
             return Iterators.flatten(mapping[qubit_name * "[$rq]"] for rq in qubit_ix)
         elseif head(qubit_expr) == :array_literal
             return evaluate_qubits(v, qubit_expr.args)
@@ -1574,6 +1583,7 @@ function (v::AbstractVisitor)(program_expr::QasmExpression)
     elseif head(program_expr) == :input
         var_name = name(program_expr)
         var_type = program_expr.args[1].args[1]
+        haskey(v.inputs, var_name) || throw(QasmVisitorError("Missing input variable '$var_name'.", "NameError"))
         var      = ClassicalVariable(var_name, var_type, v.inputs[var_name], true)
         v.classical_defs[var_name] = var
         return v
