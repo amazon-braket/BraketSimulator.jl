@@ -11,15 +11,23 @@ This gate performs an SO(2) rotation in the subspace {|1100⟩, |0011⟩}, trans
 # Examples
 
 ```jldoctest
+
+julia> using BraketSimulator
+
 julia> ϕ = 3.56;
-julia> gate_matrix = DoubleExcitation(ϕ);
-julia> m  = matrix_rep(gate_matrix);
+
+julia> gate_matrix =  BraketSimulator.DoubleExcitation(ϕ);
+
+julia> m  = BraketSimulator.matrix_rep(gate_matrix);
+
 julia> eq1 = m * [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
 julia> eq2 = m * [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0];
-julia> eq1 ==  [0, 0, 0, cos(ϕ/2), 0, 0, 0, 0, 0, 0, 0, 0, sin(ϕ/2), 0, 0, 0]
-true
-julia> eq2 ==  [0, 0, 0, -sin(ϕ/2), 0, 0, 0, 0, 0, 0, 0, 0, cos(ϕ/2), 0, 0, 0]
-true
+
+julia> eq1 ==  [0, 0, 0, cos(ϕ/2), 0, 0, 0, 0, 0, 0, 0, 0, sin(ϕ/2), 0, 0, 0] == true;
+
+julia> eq2 ==  [0, 0, 0, -sin(ϕ/2), 0, 0, 0, 0, 0, 0, 0, 0, cos(ϕ/2), 0, 0, 0] == true;
+
 ```
 """
 struct DoubleExcitation <: AngledGate{1}
@@ -30,7 +38,7 @@ end
 Braket.chars(::Type{DoubleExcitation}) = "G2(ang)"
 Braket.qubit_count(::Type{DoubleExcitation}) = 4
 Base.inv(g::DoubleExcitation) = DoubleExcitation(-g.angle[1])
-Base.:^(g::DoubleExcitation, power::Integer) = power == -1 ? inv(g) : (iszero(power) ? DoubleExcitation((0.0,)) : (power < 0 ? inv(g^(-power)) : DoubleExcitation((g.angle[1] * power,))))
+Base.:^(g::DoubleExcitation, power::Integer) = power == -1 ? inv(g) : (iszero(power) ? Braket.I() : (power < 0 ? inv(g^(-power)) : DoubleExcitation((g.angle[1] * power,))))
 function matrix_rep(g::DoubleExcitation)
     cosϕ = cos(g.angle[1] / 2.0)
     sinϕ = sin(g.angle[1] / 2.0)
@@ -56,16 +64,25 @@ This gate performs an SO(2) rotation in the subspace {|1100⟩, |0011⟩} with a
 
 # Examples
 
+
 ```jldoctest
+
+julia> using BraketSimulator
+
 julia> ϕ = 3.56;
-julia> gate_matrix = DoubleExcitationPlus(ϕ);
-julia> m  = matrix_rep(gate_matrix);
+
+julia> gate_matrix = BraketSimulator.DoubleExcitationPlus(ϕ);
+
+julia> m  = BraketSimulator.matrix_rep(gate_matrix);
+
 julia> eq1 = m * [1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
+
 julia> eq2 = m * [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1];
-julia> eq1 ==  [exp(im*ϕ/2), 0, 0, cos(ϕ/2), 0, 0, 0, 0, 0, 0, 0, 0, sin(ϕ/2), 0, 0, exp(im*ϕ/2)]
-true
-julia> eq2 ==  [exp(im*ϕ/2), 0, 0, -sin(ϕ/2), 0, 0, 0, 0, 0, 0, 0, 0, cos(ϕ/2), 0, 0, exp(im*ϕ/2)]
-true
+
+julia> eq1 ==  [exp(im*ϕ/2), 0, 0, cos(ϕ/2), 0, 0, 0, 0, 0, 0, 0, 0, sin(ϕ/2), 0, 0, exp(im*ϕ/2)] == true;
+
+julia> eq2 ==  [exp(im*ϕ/2), 0, 0, -sin(ϕ/2), 0, 0, 0, 0, 0, 0, 0, 0, cos(ϕ/2), 0, 0, exp(im*ϕ/2)] == true;
+
 ```
 
 """
@@ -77,7 +94,7 @@ end
 Braket.chars(::Type{DoubleExcitationPlus}) = "G2+(ang)"
 Braket.qubit_count(::Type{DoubleExcitationPlus}) = 4
 Base.inv(g::DoubleExcitationPlus) = DoubleExcitationPlus(-g.angle[1])
-Base.:^(g::DoubleExcitationPlus, power::Integer) = power == -1 ? inv(g) : (iszero(power) ? DoubleExcitationPlus((0.0,)) : (power < 0 ? inv(g^(-power)) : DoubleExcitationPlus((g.angle[1] * power,))))
+Base.:^(g::DoubleExcitationPlus, power::Integer) = power == -1 ? inv(g) : (iszero(power) ? Braket.I() : (power < 0 ? inv(g^(-power)) : DoubleExcitationPlus((g.angle[1] * power,))))
 function matrix_rep(g::DoubleExcitationPlus)
     cosϕ = cos(g.angle[1] / 2.0)
     sinϕ = sin(g.angle[1] / 2.0)
@@ -109,15 +126,23 @@ This gate performs an SO(2) rotation in the subspace {|1100⟩, |0011⟩} with a
 # Examples
 
 ```jldoctest
+
+julia> using BraketSimulator
+
 julia> ϕ = 3.56;
-julia> gate_matrix = DoubleExcitationMinus(ϕ);
-julia> m  = matrix_rep(gate_matrix);
+
+julia> gate_matrix = BraketSimulator.DoubleExcitationMinus(ϕ);
+
+julia> m  = BraketSimulator.matrix_rep(gate_matrix);
+
 julia> eq1 = m * [1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
+
 julia> eq2 = m * [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1];
-julia> eq1 ==  [exp(-im*ϕ/2), 0, 0, cos(ϕ/2), 0, 0, 0, 0, 0, 0, 0, 0, sin(ϕ/2), 0, 0, exp(-im*ϕ/2)]
-true
-julia> eq2 ==  [exp(-im*ϕ/2), 0, 0, -sin(ϕ/2), 0, 0, 0, 0, 0, 0, 0, 0, cos(ϕ/2), 0, 0, exp(-im*ϕ/2)]
-true
+
+julia> eq1 ==  [exp(-im*ϕ/2), 0, 0, cos(ϕ/2), 0, 0, 0, 0, 0, 0, 0, 0, sin(ϕ/2), 0, 0, exp(-im*ϕ/2)] == true;
+
+julia> eq2 ==  [exp(-im*ϕ/2), 0, 0, -sin(ϕ/2), 0, 0, 0, 0, 0, 0, 0, 0, cos(ϕ/2), 0, 0, exp(-im*ϕ/2)] == true;
+
 ```
 
 """
@@ -129,7 +154,7 @@ end
 Braket.chars(::Type{DoubleExcitationMinus}) = "G2-(ang)"
 Braket.qubit_count(::Type{DoubleExcitationMinus}) = 4
 Base.inv(g::DoubleExcitationMinus) = DoubleExcitationMinus(-g.angle[1])
-Base.:^(g::DoubleExcitationMinus, power::Integer) = power == -1 ? inv(g) : (iszero(power) ? DoubleExcitationMinus((0.0,)) : (power < 0 ? inv(g^(-power)) : DoubleExcitationMinus((g.angle[1] * power,))))
+Base.:^(g::DoubleExcitationMinus, power::Integer) = power == -1 ? inv(g) : (iszero(power) ? Braket.I() : (power < 0 ? inv(g^(-power)) : DoubleExcitationMinus((g.angle[1] * power,))))
 function matrix_rep(g::DoubleExcitationMinus)
     cosϕ = cos(g.angle[1] / 2.0)
     sinϕ = sin(g.angle[1] / 2.0)
@@ -158,16 +183,25 @@ This gate performs a rotation in the subspace {|01⟩, |10⟩}.
 # Examples
 
 ```jldoctest
+
+julia> using BraketSimulator
+
 julia> ϕ = 3.56;
-julia> gate_matrix = SingleExcitation(ϕ);
-julia> m  = matrix_rep(gate_matrix);
+
+julia> gate_matrix = BraketSimulator.SingleExcitation(ϕ);
+
+julia> m  = BraketSimulator.matrix_rep(gate_matrix);
+
 julia> eq1 = m * [0, 1, 0, 0];
+
 julia> eq2 = m * [0, 0, 1, 0];
-julia> eq1 == [0, cos(ϕ/2), - sin(ϕ/2), 0]
-true 
-julia> eq2 == [0, sin(ϕ/2), cos(ϕ/2), 0]
-true
+
+julia> eq1 == [0, cos(ϕ/2), - sin(ϕ/2), 0] == true;
+ 
+julia> eq2 == [0, sin(ϕ/2), cos(ϕ/2), 0] == true;
+
 ```
+
 """
 struct SingleExcitation <: AngledGate{1}
     angle::NTuple{1,Union{Float64,FreeParameter}}
@@ -177,7 +211,7 @@ end
 Braket.chars(::Type{SingleExcitation}) = "G(ang)"
 Braket.qubit_count(::Type{SingleExcitation}) = 2
 Base.inv(g::SingleExcitation) = SingleExcitation(-g.angle[1])
-Base.:^(g::SingleExcitation, power::Integer) = power == -1 ? inv(g) : (iszero(power) ? SingleExcitation((0.0,)) : (power < 0 ? inv(g^(-power)) : SingleExcitation((g.angle[1] * power,))))
+Base.:^(g::SingleExcitation, power::Integer) = power == -1 ? inv(g) : (iszero(power) ? Braket.I() : (power < 0 ? inv(g^(-power)) : SingleExcitation((g.angle[1] * power,))))
 function matrix_rep(g::SingleExcitation)
     cosϕ = cos(g.angle[1] / 2.0)
     sinϕ = sin(g.angle[1] / 2.0)
@@ -194,16 +228,25 @@ This gate performs a rotation in the subspace {|01⟩, |10⟩} with a phase-shif
 # Examples
 
 ```jldoctest
+
+julia> using BraketSimulator
+
 julia> ϕ = 3.56;
-julia> gate_matrix = SingleExcitationPlus(ϕ);
-julia> m  = matrix_rep(gate_matrix);
+
+julia> gate_matrix = BraketSimulator.SingleExcitationPlus(ϕ);
+
+julia> m  = BraketSimulator.matrix_rep(gate_matrix);
+
 julia> eq1 = m * [1, 1, 0, 0];
+
 julia> eq2 = m * [1, 0, 1, 0];
-julia> eq1 == [exp(im*ϕ/2), cos(ϕ/2), - sin(ϕ/2), 0]
-true 
-julia> eq2 == [exp(im*ϕ/2), sin(ϕ/2), cos(ϕ/2), 0]
-true
+
+julia> eq1 == [exp(im*ϕ/2), cos(ϕ/2), - sin(ϕ/2), 0] == true; 
+
+julia> eq2 == [exp(im*ϕ/2), sin(ϕ/2), cos(ϕ/2), 0] == true;
+
 ```
+
 """
 struct SingleExcitationPlus <: AngledGate{1}
     angle::NTuple{1,Union{Float64,FreeParameter}}
@@ -213,7 +256,7 @@ end
 Braket.chars(::Type{SingleExcitationPlus}) = "G+(ang)"
 Braket.qubit_count(::Type{SingleExcitationPlus}) = 2
 Base.inv(g::SingleExcitationPlus) = SingleExcitationPlus(-g.angle[1])
-Base.:^(g::SingleExcitationPlus, power::Integer) = power == -1 ? inv(g) : (iszero(power) ? SingleExcitationPlus((0.0,)) : (power < 0 ? inv(g^(-power)) : SingleExcitationPlus((g.angle[1] * power,))))
+Base.:^(g::SingleExcitationPlus, power::Integer) = power == -1 ? inv(g) : (iszero(power) ? Braket.I() : (power < 0 ? inv(g^(-power)) : SingleExcitationPlus((g.angle[1] * power,))))
 function matrix_rep(g::SingleExcitationPlus)
     cosϕ = cos(g.angle[1] / 2.0)
     sinϕ = sin(g.angle[1] / 2.0)
@@ -231,15 +274,23 @@ This gate performs a rotation in the subspace {|01⟩, |10⟩} with a phase-shif
 # Examples
 
 ```jldoctest
+
+julia> using BraketSimulator
+
 julia> ϕ = 3.56;
-julia> gate_matrix = SingleExcitationMinus(ϕ);
-julia> m  = matrix_rep(gate_matrix);
+
+julia> gate_matrix = BraketSimulator.SingleExcitationMinus(ϕ);
+
+julia> m  = BraketSimulator.matrix_rep(gate_matrix);
+
 julia> eq1 = m * [1, 1, 0, 0];
+
 julia> eq2 = m * [1, 0, 1, 0];
-julia> eq1 == [exp(-im*ϕ/2), cos(ϕ/2), - sin(ϕ/2), 0]
-true 
-julia> eq2 == [exp(-im*ϕ/2), sin(ϕ/2), cos(ϕ/2), 0]
-true
+
+julia> eq1 == [exp(-im*ϕ/2), cos(ϕ/2), - sin(ϕ/2), 0] == true;
+
+julia> eq2 == [exp(-im*ϕ/2), sin(ϕ/2), cos(ϕ/2), 0] == true;
+
 ```
 
 """
@@ -251,7 +302,7 @@ end
 Braket.chars(::Type{SingleExcitationMinus}) = "G-(ang)"
 Braket.qubit_count(::Type{SingleExcitationMinus}) = 2
 Base.inv(g::SingleExcitationMinus) = SingleExcitationMinus(-g.angle[1])
-Base.:^(g::SingleExcitationMinus, power::Integer) = power == -1 ? inv(g) : (iszero(power) ? SingleExcitationMinus((0.0,)) : (power < 0 ? inv(g^(-power)) : SingleExcitationMinus((g.angle[1] * power,))))
+Base.:^(g::SingleExcitationMinus, power::Integer) = power == -1 ? inv(g) : (iszero(power) ? Braket.I() : (power < 0 ? inv(g^(-power)) : SingleExcitationMinus((g.angle[1] * power,))))
 function matrix_rep(g::SingleExcitationMinus)
     cosϕ = cos(g.angle[1] / 2.0)
     sinϕ = sin(g.angle[1] / 2.0)
@@ -274,22 +325,33 @@ This gate performs a rotation in adjacent fermionic modes under the Jordan-Wigne
 # Examples
 
 ```jldoctest
+
+julia> using BraketSimulator
+
 julia> ϕ = 3.56;
-julia> gate_matrix =  FermionicSWAP(ϕ);
-julia> m  = matrix_rep(gate_matrix);
+
+julia> gate_matrix = BraketSimulator.FermionicSWAP(ϕ);
+
+julia> m  = BraketSimulator.matrix_rep(gate_matrix);
+
 julia> eq1 = m * [0, 0, 0, 0];
+
 julia> eq2 = m * [0, 1, 0, 0];
+
 julia> eq3 = m * [0, 0, 1, 0];
+
 julia> eq4 = m * [0, 0, 0, 1];
-julia> eq1 == [0, 0, 0, 0]
-true 
-julia> eq2 == [0, exp(im*ϕ/2.0)*cos(ϕ / 2.0), - im*exp(im*ϕ/2.0)*sin(ϕ/2.0), 0]
-true
-julia> eq3 == [0, - im*exp(im*ϕ/2.0)*sin(ϕ/2.0), exp(im*ϕ/2.0)*cos(ϕ/2.0), 0]
-true
-julia> eq4 == [0, 0, 0, exp(im * ϕ)]
-true
+
+julia> eq1 == [0, 0, 0, 0] == true;
+ 
+julia> eq2 == [0, exp(im*ϕ/2.0)*cos(ϕ / 2.0), - im*exp(im*ϕ/2.0)*sin(ϕ/2.0), 0] == true;
+
+julia> eq3 == [0, - im*exp(im*ϕ/2.0)*sin(ϕ/2.0), exp(im*ϕ/2.0)*cos(ϕ/2.0), 0] == true;
+
+julia> eq4 == [0, 0, 0, exp(im * ϕ)] == true;
+
 ```
+
 """
 struct FermionicSWAP <: AngledGate{1}
     angle::NTuple{1,Union{Float64,FreeParameter}}
@@ -299,7 +361,7 @@ end
 Braket.chars(::Type{FermionicSWAP}) = "FSWAP(ang)"
 Braket.qubit_count(::Type{FermionicSWAP}) = 2
 Base.inv(g::FermionicSWAP) = FermionicSWAP(-g.angle[1])
-Base.:^(g::FermionicSWAP, power::Integer) = power == -1 ? inv(g) : (power == 0 ? FermionicSWAP((0.0,)) : (power < 0 ? inv(g^(-power)) : FermionicSWAP((g.angle[1] * power,))))
+Base.:^(g::FermionicSWAP, power::Integer) = power == -1 ? inv(g) : (power == 0 ? Braket.I() : (power < 0 ? inv(g^(-power)) : FermionicSWAP((g.angle[1] * power,))))
 function matrix_rep(g::FermionicSWAP)
     cosϕ = cos(g.angle[1] / 2.0)
     sinϕ = sin(g.angle[1] / 2.0)
