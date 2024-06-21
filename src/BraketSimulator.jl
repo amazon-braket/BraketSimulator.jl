@@ -29,7 +29,7 @@ import Braket:
     device_id,
     bind_value!
 
-export StateVector, StateVectorSimulator, DensityMatrixSimulator, evolve!, simulate, U, MultiQubitPhaseShift, MultiRZ
+export StateVectorSimulator, DensityMatrixSimulator, evolve!, simulate, U, MultiQubitPhaseShift, MultiRZ
 
 const StateVector{T} = Vector{T}
 const DensityMatrix{T} = Matrix{T}
