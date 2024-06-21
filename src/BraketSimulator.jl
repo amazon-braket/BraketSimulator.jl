@@ -331,7 +331,8 @@ end
         end
         sims     = Channel(Inf)
         foreach(i -> put!(sims, copy(simulator)), 1:max(Threads.nthreads(), length(task_specs)))
-        n_task_threads = min(32, length(task_specs))
+        max_parallel_threads = max_parallel > 0 ? max_parallel : 32
+        n_task_threads = min(max_parallel_threads, length(task_specs))
         done_tasks_ch = Channel(length(tasks_and_inputs)) do ch
             function task_processor(input_tup)
                 ix, spec, input = input_tup

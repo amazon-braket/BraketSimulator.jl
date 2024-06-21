@@ -540,6 +540,7 @@ function parse_literal(tokens::Vector{Tuple{Int64, Int32, Token}}, stack, start,
     else
         return QasmExpression(:integer_literal, raw_literal)
     end
+    throw(QasmParseError("unable to parse literal", stack, start, qasm)) 
 end
 
 function parse_qubit_declaration(tokens::Vector{Tuple{Int64, Int32, Token}}, stack, start, qasm)
@@ -1178,7 +1179,10 @@ Base.push!(v::AbstractVisitor, rt::Result)    = push!(parent(v), rt)
 Base.push!(v::QasmProgramVisitor, rt::Result) = push!(v.results, rt)
 
 function generate_gate_body(v::AbstractVisitor, argument_names::Vector{String}, qubits::Vector{String}, raw_expressions::QasmExpression)
-    params = Dict(arg=>FreeParameter(arg) for arg in argument_names)
+    params = Dict{String, FreeParameter}()
+    for arg in argument_names
+        params[arg] = FreeParameter(arg)
+    end
     qubit_defs    = Dict(q=>Qubit(q, 1) for q in qubits)
     qubit_mapping = Dict(qubits[ix+1]=>[ix] for ix in 0:length(qubits)-1)
     for ix in 0:length(qubits)-1
@@ -1464,7 +1468,7 @@ function process_gate_arguments(v::AbstractVisitor, gate_name::String, defined_a
     return applied_arguments
 end
 
-function handle_gate_modifiers(v::AbstractVisitor, ixs::Vector{Instruction}, mods::Vector{QasmExpression}, control_qubits::Vector{Int}, is_gphase::Bool)
+function handle_gate_modifiers(ixs::Vector{Instruction}, mods::Vector{QasmExpression}, control_qubits::Vector{Int}, is_gphase::Bool)
     for mod in Iterators.reverse(mods)
         control_qubit = (head(mod) ∈ (:negctrl, :ctrl) && !is_gphase) ? pop!(control_qubits) : -1
         for (ii, ix) in enumerate(ixs)
@@ -1513,7 +1517,7 @@ function visit_gphase_call(v::AbstractVisitor, program_expr::QasmExpression)
     evaled_arg     = Float64(evaluate(v, provided_arg))
     applied_arguments = Instruction[Instruction(MultiQubitPhaseShift{n_called_with}(evaled_arg), gate_targets)]
     mods::Vector{QasmExpression} = length(program_expr.args) == 4 ? program_expr.args[4].args : QasmExpression[]
-    applied_arguments = handle_gate_modifiers(v, applied_arguments, mods, Int[], true)
+    applied_arguments = handle_gate_modifiers(applied_arguments, mods, Int[], true)
     target_mapper = Dict(g_ix=>gate_targets[g_ix+1][1] for g_ix in 0:n_called_with-1)
     for (ii, ix) in enumerate(applied_arguments)
         push!(v, remap(ix, target_mapper))
@@ -1540,7 +1544,7 @@ function visit_gate_call(v::AbstractVisitor, program_expr::QasmExpression)
             applied_arguments[ii] = remap(ix, modifier_remap)
         end
     end
-    applied_arguments = handle_gate_modifiers(v, applied_arguments, mods, control_qubits, false)
+    applied_arguments = handle_gate_modifiers(applied_arguments, mods, control_qubits, false)
     longest, gate_targets = splat_gate_targets(gate_targets) 
     for splatted_ix in 1:longest
         target_mapper = Dict(g_ix=>gate_targets[g_ix+1][splatted_ix] for g_ix in 0:n_called_with-1)
