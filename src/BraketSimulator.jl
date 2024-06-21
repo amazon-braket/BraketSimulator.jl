@@ -203,6 +203,37 @@ function _compute_exact_results(d::AbstractSimulator, program::Program, qc::Int)
     return _generate_results(program.results, result_types, d)
 end
 
+function _verify_openqasm_shots_observables(circuit::Circuit)
+    observable_map = Dict()
+    function _check_observable(observable_map, observable, qubits)
+        for qubit in qubits, (target, previously_measured) in observable_map
+            if qubit ∈ target
+                # must ensure that target is the same
+                !(target ⊆ qubits) && throw(ErrorException("Qubit part of incompatible results targets"))
+                # must ensure observable is the same
+                typeof(previously_measured) != typeof(observable) && throw(ErrorException("Conflicting result types applied to a single qubit"))
+                # including matrix value for Hermitians
+                observable isa Braket.Observables.HermitianObservable && !isapprox(previously_measured.matrix, observable.matrix) && throw(ErrorException("Conflicting result types applied to a single qubit"))
+            end
+        end
+        observable_map[qubits] = observable
+    end
+    for result in filter(rt->rt isa Braket.ObservableResult, circuit.result_types)
+        result.observable isa Braket.Observables.I && continue
+        observable_qubits = result.targets
+        if result.observable isa Braket.Observables.TensorProduct
+            result_targets = collect(result.targets)
+            for observable in result.observable.factors
+                obs_targets = splice!(result_targets, 1:qubit_count(observable))
+                _check_observable(observable_map, observable, obs_targets)
+            end
+        else
+            _check_observable(observable_map, result.observable, result.targets)
+        end
+    end
+    return
+end
+
 @recompile_invalidations begin
     """
         simulate(simulator::AbstractSimulator, circuit_ir; shots::Int = 0, kwargs...) -> GateModelTaskResult
@@ -229,24 +260,7 @@ end
             measured_qubits = Int[]
         end
         if shots > 0
-            observable_map = Dict()
-            for result in circuit.result_types
-                if result isa Braket.ObservableResult
-                    result.observable isa Braket.Observables.I && continue
-                    observable_qubits = result.targets
-                    for qubit in observable_qubits, (target, previously_measured) in observable_map
-                        if qubit ∈ target
-                            # must ensure that target is the same
-                            any(t ∉ observable_qubits for t in target) && throw(ErrorException("Qubit $qubit part of incompatible results targets $target"))
-                            # must ensure observable is the same
-                            typeof(previously_measured) != typeof(result.observable) && throw(ErrorException("Conflicting result types applied to a single qubit"))
-                            # including matrix value for Hermitians
-                            result.observable isa Braket.Observables.HermitianObservable && !isapprox(previously_measured.matrix, result.observable.matrix) && throw(ErrorException("Conflicting result types applied to a single qubit"))
-                        end
-                    end
-                    observable_map[observable_qubits] = result.observable
-                end
-            end
+            _verify_openqasm_shots_observables(circuit)
             Braket.basis_rotation_instructions!(circuit)
         end
         program = Program(circuit) 
