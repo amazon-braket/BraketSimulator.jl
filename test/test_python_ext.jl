@@ -1,4 +1,5 @@
 using Test, PythonCall, BraketSimulator, Braket
+using PythonCall: pyconvert
 
 @testset "Python integration" begin
     braket_rts       = pyimport("braket.ir.jaqcd.results")
@@ -93,7 +94,7 @@ using Test, PythonCall, BraketSimulator, Braket
                     Braket.Variance(Braket.Observables.TensorProduct([Braket.Observables.H(), Braket.Observables.HermitianObservable(jl_mat)]), [0, 1]),
                 ],
         )
-            @test pyconvert(Bool, Py(jl_rt) == py_rt)
+            @test PythonCall.pyconvert(Bool, Py(jl_rt) == py_rt)
         end
     end
     @testset "Programs" begin
