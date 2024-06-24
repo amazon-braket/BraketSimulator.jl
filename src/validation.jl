@@ -1,6 +1,6 @@
 struct ValidationError <: Exception
     message::String
-    python_exception::String
+    alternate_type::String
 end
 
 const _NOISE_INSTRUCTIONS = Set(replace(lowercase(op), "_"=>"") for op in

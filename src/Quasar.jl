@@ -1048,7 +1048,7 @@ FunctionDefinition(name::String, arguments::QasmExpression, body::QasmExpression
 
 struct QasmVisitorError <: Exception
     message::String
-    python_exception::String
+    alternate_type::String
 end
 function Base.showerror(io::IO, err::QasmVisitorError)
     print(io, "QasmVisitorError: ")
