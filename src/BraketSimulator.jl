@@ -338,32 +338,45 @@ end
             end
         end
         !is_single_task && !is_single_input && length(task_specs) != length(inputs) && throw(ArgumentError("number of inputs ($(length(inputs))) and task specifications ($(length(task_specs))) must be equal."))
-        tasks_and_inputs = zip(1:length(task_specs), task_specs, inputs)
-        todo_tasks_ch = Channel(length(tasks_and_inputs))
-        for (ix, spec, input) in tasks_and_inputs
-            put!(todo_tasks_ch, (ix, spec, input))
-        end
-        sims     = Channel(Inf)
-        foreach(i -> put!(sims, copy(simulator)), 1:max(Threads.nthreads(), length(task_specs)))
+        n_tasks = length(task_specs)
+        
+        tasks_and_inputs = zip(1:n_tasks, task_specs, inputs)
+        todo_tasks_ch = Channel{Int}(ch->foreach(ix->put!(ch, ix), 1:n_tasks), n_tasks)
+        
         max_parallel_threads = max_parallel > 0 ? max_parallel : 32
-        n_task_threads = min(max_parallel_threads, length(task_specs))
-        done_tasks_ch = Channel(length(tasks_and_inputs)) do ch
-            function task_processor(input_tup)
-                ix, spec, input = input_tup
-                sim = take!(sims)
-                res = simulate(sim, spec, shots; inputs=input, kwargs...)
-                put!(ch, (ix, res))
-                put!(sims, sim)
+        n_task_threads = min(max_parallel_threads, n_tasks)
+        
+        results = Vector{Braket.GateModelTaskResult}(undef, n_tasks)
+        function process_work(worker::Int)
+            my_sim = copy(simulator)
+            while isready(todo_tasks_ch)
+                my_ix = -1
+                # need to lock the channel as it may become empty
+                # and "unready" in between the while-loop call
+                # and the call to take!
+                lock(todo_tasks_ch) do
+                    my_ix = isready(todo_tasks_ch) ? take!(todo_tasks_ch) : -1
+                end
+                # if my_ix is still -1, the channel is empty and
+                # there's no more work to do
+                my_ix == -1 && break
+                spec  = task_specs[my_ix]
+                input = inputs[my_ix]
+                results[my_ix] = simulate(my_sim, spec, shots; inputs=input, kwargs...)
             end
-            Threads.foreach(task_processor, todo_tasks_ch, ntasks=n_task_threads)
+            return
         end
-	    r_ix = 1
-	    results = Vector{Braket.GateModelTaskResult}(undef, length(task_specs))
-	    while r_ix <= length(task_specs)
-            ix, res = take!(done_tasks_ch)
-            results[ix] = res
-            r_ix += 1
-	    end
+        tasks = Vector{Task}(undef, n_task_threads)
+        # need sync here to ensure all the spawns launch
+        @sync for worker in 1:n_task_threads
+            tasks[worker] = Threads.@spawn process_work(worker)
+        end
+        # tasks don't return anything so we can wait rather than fetch
+        wait.(tasks)
+        # check to ensure all the results were in fact populated
+        for r_ix in 1:n_tasks
+            @assert isassigned(results, r_ix)
+        end
         return results
     end
 end

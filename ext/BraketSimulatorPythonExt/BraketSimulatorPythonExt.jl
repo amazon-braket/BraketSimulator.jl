@@ -55,7 +55,9 @@ end
              inputs::Union{Vector{Dict{String, Float64}}, Dict{String, Float64}} = Dict{String, Float64}(),
              kwargs...
             )
+        PythonCall.GC.disable()
         jl_results = simulate(simulator, convert(Vector{Union{Braket.OpenQasmProgram, Braket.Program}}, task_specs), shots; max_parallel=max_parallel, inputs=inputs, kwargs...)
+        PythonCall.GC.enable()
         return map(Py, jl_results)
     end
 end
