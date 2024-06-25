@@ -255,7 +255,7 @@ end
         circuit = Circuit(circuit_ir.source, inputs)
         measure_ixs = splice!(circuit.instructions, findall(ix->ix.operator isa Measure, circuit.instructions))
         if !isempty(measure_ixs)
-            measured_qubits = collect(Iterators.flatten(measure.target for measure in measure_ixs))
+            measured_qubits = unique(collect(Iterators.flatten(measure.target for measure in measure_ixs)))
         else
             measured_qubits = Int[]
         end
@@ -263,8 +263,9 @@ end
             _verify_openqasm_shots_observables(circuit)
             Braket.basis_rotation_instructions!(circuit)
         end
-        program = Program(circuit) 
-        n_qubits = qubit_count(program)
+        program = Program(circuit)
+        program_qc = qubit_count(program)
+        n_qubits = max(program_qc, (measured_qubits .+ 1)...)
         _validate_ir_results_compatibility(simulator, program.results, Val(:JAQCD))
         _validate_ir_instructions_compatibility(simulator, program, Val(:JAQCD))
         _validate_shots_and_ir_results(shots, program.results, n_qubits)
@@ -272,7 +273,7 @@ end
         if shots > 0 && !isempty(program.basis_rotation_instructions)
             operations = vcat(operations, program.basis_rotation_instructions)
         end
-        _validate_operation_qubits(operations)
+        _validate_operation_qubits(vcat(operations, measure_ixs))
         reinit!(simulator, n_qubits, shots)
         simulator = evolve!(simulator, operations)
         analytic_results = shots == 0 && !isnothing(program.results) && !isempty(program.results)

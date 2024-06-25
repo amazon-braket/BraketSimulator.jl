@@ -383,6 +383,38 @@ LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
         copyto!(sim2, sim)
         @test sim2.state_vector ≈ sim.state_vector
     end
+    @testset "Measure with no gates" begin
+        qasm = """
+        bit[4] b;
+        qubit[4] q;
+        b[0] = measure q[0];
+        b[1] = measure q[1];
+        b[2] = measure q[2];
+        b[3] = measure q[3];
+        """
+        simulator = StateVectorSimulator(0, 0)
+        res = simulate(simulator, ir(Circuit(qasm), Val(:OpenQASM)), 1000)
+        @test all(m -> m == zeros(Int, 4), res.measurements)
+        @test length(res.measurements) == 1000
+        @test res.measuredQubits == collect(0:3)
+    end
+    @testset "Measure with qubits not used" begin
+        qasm = """
+        bit[4] b;
+        qubit[4] q;
+        h q[0];
+        cnot q[0], q[1];
+        b = measure q;
+        """ 
+        simulator = StateVectorSimulator(0, 0)
+        res = simulate(simulator, ir(Circuit(qasm), Val(:OpenQASM)), 1000)
+        @test res.measuredQubits == collect(0:3)
+        @test 400 < sum(m[1] for m in res.measurements) < 600
+        @test 400 < sum(m[2] for m in res.measurements) < 600
+        @test sum(m[3] for m in res.measurements) == 0
+        @test sum(m[4] for m in res.measurements) == 0
+        @test all(m->length(m) == 4, res.measurements)
+    end
     @testset "supported operations and results" begin
         qubit_count = 10
         sim = StateVectorSimulator(qubit_count, 0)
