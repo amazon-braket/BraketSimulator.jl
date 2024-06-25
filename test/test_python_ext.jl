@@ -161,7 +161,8 @@ using PythonCall: pyconvert
             @testset "OpenQASM3" begin
                 # test a "batch"
                 sv_simulator = StateVectorSimulator(n_qubits, 0)
-                oq3_results  = simulate(sv_simulator, PyList{Any}([oq3_program, oq3_program]), 0; input = pylist([pydict(Dict("a_in"=>2, "b_in"=>5)), pydict(Dict("a_in"=>3, "b_in"=>2))]))
+                py_inputs    = PyList{Any}([pydict(Dict("inputs"=>pydict(Dict("a_in"=>2, "b_in"=>5)), "shots"=>0)), pydict(Dict("inputs"=>pydict(Dict("a_in"=>3, "b_in"=>2)), "shots"=>0))])
+                oq3_results  = simulate(sv_simulator, PyList{Any}([oq3_program, oq3_program]), PyList{Any}(PyList{Any}[]), py_inputs)
                 for oq3_result in oq3_results
                     @test pyconvert(Vector{Float64}, oq3_result.resultTypes[0].value) ≠ pyconvert(Vector{Float64}, oq3_result.resultTypes[1].value)
                 end

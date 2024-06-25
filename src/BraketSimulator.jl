@@ -322,7 +322,7 @@ end
     simulate(simulator::AbstractSimulator, circuit_ir::Program, shots::Int; kwargs...) = simulate(simulator, circuit_ir, qubit_count(circuit_ir), shots; kwargs...)
     function simulate(simulator::AbstractSimulator,
                       task_specs::Vector{<:Union{Program, OpenQasmProgram}},
-                      shots::Int;
+                      task_args::Vector;
                       max_parallel::Int=-1,
                       inputs::Union{Vector{Dict{String, Float64}}, Dict{String, Float64}} = Dict{String, Float64}(),
                       kwargs...
@@ -330,17 +330,17 @@ end
         is_single_task  = length(task_specs) == 1
         is_single_input = inputs isa Dict{String, Float64} || length(inputs) == 1
         if is_single_input
-            is_single_task && return simulate(simulator, only(task_specs), shots; inputs=inputs, kwargs...)
+            is_single_task && return simulate(simulator, only(task_specs), only(task_args); inputs=inputs, kwargs...)
             if inputs isa Dict{String, Float64}
                 inputs = [deepcopy(inputs) for ix in 1:length(task_specs)]
             else
                 inputs = [deepcopy(only(inputs)) for ix in 1:length(task_specs)]
             end
         end
-        !is_single_task && !is_single_input && length(task_specs) != length(inputs) && throw(ArgumentError("number of inputs ($(length(inputs))) and task specifications ($(length(task_specs))) must be equal."))
+        !is_single_task && !is_single_input && (length(task_specs) != length(inputs) || length(task_specs) != length(task_args)) && throw(ArgumentError("number of inputs ($(length(inputs))), task arguments $(length(task_args)), and task specifications ($(length(task_specs))) must be equal."))
         n_tasks = length(task_specs)
         
-        tasks_and_inputs = zip(1:n_tasks, task_specs, inputs)
+        tasks_args_and_inputs = zip(1:n_tasks, task_specs, task_args, inputs)
         todo_tasks_ch = Channel{Int}(ch->foreach(ix->put!(ch, ix), 1:n_tasks), n_tasks)
         
         max_parallel_threads = max_parallel > 0 ? max_parallel : 32
@@ -362,7 +362,8 @@ end
                 my_ix == -1 && break
                 spec  = task_specs[my_ix]
                 input = inputs[my_ix]
-                results[my_ix] = simulate(my_sim, spec, shots; inputs=input, kwargs...)
+                args  = task_args[my_ix]
+                results[my_ix] = simulate(my_sim, spec, args...; inputs=input, kwargs...)
             end
             return
         end
@@ -514,13 +515,13 @@ end
         simulator = DensityMatrixSimulator(2, 0)
         oq3_program = Braket.OpenQasmProgram(Braket.header_dict[Braket.OpenQasmProgram], noise_qasm, nothing)
         simulate(simulator, oq3_program, 100)
-        simulate(simulator, [oq3_program, oq3_program], 100)
+        simulate(simulator, [oq3_program, oq3_program], [100, 100])
         
         simulator = StateVectorSimulator(3, 0)
         oq3_program = Braket.OpenQasmProgram(Braket.header_dict[Braket.OpenQasmProgram], unitary_qasm, nothing)
         simulate(simulator, oq3_program, 100)
         
-        simulate(simulator, [oq3_program, oq3_program], 100)
+        simulate(simulator, [oq3_program, oq3_program], [100, 100])
         
         simulator = StateVectorSimulator(6, 0)
         oq3_program = Braket.OpenQasmProgram(Braket.header_dict[Braket.OpenQasmProgram], sv_adder_qasm, Dict("a_in"=>3, "b_in"=>7))

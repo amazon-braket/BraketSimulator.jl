@@ -392,14 +392,15 @@ LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
         end
         num_qubits = 5
         n_circuits = 100
-        shots   = 1000
+        shots   = [[shot] for shot in 10:10:1000]
         jl_ghz  = [make_ghz(num_qubits) for ix in 1:n_circuits]
         jl_sim  = DensityMatrixSimulator(num_qubits, 0);
         results = simulate(jl_sim, jl_ghz, shots)
-        for r in results
-            @test 400 < count(m->m == fill(0, num_qubits), r.measurements) < 600
-            @test 400 < count(m->m == fill(1, num_qubits), r.measurements) < 600
+        for (r_ix, r) in enumerate(results)
+            @test length(r.measurements) == 10*r_ix
         end
+        @test 400 < count(m->m == fill(0, num_qubits), results[end].measurements) < 600
+        @test 400 < count(m->m == fill(1, num_qubits), results[end].measurements) < 600
     end
     @testset "similar, copy and copyto!" begin
         qubit_count = 10
