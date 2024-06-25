@@ -209,7 +209,7 @@ function _verify_openqasm_shots_observables(circuit::Circuit)
         for qubit in qubits, (target, previously_measured) in observable_map
             if qubit ∈ target
                 # must ensure that target is the same
-                target ⊆ qubits || throw(ValidationError("Qubit part of incompatible results targets", "ValueError"))
+                issetequal(target, qubits) || throw(ValidationError("Qubit part of incompatible results targets", "ValueError"))
                 # must ensure observable is the same
                 typeof(previously_measured) != typeof(observable) && throw(ValidationError("Conflicting result types applied to a single qubit", "ValueError"))
                 # including matrix value for Hermitians
