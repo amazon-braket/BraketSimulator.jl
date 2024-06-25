@@ -1050,6 +1050,7 @@ struct QasmVisitorError <: Exception
     message::String
     alternate_type::String
 end
+QasmVisitorError(message::String) = QasmVisitorError(message, "")
 function Base.showerror(io::IO, err::QasmVisitorError)
     print(io, "QasmVisitorError: ")
     print(io, err.message)
