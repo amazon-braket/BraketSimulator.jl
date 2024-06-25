@@ -215,4 +215,11 @@ all_qubit_observables_testdata = [
         dm = BraketSimulator.calculate(BraketSimulator.DensityMatrix(reverse(0:3)), sim)
         @test dm ≈ kron(adjoint(state_vector()), state_vector())
     end
+    @testset "Direct sampling" begin
+        sim = BraketSimulator.StateVectorSimulator(30, 10)
+        sim.state_vector[1]   = 1/√2
+        sim.state_vector[end] = 1/√2
+        shot_results = BraketSimulator.samples(sim)
+        @test all(s->s ∈ [0, 2^30-1], shot_results)
+    end
 end

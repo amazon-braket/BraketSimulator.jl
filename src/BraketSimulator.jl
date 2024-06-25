@@ -53,7 +53,7 @@ function complex_matrix_to_ir(m::Matrix{T}) where {T<:Complex}
     end
     return mat
 end
-
+complex_matrix_to_ir(m) = m
 
 
 include("raw_schema.jl")
@@ -74,7 +74,6 @@ include("noise_kernels.jl")
 include("Quasar.jl")
 using .Quasar
 
-const OBS_LIST = (Observables.X(), Observables.Y(), Observables.Z())
 const CHUNK_SIZE = 2^10
 
 function _index_to_endian_bits(ix::Int, qubit_count::Int)
@@ -86,19 +85,13 @@ function _index_to_endian_bits(ix::Int, qubit_count::Int)
     return bits
 end
 
-function _formatted_measurements(simulator::D, measured_qubits::Vector{Int}=collect(0:qubit_count(simulator)-1)) where {D<:AbstractSimulator}
+function _formatted_measurements(simulator::D, measured_qubits::Vector{Int}) where {D<:AbstractSimulator}
     sim_samples = samples(simulator)
     n_qubits    = qubit_count(simulator)
-    formatted   = [_index_to_endian_bits(sample, n_qubits)[measured_qubits .+ 1] for sample in sim_samples]
-    return formatted
+    return [_index_to_endian_bits(sample, n_qubits)[measured_qubits .+ 1] for sample in sim_samples]
 end
 
-function _bundle_results(
-    results::Vector{ResultTypeValue},
-    circuit_ir::Program,
-    simulator::D,
-    measured_qubits::Vector{Int} = collect(0:qubit_count(simulator)-1)
-) where {D<:AbstractSimulator}
+function _build_metadata(simulator, ir)
     task_mtd = TaskMetadata(
         braketSchemaHeader("braket.task_result.task_metadata", "1"),
         string(uuid4()),
@@ -111,7 +104,7 @@ function _bundle_results(
         nothing,
     )
     addl_mtd = AdditionalMetadata(
-        circuit_ir,
+        ir,
         nothing,
         nothing,
         nothing,
@@ -120,55 +113,28 @@ function _bundle_results(
         nothing,
         nothing,
     )
-    formatted_samples = simulator.shots > 0 ? _formatted_measurements(simulator, measured_qubits) : nothing
-    return GateModelTaskResult(
-        braketSchemaHeader("braket.task_result.gate_model_task_result", "1"),
-        formatted_samples,
-        nothing,
-        results,
-        measured_qubits,
-        task_mtd,
-        addl_mtd,
-    )
+    return task_mtd, addl_mtd
 end
 
 function _bundle_results(
     results::Vector{ResultTypeValue},
-    circuit_ir::OpenQasmProgram,
+    circuit_ir,
     simulator::D,
     measured_qubits = Set{Int}(0:qubit_count(simulator)-1)
 ) where {D<:AbstractSimulator}
-    task_mtd = TaskMetadata(
-        braketSchemaHeader("braket.task_result.task_metadata", "1"),
-        string(uuid4()),
-        simulator.shots,
-        device_id(simulator),
-        nothing,
-        nothing,
-        nothing,
-        nothing,
-        nothing,
-    )
-    addl_mtd = AdditionalMetadata(
-        circuit_ir,
-        nothing,
-        nothing,
-        nothing,
-        nothing,
-        nothing,
-        nothing,
-        nothing,
-    )
     sorted_qubits = sort(collect(measured_qubits))
-    formatted_samples = simulator.shots > 0 ? _formatted_measurements(simulator, sorted_qubits) : nothing
+    formatted_samples = if simulator.shots > 0
+            _formatted_measurements(simulator, sorted_qubits)
+        else
+            nothing
+        end
     return GateModelTaskResult(
         braketSchemaHeader("braket.task_result.gate_model_task_result", "1"),
         formatted_samples,
         nothing,
         results,
         sorted_qubits,
-        task_mtd,
-        addl_mtd,
+        _build_metadata(simulator, circuit_ir)...
     )
 end
 
@@ -178,11 +144,10 @@ function _generate_results(
     simulator::D,
 ) where {D<:AbstractSimulator}
     result_values = map(result_type -> calculate(result_type, simulator), result_types)
-    result_values =
-        [val isa Matrix ? complex_matrix_to_ir(val) : val for val in result_values]
     final_results = Vector{ResultTypeValue}(undef, length(result_values))
     for r_ix in 1:length(final_results)
-        final_results[r_ix] = ResultTypeValue(results[r_ix], result_values[r_ix])
+        final_results[r_ix] = ResultTypeValue(results[r_ix],
+                                              complex_matrix_to_ir(result_values[r_ix]))
     end
     return final_results
 end
@@ -194,7 +159,7 @@ _translate_result_type(r::IR.StateVector, qc::Int)   = StateVector()
 # stability reasons. Here we take a `nothing` value for `targets` and translate it
 # to apply to all qubits.
 _translate_result_type(r::IR.DensityMatrix, qc::Int) = isnothing(r.targets) ? DensityMatrix(collect(0:qc-1)) : DensityMatrix(r.targets)
-_translate_result_type(r::IR.Probability, qc::Int)   = isnothing(r.targets) ? Probability(collect(0:qc-1)) : Probability(r.targets)
+_translate_result_type(r::IR.Probability, qc::Int)   = isnothing(r.targets) ? Probability(collect(0:qc-1))   : Probability(r.targets)
 for (RT, IRT) in ((:Expectation, :(IR.Expectation)), (:Variance, :(IR.Variance)), (:Sample, :(IR.Sample)))
     @eval begin
         function _translate_result_type(r::$IRT, qc::Int)
@@ -206,46 +171,111 @@ for (RT, IRT) in ((:Expectation, :(IR.Expectation)), (:Variance, :(IR.Variance))
 end
 _translate_result_types(results::Vector{AbstractProgramResult}, qubit_count::Int) = map(result->_translate_result_type(result, qubit_count), results)
 
-function _compute_exact_results(d::AbstractSimulator, program::Program, qc::Int)
-    result_types = _translate_result_types(program.results, qc)
-    _validate_result_types_qubits_exist(result_types, qc)
+function _compute_exact_results(d::AbstractSimulator, program::Program, qubit_count::Int)
+    result_types = _translate_result_types(program.results, qubit_count)
+    _validate_result_types_qubits_exist(result_types, qubit_count)
     return _generate_results(program.results, result_types, d)
 end
 
-function _verify_openqasm_shots_observables(circuit::Circuit)
-    observable_map = Dict()
-    function _check_observable(observable_map, observable, qubits)
-        for qubit in qubits, (target, previously_measured) in observable_map
-            if qubit ∈ target
-                # must ensure that target is the same
-                issetequal(target, qubits) || throw(ValidationError("Qubit part of incompatible results targets", "ValueError"))
-                # must ensure observable is the same
-                typeof(previously_measured) != typeof(observable) && throw(ValidationError("Conflicting result types applied to a single qubit", "ValueError"))
-                # including matrix value for Hermitians
-                observable isa Observables.HermitianObservable && !isapprox(previously_measured.matrix, observable.matrix) && throw(ValidationError("Conflicting result types applied to a single qubit", "ValueError"))
-            end
-        end
-        observable_map[qubits] = observable
+"""
+    _get_measured_qubits(program::Program, qubit_count::Int) -> Vector{Int}
+
+Get the qubits measured by the program. If [`Measure`](@ref)
+instructions are present in the program's instruction list,
+their targets are used to form the list of measured qubits.
+If not, all qubits from 0 to `qubit_count-1` are measured. 
+"""
+function _get_measured_qubits(program::Program, qubit_count::Int)
+    measure_inds    = findall(ix->ix.operator isa Measure, program.instructions)
+    isempty(measure_inds) && return collect(0:qubit_count-1)
+    measure_ixs     = program.instructions[measure_inds]
+    measure_targets = (convert(Vector{Int}, measure.target) for measure in measure_ixs) 
+    measured_qubits = unique(reduce(vcat, measure_targets, init=Int[]))
+    return measured_qubits
+end
+"""
+    _prepare_program(circuit_ir::OpenQasmProgram, inputs::Dict{String, <:Any}, shots::Int) -> (Program, Int)
+
+Parse the OpenQASM3 source, apply any `inputs` provided for the simulation, and compute
+basis rotation instructions if running with non-zero shots. Return the `Program` after
+parsing and the qubit count of the circuit.
+"""
+function _prepare_program(circuit_ir::OpenQasmProgram, inputs::Dict{String, <:Any}, shots::Int)
+    ir_inputs = isnothing(circuit_ir.inputs) ? Dict{String, Float64}() : circuit_ir.inputs 
+    circuit   = Circuit(circuit_ir.source, merge(ir_inputs, inputs))
+    n_qubits  = qubit_count(circuit)
+    if shots > 0
+        _verify_openqasm_shots_observables(circuit, n_qubits)
+        basis_rotation_instructions!(circuit)
     end
-    for result in filter(rt->rt isa ObservableResult, circuit.result_types)
-        result.observable isa Observables.I && continue
-        if result.observable isa Observables.TensorProduct
-            result_targets = collect(result.targets)
-            for observable in result.observable.factors
-                obs_targets = splice!(result_targets, 1:qubit_count(observable))
-                _check_observable(observable_map, observable, obs_targets)
-            end
-        else
-            _check_observable(observable_map, result.observable, result.targets)
-        end
+    return Program(circuit), n_qubits
+end
+"""
+    _prepare_program(circuit_ir::Program, inputs::Dict{String, <:Any}, shots::Int) -> (Program, Int)
+
+Apply any `inputs` provided for the simulation. Return the `Program`
+(with bound parameters) and the qubit count of the circuit.
+"""
+function _prepare_program(circuit_ir::Program, inputs::Dict{String, <:Any}, shots::Int)
+    operations::Vector{Instruction} = circuit_ir.instructions
+    symbol_inputs = Dict(Symbol(k) => v for (k, v) in inputs)
+    operations    = [bind_value!(operation, symbol_inputs) for operation in operations]
+    bound_program = Program(circuit_ir.braketSchemaHeader, operations, circuit_ir.results, circuit_ir.basis_rotation_instructions)
+    return bound_program, qubit_count(circuit_ir)
+end
+"""
+    _combine_operations(program::Program, qubit_count::Int, shots::Int) -> Program
+
+Combine explicit instructions and basis rotation instructions (if necessary).
+Validate that all operations are performed on qubits within `qubit_count`.
+"""
+function _combine_operations(program::Program, qubit_count::Int, shots::Int)
+    operations = program.instructions
+    if shots > 0 && !isempty(program.basis_rotation_instructions)
+        operations = vcat(operations, program.basis_rotation_instructions)
     end
+    _validate_operation_qubits(operations)
+    return operations
+end
+"""
+    _compute_results(::Type{T}, simulator, program::Program, n_qubits::Int, shots::Int) -> Vector{ResultTypeValue}
+
+Compute the results once `simulator` has finished applying all the instructions. The results depend on the IR type if `shots>0`:
+
+- For JAQCD IR (`Program`), the results array is *empty* because the Braket SDK computes the results from the IR directly.
+- For OpenQASM IR (`OpenQasmProgram`), the results array is *empty* only if no results are present in the parsed IR. Otherwise,
+  the results array is populated with the parsed result types (to help the Braket SDK compute them from the sampled measurements)
+  and a placeholder zero value.
+"""
+function _compute_results(::Type{OpenQasmProgram}, simulator, program, n_qubits, shots)
+    analytic_results = shots == 0 && !isnothing(program.results) && !isempty(program.results)
+    if analytic_results
+        return _compute_exact_results(simulator, program, n_qubits)
+    elseif isnothing(program.results) || isempty(program.results)
+        return ResultTypeValue[]
+    else
+        return ResultTypeValue[ResultTypeValue(result_type, 0.0) for result_type in program.results]
+    end
+end
+function _compute_results(::Type{Program}, simulator, program, n_qubits, shots)
+    analytic_results = shots == 0 && !isnothing(program.results) && !isempty(program.results)
+    if analytic_results
+        return _compute_exact_results(simulator, program, n_qubits)
+    else
+        return ResultTypeValue[]
+    end
+end
+function _validate_circuit_ir(simulator, circuit_ir::Program, qubit_count::Int, shots::Int)
+    _validate_ir_results_compatibility(simulator, circuit_ir.results, Val(:JAQCD))
+    _validate_ir_instructions_compatibility(simulator, circuit_ir, Val(:JAQCD))
+    _validate_shots_and_ir_results(shots, circuit_ir.results, qubit_count)
     return
 end
 
 """
-    simulate(simulator::AbstractSimulator, circuit_ir; shots::Int = 0, kwargs...) -> GateModelTaskResult
+    simulate(simulator::AbstractSimulator, circuit_ir::Union{OpenQasmProgram, Program}, shots::Int; kwargs...) -> GateModelTaskResult
 
-Simulate the evolution of a statevector or density matrix using the passed in `simulator`.
+Simulate the evolution of a state vector or density matrix using the passed-in `simulator`.
 The instructions to apply (gates and noise channels) and measurements to make are
 encoded in `circuit_ir`. Supported IR formats are `OpenQASMProgram` (OpenQASM3)
 and `Program` (JAQCD). Returns a `GateModelTaskResult` containing the individual shot
@@ -254,76 +284,66 @@ about the task.
 """
 function simulate(
     simulator::AbstractSimulator,
-    circuit_ir::OpenQasmProgram,
-    shots::Int = 0;
+    circuit_ir::T,
+    shots::Int;
+    inputs = Dict{String, Float64}(),
     kwargs...,
-)
-    ir_inputs = isnothing(circuit_ir.inputs) || isempty(circuit_ir.inputs) ? Dict{String, Float64}() : circuit_ir.inputs 
-    inputs = get(kwargs, :inputs, ir_inputs)
-    inputs = isnothing(inputs) || isempty(inputs) ? ir_inputs : Dict{String, Any}(k=>v for (k,v) in inputs)
-    circuit = Circuit(circuit_ir.source, inputs)
-    if shots > 0
-        _verify_openqasm_shots_observables(circuit)
-        basis_rotation_instructions!(circuit)
-    end
-    measure_ixs     = splice!(circuit.instructions, findall(ix->ix.operator isa Measure, circuit.instructions))
-    measure_targets = (convert(Vector{Int}, measure.target) for measure in measure_ixs) 
-    measured_qubits = convert(Vector{Int}, unique(reduce(vcat, measure_targets, init=Int[])))::Vector{Int}
-    program    = Program(circuit)
-    program_qc = qubit_count(program)
-    n_qubits   = max(program_qc, max(measured_qubits..., 0)+1)::Int
-    _validate_ir_results_compatibility(simulator, program.results, Val(:JAQCD))
-    _validate_ir_instructions_compatibility(simulator, program, Val(:JAQCD))
-    _validate_shots_and_ir_results(shots, program.results, n_qubits)
-    operations = program.instructions
-    if shots > 0 && !isempty(program.basis_rotation_instructions)
-        operations = vcat(operations, program.basis_rotation_instructions)
-    end
-    _validate_operation_qubits(vcat(operations, measure_ixs))
+) where {T<:Union{OpenQasmProgram, Program}}
+    program, n_qubits = _prepare_program(circuit_ir, inputs, shots)
+    _validate_circuit_ir(simulator, program, n_qubits, shots)
+    operations        = _combine_operations(program,  n_qubits, shots)
     reinit!(simulator, n_qubits, shots)
-    simulator = evolve!(simulator, operations)
-    analytic_results = shots == 0 && !isnothing(program.results) && !isempty(program.results)
-    results = if analytic_results
-        _compute_exact_results(simulator, program, n_qubits)
-    elseif isnothing(program.results) || isempty(program.results)
-        ResultTypeValue[]
-    else
-        ResultTypeValue[ResultTypeValue(result_type, 0.0) for result_type in program.results]
-    end
-    isempty(measured_qubits) && (measured_qubits = collect(0:n_qubits-1))
+    simulator         = evolve!(simulator, operations)
+    measured_qubits   = _get_measured_qubits(program, n_qubits)
+    results           = _compute_results(T, simulator, program, n_qubits, shots)
     return _bundle_results(results, circuit_ir, simulator, measured_qubits)
 end
+
+"""
+    simulate(simulator::AbstractSimulator, circuit_irs::Vector{<:Union{Program, OpenQasmProgram}}, shots::Int; max_parallel::Int=min(32, Threads.nthreads()), inputs=Dict{String,Float64}(), kwargs...) -> Vector{GateModelTaskResult}
+
+Simulate the evolution of a *batch* of state vectors or density matrices using the passed in `simulator`.
+The instructions to apply (gates and noise channels) and measurements to make are
+encoded in `circuit_irs`. Supported IR formats are `OpenQASMProgram` (OpenQASM3)
+and `Program` (JAQCD).
+
+The simulation of the batch is done in parallel using threads.
+The keyword argument `max_parallel` specifies the number of evolutions to simulate in
+parallel -- the default value is whichever of `32` and `Threads.nthreads()` is smaller.
+This is to avoid overwhelming the thread scheduler with too many small tasks waiting to
+run, as each evolution is itself threaded. This value may change in the future.
+
+The `inputs` keyword argument can be a `Dict{String}` or a `Vector{Dict{String}}`. In
+the first case, the same input values are applied to all `circuit_irs`. In the second,
+the length of the `inputs` *must* be the same as the length of `circuit_irs`, and the
+`n`-th `inputs` is applied to the `n`-th `circuit_irs`.
+
+Returns a `Vector{GateModelTaskResult}`, each element of which contains the individual shot
+measurements (if `shots > 0`), final calculated results, corresponding circuit IR, and metadata
+about the task.
+"""
 function simulate(simulator::AbstractSimulator,
-                  task_specs::Vector{<:Union{Program, OpenQasmProgram}},
+                  circuit_irs::Vector{<:Union{Program, OpenQasmProgram}},
                   shots::Int=0;
-                  max_parallel::Int=-1,
+                  max_parallel::Int=min(32, Threads.nthreads()),
                   inputs = Dict{String, Float64}(),
                   kwargs...
                  )
-    is_single_task  = length(task_specs) == 1
+
+    n_tasks = length(circuit_irs)
+    is_single_task  = n_tasks == 1
     is_single_input = inputs isa Dict || length(inputs) == 1
-    if is_single_input && is_single_task
-        if inputs isa Vector
-            return [simulate(simulator, only(task_specs), shots; inputs=only(inputs), kwargs...)]
-        else
-            return [simulate(simulator, only(task_specs), shots; inputs=inputs, kwargs...)]
-        end
-    end
     if is_single_input
-        if inputs isa Dict
-            inputs = [deepcopy(inputs) for ix in 1:length(task_specs)]
+        single_input = inputs isa Vector ? only(inputs) : inputs
+        if is_single_task
+            return [simulate(simulator, only(circuit_irs), shots; inputs=single_input, kwargs...)]
         else
-            inputs = [deepcopy(only(inputs)) for ix in 1:length(task_specs)]
+            inputs = [deepcopy(single_input) for ix in 1:n_tasks]
         end
     end
-    !is_single_task && !is_single_input && (length(task_specs) != length(inputs)) && throw(ArgumentError("number of inputs ($(length(inputs))), and task specifications ($(length(task_specs))) must be equal."))
-    n_tasks = length(task_specs)
-    
+    !is_single_task && !is_single_input && (n_tasks != length(inputs)) && throw(ArgumentError("number of inputs ($(length(inputs))), and circuit IRs ($n_tasks) must be equal."))
     todo_tasks_ch = Channel{Int}(ch->foreach(ix->put!(ch, ix), 1:n_tasks), n_tasks)
-
-    max_parallel_threads = max_parallel > 0 ? max_parallel : min(32, Threads.nthreads())
-    n_task_threads = min(max_parallel_threads, n_tasks)
-
+    n_task_threads = min(max_parallel, n_tasks)
     results = Vector{GateModelTaskResult}(undef, n_tasks)
     function process_work(my_sim)
         while isready(todo_tasks_ch)
@@ -337,17 +357,12 @@ function simulate(simulator::AbstractSimulator,
             # if my_ix is still -1, the channel is empty and
             # there's no more work to do
             my_ix == -1 && break
-            spec  = task_specs[my_ix]
-            input = inputs[my_ix]
-            results[my_ix] = simulate(my_sim, spec, shots; inputs=input)
+            results[my_ix] = simulate(my_sim, circuit_irs[my_ix], shots; inputs=inputs[my_ix])
         end
         return
     end
-    tasks = Vector{Task}(undef, n_task_threads)
     # need sync here to ensure all the spawns launch
-    @sync for worker in 1:n_task_threads
-        tasks[worker] = Threads.@spawn process_work(similar(simulator))
-    end
+    tasks = @sync [Threads.@spawn process_work(similar(simulator)) for worker in 1:n_task_threads]
     # tasks don't return anything so we can wait rather than fetch
     wait.(tasks)
     # check to ensure all the results were in fact populated
@@ -356,38 +371,6 @@ function simulate(simulator::AbstractSimulator,
     end
     return results
 end
-
-function simulate(
-    simulator::AbstractSimulator,
-    circuit_ir::Program,
-    qubit_count::Int,
-    shots::Int;
-    kwargs...,
-)
-    _validate_ir_results_compatibility(simulator, circuit_ir.results, Val(:JAQCD))
-    _validate_ir_instructions_compatibility(simulator, circuit_ir, Val(:JAQCD))
-    _validate_shots_and_ir_results(shots, circuit_ir.results, qubit_count)
-    operations::Vector{Instruction} = circuit_ir.instructions
-    if shots > 0 && !isnothing(circuit_ir.basis_rotation_instructions) && !isempty(circuit_ir.basis_rotation_instructions)
-        operations = vcat(operations, circuit_ir.basis_rotation_instructions)
-    end
-    inputs        = get(kwargs, :inputs, Dict{String,Float64}())
-    symbol_inputs = Dict(Symbol(k) => v for (k, v) in inputs)
-    operations    = [bind_value!(Instruction(operation), symbol_inputs) for operation in operations]
-    _validate_operation_qubits(operations)
-    reinit!(simulator, qubit_count, shots)
-    simulator = evolve!(simulator, operations)
-    analytic_results = shots == 0 && !isnothing(circuit_ir.results) && !isempty(circuit_ir.results)
-    results = if analytic_results
-        _compute_exact_results(simulator, circuit_ir, qubit_count)
-    else
-        ResultTypeValue[]
-    end
-    measured_qubits = get(kwargs, :measured_qubits, collect(0:qubit_count-1))
-    isempty(measured_qubits) && (measured_qubits = collect(0:qubit_count-1))
-    return _bundle_results(results, circuit_ir, simulator, measured_qubits)
-end
-simulate(simulator::AbstractSimulator, circuit_ir::Program, shots::Int; kwargs...) = simulate(simulator, circuit_ir, qubit_count(circuit_ir), shots; kwargs...)
 
 include("result_types.jl")
 include("properties.jl")

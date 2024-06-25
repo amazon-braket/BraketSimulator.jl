@@ -149,6 +149,8 @@ function _evolve_op!(
     apply_noise!(op, dms.density_matrix, target...)
 end
 
+_evolve_op!(dms::DensityMatrixSimulator{T,S}, m::Measure, args...) where {T<:Complex,S<:AbstractDensityMatrix{T}} = return
+
 """
     evolve!(dms::DensityMatrixSimulator{T, S<:AbstractMatrix{T}}, operations::Vector{Instruction}) -> DensityMatrixSimulator{T, S}
 

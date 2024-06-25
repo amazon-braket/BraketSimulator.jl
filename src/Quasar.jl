@@ -28,6 +28,10 @@ const general_letter = first_letter | re"[0-9]"
 
 const prefloat = re"[-+]?([0-9]+\.[0-9]*|[0-9]*\.[0-9]+)"
 
+
+const integer = re"[-+]?[0-9]+"
+const float   = prefloat | ((prefloat | re"[-+]?[0-9]+") * re"[eE][-+]?[0-9]+")
+
 const qasm_tokens = [
         :identifier   => first_letter * rep(general_letter),
         :irrational   => re"π|pi|τ|tau|ℯ|ℇ|euler",
@@ -66,6 +70,10 @@ const qasm_tokens = [
         :measure      => re"measure",
         :arrow_token  => re"->",
         :reset_token  => re"reset",
+        :delay_token  => re"delay",
+        :stretch_token  => re"stretch",
+        :barrier_token  => re"barrier",
+        :duration_token  => re"duration",
         :void         => re"void",
         :const_token  => re"const",
         :assignment   => re"=|-=|\+=|\*=|/=|^=|&=|\|=|<<=|>>=",
@@ -89,8 +97,8 @@ const qasm_tokens = [
         :bin          => re"(0b|0B)[0-1]+",
         :hex          => re"0x[0-9A-Fa-f]+",
         :dot          => re"\.",
-        :integer      => re"[-+]?[0-9]+",
-        :float        => prefloat | ((prefloat | re"[-+]?[0-9]+") * re"[eE][-+]?[0-9]+"),
+        :integer_token => integer,
+        :float_token   => float,
         :include_token   => re"include",
         :continue_token  => re"continue",
         :octal_integer   => re"0o([0-7]_?)* [0-7]",
@@ -102,8 +110,10 @@ const qasm_tokens = [
         :string_token    => '"' * rep(re"[ !#-~]" | re"\\\\\"") * '"' | '\'' * rep(re"[ -&(-~]" | ('\\' * re"[ -~]")) * '\'',
         :newline         => re"\r?\n",
         :spaces          => re"[\t ]+",
+        :durationof_token  => re"durationof", # this MUST be lower than duration_token to preempt duration
         :classical_type    => re"bool|uint|int|float|angle|complex|array|bit",
-        :forbidden_keyword => re"cal|defcal|duration|durationof|stretch|delay|barrier|extern",
+        :duration_value    => (float | integer) * re"ns|µs|us|ms|s",
+        :forbidden_keyword => re"cal|defcal|extern",
 ]
 
 @eval @enum Token error $(first.(qasm_tokens)...)
@@ -507,27 +517,27 @@ function parse_literal(tokens::Vector{Tuple{Int64, Int32, Token}}, stack, start,
     tokens[1][end] == bin     && return parse_bin_literal(popfirst!(tokens), qasm)
     tokens[1][end] == irrational && return parse_irrational_literal(popfirst!(tokens), qasm)
     tokens[1][end] == boolean && return parse_boolean_literal(popfirst!(tokens), qasm)
-    tokens[1][end] == integer && length(tokens) == 1 && return parse_integer_literal(popfirst!(tokens), qasm)
-    tokens[1][end] == float   && length(tokens) == 1 && return parse_float_literal(popfirst!(tokens), qasm)
+    tokens[1][end] == integer_token && length(tokens) == 1 && return parse_integer_literal(popfirst!(tokens), qasm)
+    tokens[1][end] == float_token   && length(tokens) == 1 && return parse_float_literal(popfirst!(tokens), qasm)
     
-    is_float    = tokens[1][end] == float
+    is_float    = tokens[1][end] == float_token
     is_complex  = false
     is_operator = tokens[2][end] == operator
     is_plusminus = is_operator && parse_identifier(tokens[2], qasm).args[1] ∈ ("+","-")
     is_terminal  = (tokens[2][end] == semicolon || tokens[2][end] == comma || (is_operator && !is_plusminus))
-    tokens[1][end] == integer && is_terminal && return parse_integer_literal(popfirst!(tokens), qasm)
-    tokens[1][end] == float && is_terminal && return parse_float_literal(popfirst!(tokens), qasm)
+    tokens[1][end] == integer_token && is_terminal && return parse_integer_literal(popfirst!(tokens), qasm)
+    tokens[1][end] == float_token && is_terminal && return parse_float_literal(popfirst!(tokens), qasm)
     splice_end = 1
     if tokens[2][end] == im_token
         is_complex = true
         splice_end = 2
-    elseif is_plusminus && tokens[3][end] ∈ (integer, float) && tokens[4][end] == im_token
+    elseif is_plusminus && tokens[3][end] ∈ (integer_token, float_token) && tokens[4][end] == im_token
         is_complex = true
-        is_float |= tokens[3][end] == float
+        is_float |= tokens[3][end] == float_token
         splice_end = 4
-    elseif tokens[2][end] ∈ (integer, float) && tokens[3][end] == im_token # may have absorbed +/- sign
+    elseif tokens[2][end] ∈ (integer_token, float_token) && tokens[3][end] == im_token # may have absorbed +/- sign
         is_complex = true
-        is_float |= tokens[2][end] == float
+        is_float |= tokens[2][end] == float_token
         splice_end = 3
     end
     literal_tokens = splice!(tokens, 1:splice_end)
@@ -624,7 +634,7 @@ function parse_expression(tokens::Vector{Tuple{Int64, Int32, Token}}, stack, sta
         token_name = parse_bracketed_expression(pushfirst!(tokens, start_token), stack, start, qasm) 
     elseif start_token[end] == classical_type 
         token_name = parse_classical_type(pushfirst!(tokens, start_token), stack, start, qasm)
-    elseif start_token[end] ∈ (string_token, integer, float, hex, oct, bin, irrational, dot, boolean)
+    elseif start_token[end] ∈ (string_token, integer_token, float_token, hex, oct, bin, irrational, dot, boolean)
         token_name = parse_literal(pushfirst!(tokens, start_token), stack, start, qasm)
     elseif start_token[end] ∈ (mutable, readonly, const_token)
         token_name = parse_identifier(start_token, qasm)
@@ -635,10 +645,13 @@ function parse_expression(tokens::Vector{Tuple{Int64, Int32, Token}}, stack, sta
     end
     head(token_name) == :empty && throw(QasmParseError("unable to parse line with start token $(start_token[end])", stack, start, qasm))
 
-
     next_token = first(tokens)
     if next_token[end] == semicolon || next_token[end] == comma || start_token[end] ∈ (lbracket, lbrace)
         expr = token_name
+    elseif start_token[end] == integer_token && next_token[end] == irrational # this is banned! 2π is not supported, 2*π is.
+        integer_lit = parse_integer_literal(start_token, qasm).args[1]
+        irrational_lit = parse_irrational_literal(next_token, qasm).args[1]
+        throw(QasmParseError("expressions of form $(integer_lit)$(irrational_lit) are not supported -- you must separate the terms with a * operator.", stack, start, qasm))
     elseif start_token[end] == operator
         unary_op_symbol::Symbol = Symbol(token_name.args[1]::String)
         unary_op_symbol ∈ (:~, :!, :-) || throw(QasmParseError("invalid unary operator $unary_op_symbol.", stack, start, qasm))
@@ -688,7 +701,7 @@ function parse_expression(tokens::Vector{Tuple{Int64, Int32, Token}}, stack, sta
     elseif next_token[end] == assignment
         op_token = popfirst!(tokens)
         next_token = first(tokens)
-        if next_token[end] ∈ (lparen, lbracket, lbrace, string_token, integer, float, hex, oct, bin)
+        if next_token[end] ∈ (lparen, lbracket, lbrace, string_token, integer_token, float_token, hex, oct, bin)
             right_hand_side = parse_expression(tokens, stack, start, qasm)
         elseif next_token[end] == measure
             popfirst!(tokens)
@@ -996,12 +1009,31 @@ function parse_qasm(clean_tokens::Vector{Tuple{Int64, Int32, Token}}, qasm::Stri
             box_expr = QasmExpression(:box)
             parse_block_body(box_expr, clean_tokens, stack, start, qasm)
             push!(stack, box_expr)
-        elseif token == reset_token 
+        elseif token == reset_token
             @warn "reset expression encountered -- currently `reset` is a no-op"
             eol = findfirst(triplet->triplet[end] == semicolon, clean_tokens)
             reset_tokens = splice!(clean_tokens, 1:eol)
             targets = parse_expression(reset_tokens, stack, start, qasm)
             push!(stack, QasmExpression(:reset, targets))
+        elseif token == barrier_token
+            @warn "barrier expression encountered -- currently `barrier` is a no-op"
+            eol = findfirst(triplet->triplet[end] == semicolon, clean_tokens)
+            barrier_tokens = splice!(clean_tokens, 1:eol)
+            targets = parse_expression(barrier_tokens, stack, start, qasm)
+            push!(stack, QasmExpression(:barrier, targets))
+        elseif token == duration_token
+            @warn "duration expression encountered -- currently `duration` is a no-op"
+            eol = findfirst(triplet->triplet[end] == semicolon, clean_tokens)
+            duration_tokens = splice!(clean_tokens, 1:eol)
+            # TODO
+            #dur_expr = parse_expression(duration_tokens, stack, start, qasm)
+            push!(stack, QasmExpression(:duration))
+        elseif token == stretch_token
+            @warn "stretch expression encountered -- currently `stretch` is a no-op"
+            eol = findfirst(triplet->triplet[end] == semicolon, clean_tokens)
+            stretch_tokens = splice!(clean_tokens, 1:eol)
+            stretch_expr = parse_expression(stretch_tokens, stack, start, qasm)
+            push!(stack, QasmExpression(:stretch, stretch_expr))
         elseif token == end_token
             push!(stack, QasmExpression(:end))
         elseif token == identifier || token == builtin_gate
@@ -1268,26 +1300,19 @@ function evaluate(@nospecialize(v::AbstractVisitor), expr::QasmExpression)
         haskey(classical_defs(v), id_name) && return classical_defs(v)[id_name].val
         haskey(qubit_mapping(v), id_name) && return evaluate_qubits(v, expr)
     elseif head(expr) == :indexed_identifier
-        identifier_name =  name(expr)
+        identifier_name = name(expr)
         if haskey(classical_defs(v), identifier_name)
             var = classical_defs(v)[identifier_name]
             ix  = evaluate(v, expr.args[2]::QasmExpression)
             if ix isa StepRange && ix.step > 0 && ix.stop < ix.start # -1 in place of end
-                new_stop = if var.type isa SizedNumber || var.type isa SizedBitVector 
-                        evaluate(v, var.type.size) - 1
-                    else
-                        length(var.val) - 1
-                    end
-                ix = StepRange(ix.start, ix.step, new_stop)
+                new_stop = var.type isa SizedNumber || var.type isa SizedBitVector ? evaluate(v, var.type.size) : length(var.val)
+                ix = StepRange(ix.start, ix.step, new_stop-1)
             end
-            flat_ix = Int[]
-            for ix_ in ix
-                append!(flat_ix, Int[ii+1 for ii::Int in ix_])
-            end
+            flat_ix = mapreduce(ix_ -> ix_ .+ 1, vcat, ix)
             if var.type isa SizedInt || var.type isa SizedUInt
                 n_bits::Int = evaluate(v, var.type.size)::Int
-                int_val = convert(Int, var.val)::Int
-                values = Int[(int_val >> (n_bits - index)) & 1 for index in flat_ix]
+                int_val     = convert(Int, var.val)::Int
+                values      = Int[(int_val >> (n_bits - index)) & 1 for index in flat_ix]
                 return length(flat_ix) == 1 ? values[1] : values
             else
                 return length(flat_ix) == 1 ? var.val[only(flat_ix)] : var.val[flat_ix]
@@ -1364,7 +1389,7 @@ function evaluate(@nospecialize(v::AbstractVisitor), expr::QasmExpression)
             return value > 0
         # TODO
         else
-            throw(QasmVisitorError("unable to evaluate expression $expr"))
+            throw(QasmVisitorError("unable to evaluate cast expression $expr"))
         end
     elseif head(expr) == :measure
         qubits_to_measure = evaluate_qubits(v, expr.args[1])
@@ -1546,11 +1571,16 @@ function visit_gate_call(v::AbstractVisitor, program_expr::QasmExpression)
     call_targets::Vector{QasmExpression}  = convert(Vector{QasmExpression}, head(raw_call_targets.args[1]) == :array_literal ? raw_call_targets.args[1].args : raw_call_targets.args)::Vector{QasmExpression}
     provided_args::Vector{QasmExpression} = convert(Vector{QasmExpression}, program_expr.args[2].args)::Vector{QasmExpression}
     has_modifiers = length(program_expr.args) == 4
-    n_called_with = length(call_targets)
     gate_targets  = Vector{Int}[evaluate_qubits(v, call_target)::Vector{Int} for call_target in call_targets]
+    n_called_with = length(gate_targets)
     hasgate(v, gate_name) || throw(QasmVisitorError("gate $gate_name not defined!"))
     gate_def          = gate_defs(v)[gate_name]
     n_defined_with    = length(gate_def.qubit_targets)
+    # cases like `ccnot qs`;
+    if n_called_with < n_defined_with && length(gate_targets[1]) == n_defined_with
+        n_called_with = length(gate_targets[1])
+        gate_targets = Vector{Int}[[gt] for gt in gate_targets[1]]
+    end
     applied_arguments = process_gate_arguments(v, gate_name, gate_def.arguments, provided_args, gate_def.body)
     control_qubits::Vector{Int} = collect(0:(n_called_with-n_defined_with)-1)
     mods::Vector{QasmExpression} = length(program_expr.args) == 4 ? convert(Vector{QasmExpression}, program_expr.args[4].args) : QasmExpression[]
@@ -1561,7 +1591,7 @@ function visit_gate_call(v::AbstractVisitor, program_expr::QasmExpression)
         end
     end
     applied_arguments = handle_gate_modifiers(applied_arguments, mods, control_qubits, false)
-    longest, gate_targets = splat_gate_targets(gate_targets) 
+    longest, gate_targets = splat_gate_targets(gate_targets)
     for splatted_ix in 1:longest
         target_mapper = Dict{Int, Int}(g_ix=>gate_targets[g_ix+1][splatted_ix] for g_ix in 0:n_called_with-1)
         for ii in 1:length(applied_arguments)
@@ -1596,6 +1626,12 @@ function (v::AbstractVisitor)(program_expr::QasmExpression)
     elseif head(program_expr) == :version
         return v
     elseif head(program_expr) == :reset
+        return v
+    elseif head(program_expr) == :barrier
+        return v
+    elseif head(program_expr) == :stretch
+        return v
+    elseif head(program_expr) == :duration
         return v
     elseif head(program_expr) == :input
         var_name = name(program_expr)
@@ -1877,11 +1913,7 @@ function (v::AbstractVisitor)(program_expr::QasmExpression)
             if noise_type == "kraus"
                 raw_mats = raw_args.args
                 kraus_matrices = map(raw_mats) do raw_mat
-                    kraus_matrix = similar(raw_mat, ComplexF64)
-                    for ii in eachindex(kraus_matrix)
-                        kraus_matrix[ii] = evaluate(v, raw_mat[ii])
-                    end
-                    kraus_matrix
+                    return broadcast(expr->convert(ComplexF64, evaluate(v, expr)), raw_mat)::Matrix{ComplexF64}
                 end
                 push!(v, Instruction(BraketSimulator.Kraus(kraus_matrices), targets))
             else

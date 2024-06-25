@@ -227,7 +227,11 @@ function add_to_qubit_observable_mapping!(c::Circuit, o::Observables.TensorProdu
     return c
 end
 add_to_qubit_observable_set!(c::Circuit, rt::ObservableResult) = union!(c.qubit_observable_set, Set(rt.targets))
+# exclude AdjointGradient from coverage for now
+# as we don't yet implement this, so don't have a test for it
+# COV_EXCL_START
 add_to_qubit_observable_set!(c::Circuit, rt::AdjointGradient)  = union!(c.qubit_observable_set, Set(reduce(union, rt.targets)))
+# COV_EXCL_STOP
 add_to_qubit_observable_set!(c::Circuit, rt::Result) = c.qubit_observable_set
 
 function _check_if_qubit_measured(c::Circuit, qubit::Int)
@@ -244,6 +248,9 @@ function add_instruction!(c::Circuit, ix::Instruction{O}) where {O<:Operator}
         for param in parameters(ix.operator)
             union!(c.parameters, (param,))
         end
+    end
+    if ix.operator isa Measure
+        append!(c.measure_targets, ix.target)
     end
     push!(c.instructions, ix)
     return c

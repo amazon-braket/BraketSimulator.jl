@@ -14,8 +14,7 @@ end
 
 for fi in readdir("src")
     if endswith(fi, ".jl")
-        println("Coverage for file $fi")
-        @show get_summary(process_file(joinpath("src", fi)))
+        println("Coverage for file $fi: $(get_summary(process_file(joinpath("src", fi))))")
     end
 end
 
