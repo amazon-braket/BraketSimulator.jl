@@ -852,7 +852,7 @@ function parse_qasm(clean_tokens::Vector{Tuple{Int64, Int32, Token}}, qasm::Stri
                         throw(QasmVisitorError("Invalid observable specified for '$result_type' result.", "ValueError"))
                     end
                 elseif result_type == "adjoint_gradient"
-                    throw(QasmVisitorError("Result type adjoint_gradient is not supported.", "TypeError"))
+                    push!(expr, :adjoint_gradient)
                 end
             elseif pragma_type == "unitary"
                 push!(expr, :unitary)
@@ -1815,19 +1815,30 @@ function (v::AbstractVisitor)(program_expr::QasmExpression)
                 has_targets = !isempty(raw_targets.args)
                 targets = has_targets ? evaluate_qubits(v, raw_targets.args[1]) : QubitSet()
                 observable = evaluate(v, raw_obs)
+                if observable isa Braket.Observables.StandardObservable && length(targets) > 1
+                    throw(QasmVisitorError("Standard observable target must be exactly 1 qubit.", "ValueError"))
+                end
                 push!(v, Expectation(observable, targets))
             elseif result_type == :variance
                 raw_obs, raw_targets = program_expr.args[3:end]
                 has_targets = !isempty(raw_targets.args)
                 targets = has_targets ? evaluate_qubits(v, raw_targets.args[1]) : QubitSet()
                 observable = evaluate(v, raw_obs)
+                if observable isa Braket.Observables.StandardObservable && length(targets) > 1
+                    throw(QasmVisitorError("Standard observable target must be exactly 1 qubit.", "ValueError"))
+                end
                 push!(v, Variance(observable, targets))
             elseif result_type == :sample
                 raw_obs, raw_targets = program_expr.args[3:end]
                 has_targets = !isempty(raw_targets.args)
                 targets = has_targets ? evaluate_qubits(v, raw_targets.args[1]) : QubitSet()
                 observable = evaluate(v, raw_obs)
+                if observable isa Braket.Observables.StandardObservable && length(targets) > 1
+                    throw(QasmVisitorError("Standard observable target must be exactly 1 qubit.", "ValueError"))
+                end
                 push!(v, Sample(observable, targets))
+            elseif result_type == :adjoint_gradient
+                throw(QasmVisitorError("Result type adjoint_gradient is not supported.", "TypeError"))
             end
         elseif pragma_type == :unitary
             raw_mat = program_expr.args[2]
