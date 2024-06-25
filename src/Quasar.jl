@@ -1444,8 +1444,9 @@ function evaluate_qubits(v::AbstractVisitor, qubit_targets)::Vector{Int}
         elseif head(qubit_expr) == :indexed_identifier
             qubit_name = name(qubit_expr)
             qubit_ix   = evaluate(v, qubit_expr.args[2])
-            # Need to figure this out
-            # haskey(mapping, qubit_name * "[$qubit_ix]") || throw(QasmVisitorError("Invalid qubit index '$qubit_ix' in '$qubit_name'.", "IndexError"))
+            foreach(qubit_ix) do rq
+                haskey(mapping, qubit_name * "[$rq]") || throw(QasmVisitorError("Invalid qubit index '$rq' in '$qubit_name'.", "IndexError"))
+            end
             return Iterators.flatten(mapping[qubit_name * "[$rq]"] for rq in qubit_ix)
         elseif head(qubit_expr) == :array_literal
             return evaluate_qubits(v, qubit_expr.args)

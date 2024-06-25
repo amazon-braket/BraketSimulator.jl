@@ -1425,6 +1425,24 @@ get_tol(shots::Int) = return (
             end
         end
     end
+    @testset "Referencing invalid qubit(s)" begin
+        source = """
+        qubit[2] q;
+        z q;
+        #pragma braket result expectation z(q[2])
+        """
+        parsed  = parse_qasm(source)
+        visitor = QasmProgramVisitor()
+        @test_throws Quasar.QasmVisitorError("Invalid qubit index '2' in 'q'.", "IndexError") visitor(parsed)
+        set_source = """
+        qubit[4] q;
+        z q;
+        #pragma braket result expectation z(q[{0,2,5}])
+        """
+        parsed  = parse_qasm(set_source)
+        visitor = QasmProgramVisitor()
+        @test_throws Quasar.QasmVisitorError("Invalid qubit index '5' in 'q'.", "IndexError") visitor(parsed)
+    end
     @testset "GRCS 16" begin
         simulator = BraketSimulator.StateVectorSimulator(16, 0)
         circuit   = Circuit(joinpath(@__DIR__, "grcs_16.qasm")) 
