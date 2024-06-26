@@ -29,7 +29,7 @@ import Braket:
     device_id,
     bind_value!
 
-export StateVectorSimulator, DensityMatrixSimulator, evolve!, simulate, U, MultiQubitPhaseShift, MultiRZ
+export StateVectorSimulator, DensityMatrixSimulator, evolve!, simulate, U, MultiQubitPhaseShift, MultiRZ, ValidationError
 
 const StateVector{T} = Vector{T}
 const DensityMatrix{T} = Matrix{T}
@@ -209,11 +209,11 @@ function _verify_openqasm_shots_observables(circuit::Circuit)
         for qubit in qubits, (target, previously_measured) in observable_map
             if qubit ∈ target
                 # must ensure that target is the same
-                !(target ⊆ qubits) && throw(ErrorException("Qubit part of incompatible results targets"))
+                issetequal(target, qubits) || throw(ValidationError("Qubit part of incompatible results targets", "ValueError"))
                 # must ensure observable is the same
-                typeof(previously_measured) != typeof(observable) && throw(ErrorException("Conflicting result types applied to a single qubit"))
+                typeof(previously_measured) != typeof(observable) && throw(ValidationError("Conflicting result types applied to a single qubit", "ValueError"))
                 # including matrix value for Hermitians
-                observable isa Braket.Observables.HermitianObservable && !isapprox(previously_measured.matrix, observable.matrix) && throw(ErrorException("Conflicting result types applied to a single qubit"))
+                observable isa Braket.Observables.HermitianObservable && !isapprox(previously_measured.matrix, observable.matrix) && throw(ValidationError("Conflicting result types applied to a single qubit", "ValueError"))
             end
         end
         observable_map[qubits] = observable
@@ -255,7 +255,7 @@ end
         circuit = Circuit(circuit_ir.source, inputs)
         measure_ixs = splice!(circuit.instructions, findall(ix->ix.operator isa Measure, circuit.instructions))
         if !isempty(measure_ixs)
-            measured_qubits = collect(Iterators.flatten(measure.target for measure in measure_ixs))
+            measured_qubits = unique(collect(Iterators.flatten(measure.target for measure in measure_ixs)))
         else
             measured_qubits = Int[]
         end
@@ -263,8 +263,9 @@ end
             _verify_openqasm_shots_observables(circuit)
             Braket.basis_rotation_instructions!(circuit)
         end
-        program = Program(circuit) 
-        n_qubits = qubit_count(program)
+        program = Program(circuit)
+        program_qc = qubit_count(program)
+        n_qubits = max(program_qc, (measured_qubits .+ 1)...)
         _validate_ir_results_compatibility(simulator, program.results, Val(:JAQCD))
         _validate_ir_instructions_compatibility(simulator, program, Val(:JAQCD))
         _validate_shots_and_ir_results(shots, program.results, n_qubits)
@@ -272,7 +273,7 @@ end
         if shots > 0 && !isempty(program.basis_rotation_instructions)
             operations = vcat(operations, program.basis_rotation_instructions)
         end
-        _validate_operation_qubits(operations)
+        _validate_operation_qubits(vcat(operations, measure_ixs))
         reinit!(simulator, n_qubits, shots)
         simulator = evolve!(simulator, operations)
         analytic_results = shots == 0 && !isnothing(program.results) && !isempty(program.results)
@@ -520,7 +521,6 @@ end
         simulator = StateVectorSimulator(3, 0)
         oq3_program = Braket.OpenQasmProgram(Braket.header_dict[Braket.OpenQasmProgram], unitary_qasm, nothing)
         simulate(simulator, oq3_program, 100)
-        
         simulate(simulator, [oq3_program, oq3_program], [100, 100])
         
         simulator = StateVectorSimulator(6, 0)

@@ -56,8 +56,8 @@ end
                      )
         args_provided = !isnothing(task_args) && !isempty(task_args)
         kwargs_provided = !isnothing(task_kwargs) && !isempty(task_kwargs)
-        kwargs_provided && length(task_kwargs) > 1 && length(task_kwargs) != length(task_specs) && throw(ArgumentError("number of kwargs ($(length(task_kwargs))) is not equal to number of task specifications ($(length(task_specs))) or equal to 1.")) 
-        args_provided && length(task_args) > 1 && length(task_args) != length(task_specs) && throw(ArgumentError("number of args ($(length(task_args))) is not equal to number of task specifications ($(length(task_specs))) or equal to 1.")) 
+        kwargs_provided && length(task_kwargs) > 1 && length(task_kwargs) != length(task_specs) && throw(ValidationError("number of kwargs ($(length(task_kwargs))) is not equal to number of task specifications ($(length(task_specs))) or equal to 1.", "ValueError")) 
+        args_provided && length(task_args) > 1 && length(task_args) != length(task_specs) && throw(ValidationError("number of args ($(length(task_args))) is not equal to number of task specifications ($(length(task_specs))) or equal to 1.", "ValueError")) 
         PythonCall.GC.disable()
         jl_specs = convert(Vector{Union{Braket.OpenQasmProgram, Braket.Program}}, task_specs)
         jl_args  = args_provided ? map(arg->pyconvert(Vector{Any}, arg), task_args) : [[] for t_ix in 1:length(task_specs)]

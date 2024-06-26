@@ -1425,6 +1425,36 @@ get_tol(shots::Int) = return (
             end
         end
     end
+    @testset "Referencing invalid qubit(s)" begin
+        source = """
+        qubit[2] q;
+        z q;
+        #pragma braket result expectation z(q[2])
+        """
+        parsed  = parse_qasm(source)
+        visitor = QasmProgramVisitor()
+        @test_throws Quasar.QasmVisitorError("Invalid qubit index '2' in 'q'.", "IndexError") visitor(parsed)
+        set_source = """
+        qubit[4] q;
+        z q;
+        #pragma braket result expectation z(q[{0,2,5}])
+        """
+        parsed  = parse_qasm(set_source)
+        visitor = QasmProgramVisitor()
+        @test_throws Quasar.QasmVisitorError("Invalid qubit index '5' in 'q'.", "IndexError") visitor(parsed)
+    end
+    @testset "Invalid Hermitian target" begin
+        qasm = """
+        OPENQASM 3.0;
+        qubit[3] q;
+        i q;
+        #pragma braket result expectation hermitian([[-6+0im, 2+1im, -3+0im, -5+2im], [2-1im, 0im, 2-1im, -5+4im], [-3+0im, 2+1im, 0im, -4+3im], [-5-2im, -5-4im, -4-3im, -6+0im]]) q[0]
+        """
+        parsed  = parse_qasm(qasm)
+        visitor = QasmProgramVisitor()
+        err_msg = "Invalid observable specified: [[[-6.0, 0.0], [2.0, 1.0], [-3.0, 0.0], [-5.0, 2.0]], [[2.0, -1.0], [0.0, 0.0], [2.0, -1.0], [-5.0, 4.0]], [[-3.0, 0.0], [2.0, 1.0], [0.0, 0.0], [-4.0, 3.0]], [[-5.0, -2.0], [-5.0, -4.0], [-4.0, -3.0], [-6.0, 0.0]]], targets: [0]" 
+        @test_throws Quasar.QasmVisitorError(err_msg, "ValueError") visitor(parsed)
+    end
     @testset "GRCS 16" begin
         simulator = BraketSimulator.StateVectorSimulator(16, 0)
         circuit   = Circuit(joinpath(@__DIR__, "grcs_16.qasm")) 
