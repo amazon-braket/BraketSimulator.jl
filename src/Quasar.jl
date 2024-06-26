@@ -1914,83 +1914,83 @@ function Braket.Circuit(qasm_source::String, inputs::Dict{String, <:Any}=Dict{St
     return Circuit(visitor) 
 end
 
-@setup_workload begin
-    custom_qasm = """
-               int[8] two = 2;
-               gate x a { U(π, 0, π) a; }
-               gate cx c, a {
-                   pow(1) @ ctrl @ x c, a;
-               }
-               gate cxx_1 c, a {
-                   pow(two) @ cx c, a;
-               }
-               gate cxx_2 c, a {
-                   pow(1/2) @ pow(4) @ cx c, a;
-               }
-               gate cxxx c, a {
-                   pow(1) @ pow(two) @ cx c, a;
-               }
-
-               qubit q1;
-               qubit q2;
-               qubit q3;
-               qubit q4;
-               qubit q5;
-
-               pow(1/2) @ x q1;       // half flip
-               pow(1/2) @ x q1;       // half flip
-               cx q1, q2;   // flip
-               cxx_1 q1, q3;    // don't flip
-               cxx_2 q1, q4;    // don't flip
-               cnot q1, q5;    // flip
-               x q3;       // flip
-               x q4;       // flip
-
-               s q1;   // sqrt z
-               s q1;   // again
-               inv @ z q1; // inv z
-               """;
-        noise_qasm = """
-        qubit[2] qs;
-
-        #pragma braket noise bit_flip(.5) qs[1]
-        #pragma braket noise phase_flip(.5) qs[0]
-        #pragma braket noise pauli_channel(.1, .2, .3) qs[0]
-        #pragma braket noise depolarizing(.5) qs[0]
-        #pragma braket noise two_qubit_depolarizing(.9) qs
-        #pragma braket noise two_qubit_depolarizing(.7) qs[1], qs[0]
-        #pragma braket noise two_qubit_dephasing(.6) qs
-        #pragma braket noise amplitude_damping(.2) qs[0]
-        #pragma braket noise generalized_amplitude_damping(.2, .3)  qs[1]
-        #pragma braket noise phase_damping(.4) qs[0]
-        #pragma braket noise kraus([[0.9486833im, 0], [0, 0.9486833im]], [[0, 0.31622777], [0.31622777, 0]]) qs[0]
-        #pragma braket noise kraus([[0.9486832980505138, 0, 0, 0], [0, 0.9486832980505138, 0, 0], [0, 0, 0.9486832980505138, 0], [0, 0, 0, 0.9486832980505138]], [[0, 0.31622776601683794, 0, 0], [0.31622776601683794, 0, 0, 0], [0, 0, 0, 0.31622776601683794], [0, 0, 0.31622776601683794, 0]]) qs[{1, 0}]
-        """
-        unitary_qasm = """
-        qubit[3] q;
-
-        x q[0];
-        h q[1];
-
-        // unitary pragma for t gate
-        #pragma braket unitary([[1.0, 0], [0, 0.70710678 + 0.70710678im]]) q[0]
-        ti q[0];
-
-        // unitary pragma for h gate (with phase shift)
-        #pragma braket unitary([[0.70710678im, 0.70710678im], [0 - -0.70710678im, -0.0 - 0.70710678im]]) q[1]
-        gphase(-π/2) q[1];
-        h q[1];
-
-        // unitary pragma for ccnot gate
-        #pragma braket unitary([[1.0, 0, 0, 0, 0, 0, 0, 0], [0, 1.0, 0, 0, 0, 0, 0, 0], [0, 0, 1.0, 0, 0, 0, 0, 0], [0, 0, 0, 1.0, 0, 0, 0, 0], [0, 0, 0, 0, 1.0, 0, 0, 0], [0, 0, 0, 0, 0, 1.0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 1.0], [0, 0, 0, 0, 0, 0, 1.0, 0]]) q
-        measure q;
-        """
-    @compile_workload begin
-        using Braket, BraketSimulator, BraketSimulator.Quasar
-        Circuit(custom_qasm)
-        Circuit(noise_qasm)
-        Circuit(unitary_qasm)
-    end
-end
+# @setup_workload begin
+#     custom_qasm = """
+#                int[8] two = 2;
+#                gate x a { U(π, 0, π) a; }
+#                gate cx c, a {
+#                    pow(1) @ ctrl @ x c, a;
+#                }
+#                gate cxx_1 c, a {
+#                    pow(two) @ cx c, a;
+#                }
+#                gate cxx_2 c, a {
+#                    pow(1/2) @ pow(4) @ cx c, a;
+#                }
+#                gate cxxx c, a {
+#                    pow(1) @ pow(two) @ cx c, a;
+#                }
+#
+#                qubit q1;
+#                qubit q2;
+#                qubit q3;
+#                qubit q4;
+#                qubit q5;
+#
+#                pow(1/2) @ x q1;       // half flip
+#                pow(1/2) @ x q1;       // half flip
+#                cx q1, q2;   // flip
+#                cxx_1 q1, q3;    // don't flip
+#                cxx_2 q1, q4;    // don't flip
+#                cnot q1, q5;    // flip
+#                x q3;       // flip
+#                x q4;       // flip
+#
+#                s q1;   // sqrt z
+#                s q1;   // again
+#                inv @ z q1; // inv z
+#                """;
+#         noise_qasm = """
+#         qubit[2] qs;
+#
+#         #pragma braket noise bit_flip(.5) qs[1]
+#         #pragma braket noise phase_flip(.5) qs[0]
+#         #pragma braket noise pauli_channel(.1, .2, .3) qs[0]
+#         #pragma braket noise depolarizing(.5) qs[0]
+#         #pragma braket noise two_qubit_depolarizing(.9) qs
+#         #pragma braket noise two_qubit_depolarizing(.7) qs[1], qs[0]
+#         #pragma braket noise two_qubit_dephasing(.6) qs
+#         #pragma braket noise amplitude_damping(.2) qs[0]
+#         #pragma braket noise generalized_amplitude_damping(.2, .3)  qs[1]
+#         #pragma braket noise phase_damping(.4) qs[0]
+#         #pragma braket noise kraus([[0.9486833im, 0], [0, 0.9486833im]], [[0, 0.31622777], [0.31622777, 0]]) qs[0]
+#         #pragma braket noise kraus([[0.9486832980505138, 0, 0, 0], [0, 0.9486832980505138, 0, 0], [0, 0, 0.9486832980505138, 0], [0, 0, 0, 0.9486832980505138]], [[0, 0.31622776601683794, 0, 0], [0.31622776601683794, 0, 0, 0], [0, 0, 0, 0.31622776601683794], [0, 0, 0.31622776601683794, 0]]) qs[{1, 0}]
+#         """
+#         unitary_qasm = """
+#         qubit[3] q;
+#
+#         x q[0];
+#         h q[1];
+#
+#         // unitary pragma for t gate
+#         #pragma braket unitary([[1.0, 0], [0, 0.70710678 + 0.70710678im]]) q[0]
+#         ti q[0];
+#
+#         // unitary pragma for h gate (with phase shift)
+#         #pragma braket unitary([[0.70710678im, 0.70710678im], [0 - -0.70710678im, -0.0 - 0.70710678im]]) q[1]
+#         gphase(-π/2) q[1];
+#         h q[1];
+#
+#         // unitary pragma for ccnot gate
+#         #pragma braket unitary([[1.0, 0, 0, 0, 0, 0, 0, 0], [0, 1.0, 0, 0, 0, 0, 0, 0], [0, 0, 1.0, 0, 0, 0, 0, 0], [0, 0, 0, 1.0, 0, 0, 0, 0], [0, 0, 0, 0, 1.0, 0, 0, 0], [0, 0, 0, 0, 0, 1.0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 1.0], [0, 0, 0, 0, 0, 0, 1.0, 0]]) q
+#         measure q;
+#         """
+#     @compile_workload begin
+#         using Braket, BraketSimulator, BraketSimulator.Quasar
+#         Circuit(custom_qasm)
+#         Circuit(noise_qasm)
+#         Circuit(unitary_qasm)
+#     end
+# end
 
 end # module Quasar
