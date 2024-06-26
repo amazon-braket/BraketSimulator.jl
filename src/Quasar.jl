@@ -849,7 +849,7 @@ function parse_qasm(clean_tokens::Vector{Tuple{Int64, Int32, Token}}, qasm::Stri
                         obs, targets = parse_pragma_observables(pragma_tokens, stack, start, qasm)
                         push!(expr, Symbol(result_type), obs, targets)
                     catch
-                        throw(QasmVisitorError("Invalid observable specified for '$result_type' result.", "ValueError"))
+                        push!(expr, Symbol(result_type), :invalid, :invalid)
                     end
                 elseif result_type == "adjoint_gradient"
                     push!(expr, :adjoint_gradient)
@@ -1812,6 +1812,7 @@ function (v::AbstractVisitor)(program_expr::QasmExpression)
                 push!(v, Amplitude(clean_states))
             elseif result_type == :expectation
                 raw_obs, raw_targets = program_expr.args[3:end]
+                raw_obs == :invalid && throw(QasmVisitorError("Invalid observable specified for 'expectation' result.", "ValueError"))
                 has_targets = !isempty(raw_targets.args)
                 targets = has_targets ? evaluate_qubits(v, raw_targets.args[1]) : QubitSet()
                 observable = evaluate(v, raw_obs)
@@ -1821,6 +1822,7 @@ function (v::AbstractVisitor)(program_expr::QasmExpression)
                 push!(v, Expectation(observable, targets))
             elseif result_type == :variance
                 raw_obs, raw_targets = program_expr.args[3:end]
+                raw_obs == :invalid && throw(QasmVisitorError("Invalid observable specified for 'variance' result.", "ValueError"))
                 has_targets = !isempty(raw_targets.args)
                 targets = has_targets ? evaluate_qubits(v, raw_targets.args[1]) : QubitSet()
                 observable = evaluate(v, raw_obs)
@@ -1830,6 +1832,7 @@ function (v::AbstractVisitor)(program_expr::QasmExpression)
                 push!(v, Variance(observable, targets))
             elseif result_type == :sample
                 raw_obs, raw_targets = program_expr.args[3:end]
+                raw_obs == :invalid && throw(QasmVisitorError("Invalid observable specified for 'sample' result.", "ValueError"))
                 has_targets = !isempty(raw_targets.args)
                 targets = has_targets ? evaluate_qubits(v, raw_targets.args[1]) : QubitSet()
                 observable = evaluate(v, raw_obs)
