@@ -768,7 +768,7 @@ function parse_pragma_observables(tokens::Vector{Tuple{Int64, Int32, Token}}, st
                 push!(target_tokens, (-1, Int32(-1), semicolon))
                 while !isempty(target_tokens) && first(target_tokens)[end] != semicolon
                     target_tokens[1][end] == comma && popfirst!(target_tokens)
-                    target_expr = parse_expression(target_tokens, stack, start, qasm)
+                    target_expr = parse_expression(target_tokens, stack, target_tokens[1][1], qasm)
                     push!(obs_targets, target_expr)
                 end
             end
@@ -845,12 +845,8 @@ function parse_qasm(clean_tokens::Vector{Tuple{Int64, Int32, Token}}, qasm::Stri
                     states = parse_list_expression(pragma_tokens, stack, start, qasm)
                     push!(expr, :amplitude, states)
                 elseif result_type ∈ ("expectation", "variance", "sample")
-                    try
-                        obs, targets = parse_pragma_observables(pragma_tokens, stack, start, qasm)
-                        push!(expr, Symbol(result_type), obs, targets)
-                    catch
-                        push!(expr, Symbol(result_type), :invalid, :invalid)
-                    end
+                    obs, targets = parse_pragma_observables(pragma_tokens, stack, start, qasm)
+                    push!(expr, Symbol(result_type), obs, targets)
                 elseif result_type == "adjoint_gradient"
                     push!(expr, :adjoint_gradient)
                 end
@@ -1567,6 +1563,14 @@ function visit_gate_call(v::AbstractVisitor, program_expr::QasmExpression)
     return
 end
 
+function _check_observable_targets(observable::Braket.Observables.HermitianObservable, targets)
+    qubit_count(observable) == 1 && (isempty(targets) || length(targets) == 1) && return
+    qubit_count(observable) == length(targets) && return
+    matrix_ir = Braket.complex_matrix_to_ir(observable.matrix)
+    throw(QasmVisitorError("Invalid observable specified: $matrix_ir, targets: $targets", "ValueError"))
+end
+_check_observable_targets(observable, targets) = nothing 
+
 function (v::AbstractVisitor)(program_expr::QasmExpression)
     var_name::String = ""
     if head(program_expr) == :program
@@ -1812,33 +1816,33 @@ function (v::AbstractVisitor)(program_expr::QasmExpression)
                 push!(v, Amplitude(clean_states))
             elseif result_type == :expectation
                 raw_obs, raw_targets = program_expr.args[3:end]
-                raw_obs == :invalid && throw(QasmVisitorError("Invalid observable specified for 'expectation' result.", "ValueError"))
                 has_targets = !isempty(raw_targets.args)
                 targets = has_targets ? evaluate_qubits(v, raw_targets.args[1]) : QubitSet()
                 observable = evaluate(v, raw_obs)
                 if observable isa Braket.Observables.StandardObservable && length(targets) > 1
                     throw(QasmVisitorError("Standard observable target must be exactly 1 qubit.", "ValueError"))
                 end
+                _check_observable_targets(observable, targets)
                 push!(v, Expectation(observable, targets))
             elseif result_type == :variance
                 raw_obs, raw_targets = program_expr.args[3:end]
-                raw_obs == :invalid && throw(QasmVisitorError("Invalid observable specified for 'variance' result.", "ValueError"))
                 has_targets = !isempty(raw_targets.args)
                 targets = has_targets ? evaluate_qubits(v, raw_targets.args[1]) : QubitSet()
                 observable = evaluate(v, raw_obs)
                 if observable isa Braket.Observables.StandardObservable && length(targets) > 1
                     throw(QasmVisitorError("Standard observable target must be exactly 1 qubit.", "ValueError"))
                 end
+                _check_observable_targets(observable, targets)
                 push!(v, Variance(observable, targets))
             elseif result_type == :sample
                 raw_obs, raw_targets = program_expr.args[3:end]
-                raw_obs == :invalid && throw(QasmVisitorError("Invalid observable specified for 'sample' result.", "ValueError"))
                 has_targets = !isempty(raw_targets.args)
                 targets = has_targets ? evaluate_qubits(v, raw_targets.args[1]) : QubitSet()
                 observable = evaluate(v, raw_obs)
                 if observable isa Braket.Observables.StandardObservable && length(targets) > 1
                     throw(QasmVisitorError("Standard observable target must be exactly 1 qubit.", "ValueError"))
                 end
+                _check_observable_targets(observable, targets)
                 push!(v, Sample(observable, targets))
             elseif result_type == :adjoint_gradient
                 throw(QasmVisitorError("Result type adjoint_gradient is not supported.", "TypeError"))
