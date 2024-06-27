@@ -3,10 +3,12 @@
 
 Generate the matrix representation of the [DoubleExcitation](https://docs.pennylane.ai/en/stable/code/api/pennylane.DoubleExcitation.html) gate.
 
-This gate performs an SO(2) rotation in the subspace {|1100⟩, |0011⟩}, transforming the states as follows:
+This gate performs an SO(2) rotation in the subspace ``{|1100\\rangle, |0011\\rangle}``, transforming the states as follows:
 
-- |0011⟩ ⟼ cos(ϕ/2)|0011⟩ + sin(ϕ/2)|1100⟩
-- |1100⟩ ⟼ cos(ϕ/2)|1100⟩ - sin(ϕ/2)|0011⟩
+```math
+|0011\\rangle & \\rightarrow \\cos\\left(\\frac{\\phi}{2}\\right)|0011\\rangle + \\sin\\left(\\frac{\\phi}{2}\\right)|1100\\rangle \\
+|1100\\rangle & \\rightarrow \\cos\\left(\\frac{\\phi}{2}\\right)|1100\\rangle - \\sin\\left(\\frac{\\phi}{2}\\right)|0011\\rangle
+```
 
 # Examples
 
@@ -56,11 +58,13 @@ end
 
 Generate the matrix representation of the [DoubleExcitationPlus](https://docs.pennylane.ai/en/stable/code/api/pennylane.DoubleExcitationPlus.html) gate.
 
-This gate performs an SO(2) rotation in the subspace {|1100⟩, |0011⟩} with a phase-shift on other states:
+This gate performs an SO(2) rotation in the subspace ``{|1100\\rangle, |0011\\rangle}`` with a phase-shift on other states:
 
-- |0011⟩ ⟼ cos(ϕ/2)|0011⟩ - sin(ϕ/2)|1100⟩
-- |1100⟩ ⟼ cos(ϕ/2)|1100⟩ + sin(ϕ/2)|0011⟩
-- |x⟩ ⟼ e^{iϕ/2}|x⟩   for all other basis states |x⟩
+```math
+|0011\\rangle & \\rightarrow \\cos\\left(\\frac{\\phi}{2}\\right)|0011\\rangle - \\sin\\left(\\frac{\\phi}{2}\\right)|1100\\rangle \\
+|1100\\rangle & \\rightarrow \\cos\\left(\\frac{\\phi}{2}\\right)|1100\\rangle + \\sin\\left(\\frac{\\phi}{2}\\right)|0011\\rangle \\
+|x\\rangle & \\rightarrow e^{\\frac{i\\phi}{2}}|x\\rangle \\quad \\text{for all other basis states } |x\\rangle
+```
 
 # Examples
 
@@ -117,11 +121,13 @@ end
 
 Generate the matrix representation of the [DoubleExcitationMinus](https://docs.pennylane.ai/en/stable/code/api/pennylane.DoubleExcitationMinus.html) gate.
 
-This gate performs an SO(2) rotation in the subspace {|1100⟩, |0011⟩} with a phase-shift on other states:
+This gate performs an SO(2) rotation in the subspace ``{|1100\\rangle, |0011\\rangle}`` with a phase-shift on other states:
 
-- |0011⟩ ⟼ cos(ϕ/2)|0011⟩ - sin(ϕ/2)|1100⟩
-- |1100⟩ ⟼ cos(ϕ/2)|1100⟩ + sin(ϕ/2)|0011⟩
-- |x⟩ ⟼ e^{-iϕ/2}|x⟩   for all other basis states |x⟩
+```math
+|0011\\rangle & \\rightarrow \\cos\\left(\\frac{\\phi}{2}\\right)|0011\\rangle - \\sin\\left(\\frac{\\phi}{2}\\right)|1100\\rangle \\
+|1100\\rangle & \\rightarrow \\cos\\left(\\frac{\\phi}{2}\\right)|1100\\rangle + \\sin\\left(\\frac{\\phi}{2}\\right)|0011\\rangle \\
+|x\\rangle & \\rightarrow e^{-\\frac{i\\phi}{2}}|x\\rangle \\quad \\text{for all other basis states } |x\\rangle
+```
 
 # Examples
 
@@ -178,7 +184,7 @@ end
 
 Generate the matrix representation of the [SingleExcitation](https://docs.pennylane.ai/en/stable/code/api/pennylane.SingleExcitation.html) gate. 
 
-This gate performs a rotation in the subspace {|01⟩, |10⟩}.
+This gate performs a rotation in the subspace ``{|01\\rangle, |10\\rangle}``.
 
 # Examples
 
@@ -223,7 +229,7 @@ end
 
 Generate the matrix representation of the [SingleExcitationPlus](https://docs.pennylane.ai/en/stable/code/api/pennylane.SingleExcitationPlus.html) gate.
 
-This gate performs a rotation in the subspace {|01⟩, |10⟩} with a phase-shift.
+This gate performs a rotation in the subspace ``{|01\\rangle, |10\\rangle}`` with a phase-shift.
 
 # Examples
 
@@ -269,7 +275,7 @@ end
 
 Generate the matrix representation of the [SingleExcitationMinus](https://docs.pennylane.ai/en/stable/code/api/pennylane.SingleExcitationMinus.html) gate.
 
-This gate performs a rotation in the subspace {|01⟩, |10⟩} with a phase-shift.
+This gate performs a rotation in the subspace ``{|01\\rangle, |10\\rangle}`` with a phase-shift.
 
 # Examples
 
@@ -317,10 +323,12 @@ Generate the matrix representation of the [FermionicSWAP](https://docs.pennylane
 
 This gate performs a rotation in adjacent fermionic modes under the Jordan-Wigner mapping, transforming states as follows:
 
-- |00⟩ ⟼ |00⟩
-- |01⟩ ⟼ e^{iϕ/2}cos(ϕ/2)|01⟩ - ie^{iϕ/2}sin(ϕ/2)|10⟩
-- |10⟩ ⟼ -ie^{iϕ/2}sin(ϕ/2)|01⟩ + e^{iϕ/2}cos(ϕ/2)|10⟩
-- |11⟩ ⟼ e^{iϕ}|11⟩
+```math
+|00\\rangle & \\rightarrow |00\\rangle \\
+|01\\rangle & \\rightarrow e^{\\frac{i\\phi}{2}}\\cos\\left(\\frac{\\phi}{2}\\right)|01\\rangle - ie^{\\frac{i\\phi}{2}}\\sin\\left(\\frac{\\phi}{2}\\right)|10\\rangle \\
+|10\\rangle & \\rightarrow -ie^{\\frac{i\\phi}{2}}\\sin\\left(\\frac{\\phi}{2}\\right)|01\\rangle + e^{\\frac{i\\phi}{2}}\\cos\\left(\\frac{\\phi}{2}\\right)|10\\rangle \\
+|11\\rangle & \\rightarrow e^{i\\phi}|11\\rangle
+```
 
 # Examples
 
