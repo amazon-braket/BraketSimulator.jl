@@ -4,4 +4,4 @@ channels = ["conda-forge"]
 # Conda package names and versions
 python = ">=3.9,<4"
 amazon-braket-sdk = ">=1.83"
-amazon-braket-schemas = ">=1.26"
+amazon-braket-schemas = ">=1.22"
