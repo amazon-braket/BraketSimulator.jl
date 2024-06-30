@@ -348,6 +348,27 @@ LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
         @test 0.4 < samples[3] / (samples[0] + samples[3]) < 0.6
         @test samples[0] + samples[3] == 10000
     end
+    @testset "batch" begin
+        function make_ghz(num_qubits)
+            ghz = Circuit()
+            ghz(H, 0)
+            for ii in 0:num_qubits-2
+                ghz(CNot, ii, ii+1)
+            end
+            return ir(ghz)
+        end
+        num_qubits = 5
+        n_circuits = 100
+        shots   = 1000
+        jl_ghz  = [make_ghz(num_qubits) for ix in 1:n_circuits]
+        jl_sim  = StateVectorSimulator(num_qubits, 0);
+        results = simulate(jl_sim, jl_ghz, shots)
+        for (r_ix, r) in enumerate(results)
+            @test length(r.measurements) == shots
+            @test 400 < count(m->m == fill(0, num_qubits), r.measurements) < 600
+            @test 400 < count(m->m == fill(1, num_qubits), r.measurements) < 600
+        end
+    end
     @testset "similar, copy and copyto!" begin
         qubit_count = 10
         orig = StateVectorSimulator(qubit_count, 0)
@@ -361,6 +382,38 @@ LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
         sim.state_vector = 1/√2^qubit_count .* [exp(im*rand()) for ix in 1:2^qubit_count]
         copyto!(sim2, sim)
         @test sim2.state_vector ≈ sim.state_vector
+    end
+    @testset "Measure with no gates" begin
+        qasm = """
+        bit[4] b;
+        qubit[4] q;
+        b[0] = measure q[0];
+        b[1] = measure q[1];
+        b[2] = measure q[2];
+        b[3] = measure q[3];
+        """
+        simulator = StateVectorSimulator(0, 0)
+        res = simulate(simulator, ir(Circuit(qasm), Val(:OpenQASM)), 1000)
+        @test all(m -> m == zeros(Int, 4), res.measurements)
+        @test length(res.measurements) == 1000
+        @test res.measuredQubits == collect(0:3)
+    end
+    @testset "Measure with qubits not used" begin
+        qasm = """
+        bit[4] b;
+        qubit[4] q;
+        h q[0];
+        cnot q[0], q[1];
+        b = measure q;
+        """ 
+        simulator = StateVectorSimulator(0, 0)
+        res = simulate(simulator, ir(Circuit(qasm), Val(:OpenQASM)), 1000)
+        @test res.measuredQubits == collect(0:3)
+        @test 400 < sum(m[1] for m in res.measurements) < 600
+        @test 400 < sum(m[2] for m in res.measurements) < 600
+        @test sum(m[3] for m in res.measurements) == 0
+        @test sum(m[4] for m in res.measurements) == 0
+        @test all(m->length(m) == 4, res.measurements)
     end
     @testset "supported operations and results" begin
         qubit_count = 10

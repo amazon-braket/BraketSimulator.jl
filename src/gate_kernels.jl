@@ -253,7 +253,7 @@ end
 apply_gate!(g::G, args...) where {G<:Gate} = apply_gate!(Val(false), g, args...)
 
 function apply_controlled_gate!(
-    g_matrix::Union{SMatrix{2,2,T}, Diagonal{T,SVector{2,T}}},
+    g_matrix::Union{SMatrix{2,2,T}, Diagonal{T,SVector{2,T}}, Matrix{T}},
     c_bit::Bool,
     state_vec::StateVector{T},
     control::Int,
@@ -281,7 +281,7 @@ function apply_controlled_gate!(
     return
 end
 function apply_controlled_gate!(
-    g_matrix::Union{SMatrix{4, 4, T}, Diagonal{T, SVector{4, T}}},
+    g_matrix::Union{SMatrix{4, 4, T}, Diagonal{T, SVector{4, T}}, Matrix{T}},
     c_bit::Bool,
     state_vec::StateVector{T},
     control::Int,
@@ -309,7 +309,7 @@ function apply_controlled_gate!(
 end
 # doubly controlled unitaries
 function apply_controlled_gate!(
-    g_matrix::Union{SMatrix{2, 2, T}, Diagonal{T, SVector{2, T}}},
+    g_matrix::Union{SMatrix{2, 2, T}, Diagonal{T, SVector{2, T}}, Matrix{T}},
     c1_bit::Bool,
     c2_bit::Bool,
     state_vec::StateVector{T},

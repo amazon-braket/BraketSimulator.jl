@@ -16,6 +16,6 @@ using Test, Braket, BraketSimulator
     @test_logs (:warn, "You are running a noise-free circuit on the density matrix simulator. Consider running this circuit on the state vector simulator: LocalSimulator(\"braket_sv_v2\") for a better user experience.") BraketSimulator._validate_ir_instructions_compatibility(sim, c, Val(:JAQCD))
     sim = StateVectorSimulator(2, 0)
     c = Circuit([(BitFlip(0.1), 0)])
-    @test_throws ErrorException BraketSimulator._validate_ir_instructions_compatibility(sim, c, Val(:OpenQASM))
-    @test_throws ErrorException BraketSimulator._validate_ir_instructions_compatibility(sim, c, Val(:JAQCD))
+    @test_throws ValidationError BraketSimulator._validate_ir_instructions_compatibility(sim, c, Val(:OpenQASM))
+    @test_throws ValidationError BraketSimulator._validate_ir_instructions_compatibility(sim, c, Val(:JAQCD))
 end
