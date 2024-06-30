@@ -49,7 +49,7 @@ function _validate_shots_and_ir_results(shots::Int, results, qubit_count::Int)
     elseif shots > 0 && !isnothing(results) && !isempty(results)
         for rt in results
             rt.type ∈ ["statevector", "amplitude", "densitymatrix"] && throw(ValidationError(
-                "statevector, amplitude and densitymatrix result types not available when shots>0",
+                "statevector, amplitude and densitymatrix result types are only available when shots==0",
                 "ValueError"
             ))
         end
