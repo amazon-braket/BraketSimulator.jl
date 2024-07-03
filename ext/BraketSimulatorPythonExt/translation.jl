@@ -19,20 +19,20 @@ function py_obs(obs::Vector)
     end
     return pylist(raw_obs)
 end
-Py(r::Braket.IR.Sample)        = braket[].ir.jaqcd.results.Sample(targets=convert_targets(r.targets), observable=py_obs(r.observable), type=pystr("sample"))
-Py(r::Braket.IR.Expectation)   = braket[].ir.jaqcd.results.Expectation(targets=convert_targets(r.targets), observable=py_obs(r.observable), type=pystr("expectation"))
-Py(r::Braket.IR.Variance)      = braket[].ir.jaqcd.results.Variance(observable=py_obs(r.observable), targets=convert_targets(r.targets), type=pystr("variance"))
-Py(r::Braket.IR.Amplitude)     = braket[].ir.jaqcd.results.Amplitude(states=pylist(pystr(s) for s in r.states), type=pystr("amplitude"))
-Py(r::Braket.IR.StateVector)   = braket[].ir.jaqcd.results.StateVector(type=pystr("statevector"))
-Py(r::Braket.IR.DensityMatrix) = braket[].ir.jaqcd.results.DensityMatrix(targets=convert_targets(r.targets), type=pystr("densitymatrix"))
-Py(r::Braket.IR.Probability)   = braket[].ir.jaqcd.results.Probability(targets=convert_targets(r.targets), type=pystr("probability"))
+Py(r::BraketSimulator.IR.Sample)        = braket[].ir.jaqcd.results.Sample(targets=convert_targets(r.targets), observable=py_obs(r.observable), type=pystr("sample"))
+Py(r::BraketSimulator.IR.Expectation)   = braket[].ir.jaqcd.results.Expectation(targets=convert_targets(r.targets), observable=py_obs(r.observable), type=pystr("expectation"))
+Py(r::BraketSimulator.IR.Variance)      = braket[].ir.jaqcd.results.Variance(observable=py_obs(r.observable), targets=convert_targets(r.targets), type=pystr("variance"))
+Py(r::BraketSimulator.IR.Amplitude)     = braket[].ir.jaqcd.results.Amplitude(states=pylist(pystr(s) for s in r.states), type=pystr("amplitude"))
+Py(r::BraketSimulator.IR.StateVector)   = braket[].ir.jaqcd.results.StateVector(type=pystr("statevector"))
+Py(r::BraketSimulator.IR.DensityMatrix) = braket[].ir.jaqcd.results.DensityMatrix(targets=convert_targets(r.targets), type=pystr("densitymatrix"))
+Py(r::BraketSimulator.IR.Probability)   = braket[].ir.jaqcd.results.Probability(targets=convert_targets(r.targets), type=pystr("probability"))
 # exclude adjoint gradient translation from coverage for now
 # as we don't yet implement this, so don't have a test for it
 # COV_EXCL_START
-Py(r::Braket.IR.AdjointGradient) =  braket[].ir.jaqcd.results.AdjointGradient(targets=convert_targets(r.targets), observable=pylist(r.observable), parameters=pylist(pystr(p) for p in r.parameters), type=pystr("adjoint_gradient"))
+Py(r::BraketSimulator.IR.AdjointGradient) =  braket[].ir.jaqcd.results.AdjointGradient(targets=convert_targets(r.targets), observable=pylist(r.observable), parameters=pylist(pystr(p) for p in r.parameters), type=pystr("adjoint_gradient"))
 # COV_EXCL_STOP
 
-function Py(rt::Braket.ResultTypeValue)
+function Py(rt::BraketSimulator.ResultTypeValue)
     py_typ = Py(rt.type)
     py_val = if rt.value isa Dict
         pydict(rt.value)
