@@ -342,7 +342,7 @@ end
         
         todo_tasks_ch = Channel{Int}(ch->foreach(ix->put!(ch, ix), 1:n_tasks), n_tasks)
 
-        max_parallel_threads = max_parallel > 0 ? max_parallel : 32
+        max_parallel_threads = max_parallel > 0 ? max_parallel : min(32, Threads.nthreads())
         n_task_threads = min(max_parallel_threads, n_tasks)
 
         results = Vector{Braket.GateModelTaskResult}(undef, n_tasks)
