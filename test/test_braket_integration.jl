@@ -593,7 +593,8 @@ end
                     device = DEVICE
                     @testset for task in tasks
                         run_circuit(circuit) = result(simulate(device, circuit; shots = SHOTS))
-                        task_array = [task() for ii = 1:Threads.nthreads()]
+                        batch_size = 5
+                        task_array = [task() for ii = 1:batch_size]
                         batch_results = results(simulate(device, task_array; shots=SHOTS))
                         for r in batch_results
                             @test isapprox(
