@@ -166,6 +166,13 @@ using PythonCall: pyconvert
                 for oq3_result in oq3_results
                     @test pyconvert(Vector{Float64}, oq3_result.resultTypes[0].value) ≠ pyconvert(Vector{Float64}, oq3_result.resultTypes[1].value)
                 end
+                # test a "batch" of length 1
+                sv_simulator = StateVectorSimulator(n_qubits, 0)
+                py_inputs    = PyList{Any}([pydict(Dict("a_in"=>2, "b_in"=>5))])
+                oq3_results  = simulate(sv_simulator, PyList{Any}([oq3_program]); inputs=py_inputs, shots=0)
+                for oq3_result in oq3_results
+                    @test pyconvert(Vector{Float64}, oq3_result.resultTypes[0].value) ≠ pyconvert(Vector{Float64}, oq3_result.resultTypes[1].value)
+                end
             end
         end
     end
