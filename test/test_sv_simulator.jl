@@ -358,15 +358,16 @@ LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
             return ir(ghz)
         end
         num_qubits = 5
-        n_circuits = 100
-        shots   = 1000
-        jl_ghz  = [make_ghz(num_qubits) for ix in 1:n_circuits]
-        jl_sim  = StateVectorSimulator(num_qubits, 0);
-        results = simulate(jl_sim, jl_ghz, shots)
-        for (r_ix, r) in enumerate(results)
-            @test length(r.measurements) == shots
-            @test 400 < count(m->m == fill(0, num_qubits), r.measurements) < 600
-            @test 400 < count(m->m == fill(1, num_qubits), r.measurements) < 600
+        @testset for n_circuits in (1, 100)
+            shots   = 1000
+            jl_ghz  = [make_ghz(num_qubits) for ix in 1:n_circuits]
+            jl_sim  = StateVectorSimulator(num_qubits, 0);
+            results = simulate(jl_sim, jl_ghz, shots)
+            for (r_ix, r) in enumerate(results)
+                @test length(r.measurements) == shots
+                @test 400 < count(m->m == fill(0, num_qubits), r.measurements) < 600
+                @test 400 < count(m->m == fill(1, num_qubits), r.measurements) < 600
+            end
         end
     end
     @testset "similar, copy and copyto!" begin
