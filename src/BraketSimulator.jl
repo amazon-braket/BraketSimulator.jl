@@ -353,7 +353,6 @@ end
 
         results = Vector{Braket.GateModelTaskResult}(undef, n_tasks)
         function process_work()
-            my_sim = similar(simulator)
             while isready(todo_tasks_ch)
                 my_ix = -1
                 # need to lock the channel as it may become empty
@@ -365,6 +364,7 @@ end
                 # if my_ix is still -1, the channel is empty and
                 # there's no more work to do
                 my_ix == -1 && break
+                my_sim = similar(simulator)
                 spec  = task_specs[my_ix]
                 input = inputs[my_ix]
                 results[my_ix] = simulate(my_sim, spec, shots; inputs=input)
