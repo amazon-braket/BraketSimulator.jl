@@ -329,7 +329,13 @@ end
                      )
         is_single_task  = length(task_specs) == 1
         is_single_input = inputs isa Dict || length(inputs) == 1
-        is_single_input && is_single_task && return simulate(simulator, only(task_specs), only(task_args); inputs=inputs, kwargs...)
+        if is_single_input && is_single_task
+            if inputs isa Vector
+                return [simulate(simulator, only(task_specs); inputs=only(inputs), kwargs...)]
+            else
+                return [simulate(simulator, only(task_specs); inputs=inputs, kwargs...)]
+            end
+        end
         if is_single_input
             if inputs isa Dict
                 inputs = [deepcopy(inputs) for ix in 1:length(task_specs)]

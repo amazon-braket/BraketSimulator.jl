@@ -1494,6 +1494,30 @@ get_tol(shots::Int) = return (
         err_msg = "Invalid observable specified: [[[-6.0, 0.0], [2.0, 1.0], [-3.0, 0.0], [-5.0, 2.0]], [[2.0, -1.0], [0.0, 0.0], [2.0, -1.0], [-5.0, 4.0]], [[-3.0, 0.0], [2.0, 1.0], [0.0, 0.0], [-4.0, 3.0]], [[-5.0, -2.0], [-5.0, -4.0], [-4.0, -3.0], [-6.0, 0.0]]], targets: [0]" 
         @test_throws Quasar.QasmVisitorError(err_msg, "ValueError") visitor(parsed)
     end
+    @testset "Qubits with variable as size" begin
+        qasm_string = """
+        OPENQASM 3.0;
+
+        def ghz(int[32] n) {
+            h q[0];
+            for int i in [0:n - 1] {
+                cnot q[i], q[i + 1];
+            }
+        }
+
+        int[32] n = 5;
+        bit[n + 1] c;
+        qubit[n + 1] q;
+
+        ghz(n);
+
+        c = measure q;
+        """
+        parsed = parse_qasm(qasm_string)
+        visitor = Quasar.QasmProgramVisitor()
+        visitor(parsed)
+        @test Quasar.qubit_count(visitor) == 6
+    end
     @testset "String inputs" begin
         qasm_string = """
         const int[8] n = 4;

@@ -1106,9 +1106,9 @@ mutable struct QasmFunctionVisitor <: AbstractVisitor
     function QasmFunctionVisitor(parent::AbstractVisitor, declared_arguments::Vector{QasmExpression}, provided_arguments::Vector{QasmExpression})
         v = new(parent, 
             classical_defs(parent),
-            Dict{String, Qubit}(),
-            Dict{String, Vector{Int}}(),
-            0,
+            deepcopy(parent.qubit_defs),
+            deepcopy(parent.qubit_mapping),
+            qubit_count(parent),
             Instruction[],
            )
         arg_map = Dict(zip(declared_arguments, provided_arguments))
@@ -1411,7 +1411,8 @@ function evaluate(v::AbstractVisitor, expr::QasmExpression)
                     end
                 end
             end
-            push!(v, Instruction[remap(ix, reverse_qubits_map) for ix in function_v.instructions])
+            remapped = isempty(reverse_qubits_map) ? function_v.instructions : Instruction[remap(ix, reverse_qubits_map) for ix in function_v.instructions] 
+            push!(v, remapped)
             return return_val
         end
     else
@@ -1741,7 +1742,7 @@ function (v::AbstractVisitor)(program_expr::QasmExpression)
         v.classical_defs[var_name] = ClassicalVariable(var_name, var_type, v.classical_defs[var_name].val, true)
     elseif head(program_expr) == :qubit_declaration
         qubit_name::String = name(program_expr)
-        qubit_size::Int = program_expr.args[2].args[1]
+        qubit_size::Int = evaluate(v, program_expr.args[2])
         qubit_defs(v)[qubit_name] = Qubit(qubit_name, qubit_size)
         qubit_mapping(v)[qubit_name] = collect(qubit_count(v) : qubit_count(v) + qubit_size - 1)
         for qubit_i in 0:qubit_size-1

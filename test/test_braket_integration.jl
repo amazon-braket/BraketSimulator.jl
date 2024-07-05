@@ -592,11 +592,10 @@ end
                     tasks = (bell_circ, (()->ir(bell_circ(), Val(:OpenQASM))), (()->ir(bell_circ(), Val(:JAQCD))))
                     device = DEVICE
                     @testset for task in tasks
-                        run_circuit(circuit) = result(device(circuit, shots = SHOTS))
+                        run_circuit(circuit) = result(simulate(device, circuit; shots = SHOTS))
                         task_array = [task() for ii = 1:Threads.nthreads()]
-                        futures = [Threads.@spawn run_circuit(c) for c in task_array]
-                        future_results = fetch.(futures)
-                        for r in future_results
+                        batch_results = results(simulate(device, task_array; shots=SHOTS))
+                        for r in batch_results
                             @test isapprox(
                                 r.measurement_probabilities["00"],
                                 0.5,
