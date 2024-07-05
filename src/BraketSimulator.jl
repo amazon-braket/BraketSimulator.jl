@@ -331,9 +331,9 @@ end
         is_single_input = inputs isa Dict || length(inputs) == 1
         if is_single_input && is_single_task
             if inputs isa Vector
-                return [simulate(simulator, only(task_specs); inputs=only(inputs), kwargs...)]
+                return [simulate(simulator, only(task_specs), shots; inputs=only(inputs), kwargs...)]
             else
-                return [simulate(simulator, only(task_specs); inputs=inputs, kwargs...)]
+                return [simulate(simulator, only(task_specs), shots; inputs=inputs, kwargs...)]
             end
         end
         if is_single_input
