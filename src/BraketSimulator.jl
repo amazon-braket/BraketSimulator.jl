@@ -352,8 +352,7 @@ end
         n_task_threads = min(max_parallel_threads, n_tasks)
 
         results = Vector{Braket.GateModelTaskResult}(undef, n_tasks)
-        function process_work()
-            my_sim = copy(simulator)
+        function process_work(my_sim)
             while isready(todo_tasks_ch)
                 my_ix = -1
                 # need to lock the channel as it may become empty
@@ -374,7 +373,7 @@ end
         tasks = Vector{Task}(undef, n_task_threads)
         # need sync here to ensure all the spawns launch
         @sync for worker in 1:n_task_threads
-            tasks[worker] = Threads.@spawn process_work()
+            tasks[worker] = Threads.@spawn process_work(similar(simulator))
         end
         # tasks don't return anything so we can wait rather than fetch
         wait.(tasks)

@@ -149,7 +149,7 @@ function evolve!(
     return svs
 end
 
-state_vector(svs::StateVectorSimulator) = svs.state_vector
+state_vector(svs::StateVectorSimulator) = copy(svs.state_vector)
 density_matrix(svs::StateVectorSimulator) =
     kron(svs.state_vector, adjoint(svs.state_vector))
 

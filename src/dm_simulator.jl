@@ -252,7 +252,7 @@ function expectation(
     return real(sum(diag(dm_copy)))
 end
 state_vector(dms::DensityMatrixSimulator)   = diag(dms.density_matrix)
-density_matrix(dms::DensityMatrixSimulator) = dms.density_matrix
+density_matrix(dms::DensityMatrixSimulator) = copy(dms.density_matrix)
 probabilities(dms::DensityMatrixSimulator)  = real.(diag(dms.density_matrix))
 
 function swap_bits(ix::Int, qubit_map::Dict{Int,Int})
