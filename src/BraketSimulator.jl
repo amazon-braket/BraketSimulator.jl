@@ -273,17 +273,7 @@ end
             operations = vcat(operations, program.basis_rotation_instructions)
         end
         _validate_operation_qubits(vcat(operations, measure_ixs))
-        if simulator isa StateVectorSimulator
-            println("SV before reinit:")
-            println(simulator.state_vector)
-            flush(stdout)
-        end
         reinit!(simulator, n_qubits, shots)
-        if simulator isa StateVectorSimulator
-            println("SV after reinit:")
-            println(simulator.state_vector)
-            flush(stdout)
-        end
         simulator = evolve!(simulator, operations)
         analytic_results = shots == 0 && !isnothing(program.results) && !isempty(program.results)
         results = if analytic_results
