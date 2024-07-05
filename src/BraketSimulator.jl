@@ -353,7 +353,7 @@ end
 
         results = Vector{Braket.GateModelTaskResult}(undef, n_tasks)
         function process_work()
-            my_sim = copy(simulator)
+            my_sim = similar(simulator)
             while isready(todo_tasks_ch)
                 my_ix = -1
                 # need to lock the channel as it may become empty
