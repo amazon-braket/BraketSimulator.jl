@@ -462,4 +462,51 @@ LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
                 "zz",
             ]
     end
+    @testset "inputs handling" begin
+        sv_adder_qasm = """
+            OPENQASM 3;
+
+            input uint[4] a_in;
+            input uint[4] b_in;
+
+            gate majority a, b, c {
+                cnot c, b;
+                cnot c, a;
+                ccnot a, b, c;
+            }
+
+            gate unmaj a, b, c {
+                ccnot a, b, c;
+                cnot c, a;
+                cnot a, b;
+            }
+
+            qubit cin;
+            qubit[4] a;
+            qubit[4] b;
+            qubit cout;
+
+            // set input states
+            for int[8] i in [0: 3] {
+              if(bool(a_in[i])) x a[i];
+              if(bool(b_in[i])) x b[i];
+            }
+
+            // add a to b, storing result in b
+            majority cin, b[3], a[3];
+            for int[8] i in [3: -1: 1] { majority a[i], b[i - 1], a[i - 1]; }
+            cnot a[0], cout;
+            for int[8] i in [1: 3] { unmaj a[i], b[i - 1], a[i - 1]; }
+            unmaj cin, b[3], a[3];
+
+            // todo: subtle bug when trying to get a result type for both at once
+            #pragma braket result probability cout, b
+            #pragma braket result probability cout
+            #pragma braket result probability b
+            """
+        simulator = StateVectorSimulator(6, 0)
+        oq3_program = Braket.OpenQasmProgram(Braket.header_dict[Braket.OpenQasmProgram], sv_adder_qasm, Dict("a_in"=>3, "b_in"=>7))
+        # should NOT throw a missing input error
+        simulate(simulator, oq3_program, 0; inputs=Dict{String, Float64}())
+    end
 end
