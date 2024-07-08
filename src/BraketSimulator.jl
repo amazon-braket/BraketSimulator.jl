@@ -252,8 +252,9 @@ end
         shots::Int = 0;
         kwargs...,
     )
-        inputs = get(kwargs, :inputs, circuit_ir.inputs)
-        inputs = isnothing(inputs) ? Dict{String, Float64}() : Dict{String, Any}(k=>v for (k,v) in inputs)
+        ir_inputs = isnothing(circuit_ir.inputs) || isempty(circuit_ir.inputs) ? Dict{String, Float64}() : circuit_ir.inputs 
+        inputs = get(kwargs, :inputs, ir_inputs)
+        inputs = isnothing(inputs) || isempty(inputs) ? ir_inputs : Dict{String, Any}(k=>v for (k,v) in inputs)
         circuit = Circuit(circuit_ir.source, inputs)
         measure_ixs = splice!(circuit.instructions, findall(ix->ix.operator isa Measure, circuit.instructions))
         measure_targets = (convert(Vector{Int}, measure.target) for measure in measure_ixs) 
