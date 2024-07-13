@@ -510,6 +510,46 @@ end
         #pragma braket result probability cout
         #pragma braket result probability b
         """
+    qft_qasm = """
+    OPENQASM 3.0;
+    bit[5] b;
+    qubit[5] q;
+    h q[0];
+    cphaseshift(1.5707963267948966) q[1], q[0];
+    cphaseshift(0.7853981633974483) q[2], q[0];
+    cphaseshift(0.39269908169872414) q[3], q[0];
+    cphaseshift(0.19634954084936207) q[4], q[0];
+    h q[1];
+    cphaseshift(1.5707963267948966) q[2], q[1];
+    cphaseshift(0.7853981633974483) q[3], q[1];
+    cphaseshift(0.39269908169872414) q[4], q[1];
+    h q[2];
+    cphaseshift(1.5707963267948966) q[3], q[2];
+    cphaseshift(0.7853981633974483) q[4], q[2];
+    h q[3];
+    cphaseshift(1.5707963267948966) q[4], q[3];
+    h q[4];
+    b[0] = measure q[0];
+    b[1] = measure q[1];
+    b[2] = measure q[2];
+    b[3] = measure q[3];
+    b[4] = measure q[4];
+    """
+    swap_qasm = """
+    OPENQASM 3.0;
+    bit[2] b;
+    qubit[2] q;
+    h q[0];
+    h q[1];
+    cnot q[0], q[1];
+    cphaseshift(0.5) q[0], q[1];
+    xx(0.2) q[0], q[1];
+    yy(0.2) q[0], q[1];
+    zz(0.2) q[0], q[1];
+    swap q[0], q[1];
+    b[0] = measure q[0];
+    b[1] = measure q[1];
+    """
     @compile_workload begin
         using Braket, BraketSimulator, BraketSimulator.Quasar
         simulator = StateVectorSimulator(5, 0)
@@ -526,6 +566,14 @@ end
         simulate(simulator, oq3_program, 100)
         simulate(simulator, [oq3_program, oq3_program], 100)
         
+        simulator = StateVectorSimulator(2, 0)
+        oq3_program = Braket.OpenQasmProgram(Braket.header_dict[Braket.OpenQasmProgram], swap_qasm, nothing)
+        simulate(simulator, oq3_program, 100)
+        
+        simulator = StateVectorSimulator(5, 0)
+        oq3_program = Braket.OpenQasmProgram(Braket.header_dict[Braket.OpenQasmProgram], qft_qasm, nothing)
+        simulate(simulator, oq3_program, 100)
+
         simulator = StateVectorSimulator(6, 0)
         oq3_program = Braket.OpenQasmProgram(Braket.header_dict[Braket.OpenQasmProgram], sv_adder_qasm, Dict("a_in"=>3, "b_in"=>7))
         simulate(simulator, oq3_program, 0)
