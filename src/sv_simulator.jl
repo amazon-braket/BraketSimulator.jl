@@ -63,24 +63,24 @@ end
 Create a `StateVectorSimulator` with `2^qubit_count` elements and `shots` shots to be measured. The default element type is `ComplexF64`.
 """
 StateVectorSimulator(::Type{T}, qubit_count::Int, shots::Int) where {T<:Number} =
-    StateVectorSimulator{T,StateVector{T}}(qubit_count, shots)
+    StateVectorSimulator{T,Vector{T}}(qubit_count, shots)
 StateVectorSimulator(qubit_count::Int, shots::Int) =
     StateVectorSimulator(ComplexF64, qubit_count, shots)
-Braket.qubit_count(svs::StateVectorSimulator) = svs.qubit_count
+qubit_count(svs::StateVectorSimulator) = svs.qubit_count
 """
     properties(svs::StateVectorSimulator) -> GateModelSimulatorDeviceCapabilities
 
 Query the properties and capabilities of a `StateVectorSimulator`, including which gates and result types are supported and the minimum and maximum shot and qubit counts.
 """
-Braket.properties(svs::StateVectorSimulator) = sv_props
+properties(svs::StateVectorSimulator) = sv_props
 supported_operations(svs::StateVectorSimulator, ::Val{:OpenQASM}) = sv_props.action["braket.ir.openqasm.program"].supportedOperations
 supported_operations(svs::StateVectorSimulator) = supported_operations(svs::StateVectorSimulator, Val(:OpenQASM))
 supported_operations(svs::StateVectorSimulator, ::Val{:JAQCD}) = sv_props.action["braket.ir.jaqcd.program"].supportedOperations
 supported_result_types(svs::StateVectorSimulator, ::Val{:OpenQASM}) = sv_props.action["braket.ir.openqasm.program"].supportedResultTypes
 supported_result_types(svs::StateVectorSimulator, ::Val{:JAQCD}) = sv_props.action["braket.ir.jaqcd.program"].supportedResultTypes
 supported_result_types(svs::StateVectorSimulator) = supported_result_types(svs::StateVectorSimulator, Val(:OpenQASM))
-Braket.device_id(svs::StateVectorSimulator) = "braket_sv_v2"
-Braket.name(svs::StateVectorSimulator) = "StateVectorSimulator"
+device_id(svs::StateVectorSimulator) = "braket_sv_v2"
+name(svs::StateVectorSimulator) = "StateVectorSimulator"
 Base.show(io::IO, svs::StateVectorSimulator) =
     print(io, "StateVectorSimulator(qubit_count=$(qubit_count(svs)), shots=$(svs.shots))")
 Base.similar(svs::StateVectorSimulator{T,S}; shots::Int = svs.shots) where {T,S} =
@@ -162,8 +162,8 @@ function apply_observable!(
     return sv
 end
 function apply_observable!(
-    observable::Braket.Observables.HermitianObservable,
-    sv::StateVector{T},
+    observable::Observables.HermitianObservable,
+    sv::AbstractStateVector{T},
     target::Int,
 ) where {T<:Complex}
     n_amps   = length(sv)
@@ -179,20 +179,17 @@ function apply_observable!(
     return sv
 end
 function apply_observable!(
-    observable::Braket.Observables.HermitianObservable,
-    sv::StateVector{T},
+    observable::Observables.HermitianObservable,
+    sv::AbstractStateVector{T},
     target_1::Int,
     target_2::Int,
 ) where {T<:Complex}
-    n_amps    = length(sv)
-    n_qubits  = Int(log2(n_amps))
-    endian_t1 = n_qubits - 1 - target_1
-    endian_t2 = n_qubits - 1 - target_2
-    mat       = observable.matrix
-    small_target, big_target = minmax(endian_t1, endian_t2)
+    n_amps, (endian_t1, endian_t2) = get_amps_and_qubits(sv, target_1, target_2)
+    small_t, big_t = minmax(endian_t1, endian_t2)
+    mat            = observable.matrix
     Threads.@threads for ix = 0:div(n_amps, 4)-1
         # bit shift to get indices
-        ix_00 = pad_bits(ix, (small_target, big_target))
+        ix_00 = pad_bits(ix, (small_t, big_t))
         ix_10 = flip_bit(ix_00, endian_t2)
         ix_01 = flip_bit(ix_00, endian_t1)
         ix_11 = flip_bit(ix_10, endian_t1)
@@ -203,8 +200,8 @@ function apply_observable!(
 end
 
 function apply_observable!(
-    observable::Braket.Observables.HermitianObservable,
-    sv::StateVector{T},
+    observable::Observables.HermitianObservable,
+    sv::AbstractStateVector{T},
     target_1::Int,
     target_2::Int,
     targets::Int...,

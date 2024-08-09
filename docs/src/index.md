@@ -1,5 +1,5 @@
 ```@meta
-DocTestSetup = quote using Braket, BraketSimulator end
+DocTestSetup = quote using BraketSimulator, BraketSimulator.Observables; using BraketSimulator: Program, Circuit, qubits, CNot, H, Rx, FreeParameter, QubitSet, AdjointGradient, BitFlip, qubit_count, Qubit, StateVector, Measure, Probability, Ry, Amplitude, Instruction, DensityMatrix, add_instruction! end
 CurrentModule = BraketSimulator
 ```
 
@@ -31,29 +31,28 @@ Pkg.add("BraketSimulator")
 
 Then you can run a simulation of a simple [GHZ state](https://en.wikipedia.org/wiki/Greenberger%E2%80%93Horne%E2%80%93Zeilinger_state) preparation circuit.
 
-!!! note
-    To simulate OpenQASM3 programs, you will need to load the Python extension `BraketSimulatorPythonExt` like so: `using PythonCall, BraketSimulator`. If
-    you prefer not to install or use Python, make sure to set the default `IRType` for `Braket.jl` to JAQCD: `Braket.IRType[] = :JAQCD`. 
-
 ```jldoctest
-julia> using Braket, BraketSimulator
+julia> using BraketSimulator
+
+julia> using BraketSimulator: Circuit, H, CNot, Amplitude
 
 julia> n_qubits = 10;
 
 julia> c = Circuit();
 
-julia> H(c, 0);
+julia> add_instruction!(c, Instruction(H(), 0));
 
-julia> foreach(q->CNot(c, 0, q), 1:n_qubits-1);
+julia> foreach(q->add_instruction!(c, Instruction(CNot(), [0, q])), 1:n_qubits-1);
 
-julia> Amplitude(c, [repeat("0", n_qubits), repeat("1", n_qubits)]);
+julia> push!(c.result_types, Amplitude([repeat("0", n_qubits), repeat("1", n_qubits)]));
 
-julia> sim = LocalSimulator("braket_sv_v2"); # use the state vector simulator (without noise)
+julia> sim = StateVectorSimulator(n_qubits, 0); # use the state vector simulator (without noise)
 
-julia> res = result(simulate(sim, ir(c, Val(:JAQCD)), shots=0));
+julia> res = simulate(sim, Program(c), n_qubits, 0);
 
-julia> res.values
-1-element Vector{Any}:
- Dict{String, ComplexF64}("0000000000" => 0.7071067811865475 + 0.0im, "1111111111" => 0.7071067811865475 + 0.0im)
+julia> res.resultTypes[1].value
+Dict{String, ComplexF64} with 2 entries:
+  "0000000000" => 0.707107+0.0im
+  "1111111111" => 0.707107+0.0im
 ```
  

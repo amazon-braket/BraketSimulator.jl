@@ -79,8 +79,8 @@ function samples(simulator::AbstractSimulator)
     return simulator.shot_buffer
 end
 
-calculate(sv::Braket.StateVector, sim::AbstractSimulator) = state_vector(sim)
-function calculate(amplitude::Braket.Amplitude, sim::AbstractSimulator)
+calculate(sv::StateVector, sim::AbstractSimulator) = state_vector(sim)
+function calculate(amplitude::Amplitude, sim::AbstractSimulator)
     state = collect(state_vector(sim))
     rev_states = reverse.(amplitude.states)
     state_ints = [
@@ -148,7 +148,7 @@ function permute_density_matrix(ρ::Matrix{T}, qubit_count::Int, targets) where 
     return new_ρ
 end
 
-function calculate(probability::Braket.Probability, sim::AbstractSimulator)
+function calculate(probability::Probability, sim::AbstractSimulator)
     targets  = probability.targets
     probs    = probabilities(sim)
     n_qubits = qubit_count(sim)
@@ -158,53 +158,53 @@ function calculate(probability::Braket.Probability, sim::AbstractSimulator)
     return marginal_probability(probs, n_qubits, targets)
 end
 
-function calculate(expectation_result::Braket.Expectation, sim::AbstractSimulator)
+function calculate(expectation_result::Expectation, sim::AbstractSimulator)
     obs             = expectation_result.observable
     targets         = isempty(expectation_result.targets) ? collect(0:qubit_count(sim)-1) : expectation_result.targets
     obs_qubit_count = qubit_count(obs)
     length(targets) == obs_qubit_count && return expectation(sim, obs, targets...)
     return [expectation(sim, obs, target) for target in targets]
 end
-expectation_op_squared(sim, obs::Braket.Observables.StandardObservable, target::Int) = 1.0
-expectation_op_squared(sim, obs::Braket.Observables.I, target::Int) = 1.0
-function expectation_op_squared(sim, obs::Braket.Observables.TensorProduct, targets::Int...)
+expectation_op_squared(sim, obs::Observables.StandardObservable, target::Int) = 1.0
+expectation_op_squared(sim, obs::Observables.I, target::Int) = 1.0
+function expectation_op_squared(sim, obs::Observables.TensorProduct, targets::Int...)
     all(
-        factor isa Braket.Observables.StandardObservable || factor isa Braket.Observables.I for
+        factor isa Observables.StandardObservable || factor isa Observables.I for
         factor in obs.factors
     ) && return 1.0
     sq_factors = map(obs.factors) do factor
-        (factor isa Braket.Observables.StandardObservable || factor isa Braket.Observables.I) &&
-            return Braket.Observables.I()
-        factor isa Braket.Observables.HermitianObservable &&
-            return Braket.Observables.HermitianObservable(factor.matrix * factor.matrix)
+        (factor isa Observables.StandardObservable || factor isa Observables.I) &&
+            return Observables.I()
+        factor isa Observables.HermitianObservable &&
+            return Observables.HermitianObservable(factor.matrix * factor.matrix)
     end
-    sq_tensor_prod = Braket.Observables.TensorProduct(sq_factors)
+    sq_tensor_prod = Observables.TensorProduct(sq_factors)
     return expectation(sim, sq_tensor_prod, targets...)
 end
 function expectation_op_squared(
     sim,
-    obs::Braket.Observables.HermitianObservable,
+    obs::Observables.HermitianObservable,
     targets::Int...,
 )
     return expectation(
         sim,
-        Braket.Observables.HermitianObservable(obs.matrix * obs.matrix),
+        Observables.HermitianObservable(obs.matrix * obs.matrix),
         targets...,
     )
 end
 
 for (gate, obs) in (
-    (:X, :(Braket.Observables.X)),
-    (:Y, :(Braket.Observables.Y)),
-    (:Z, :(Braket.Observables.Z)),
-    (:I, :(Braket.Observables.I)),
-    (:H, :(Braket.Observables.H)),
+    (:X, :(Observables.X)),
+    (:Y, :(Observables.Y)),
+    (:Z, :(Observables.Z)),
+    (:I, :(Observables.I)),
+    (:H, :(Observables.H)),
 )
     @eval apply_observable!(::$obs, sv_or_dm::T, targets) where {T<:AbstractVecOrMat{<:Complex}} = apply_observable!($gate(), sv_or_dm, targets)
 end
 
 function apply_observable!(
-    observable::Braket.Observables.TensorProduct,
+    observable::Observables.TensorProduct,
     sv_or_dm::T,
     targets::Int...,
 ) where {T<:AbstractVecOrMat{<:Complex}}
@@ -218,14 +218,9 @@ function apply_observable!(
     end
     return sv_or_dm
 end
-apply_observable(
-    observable::O,
-    sv_or_dm,
-    target::Int...,
-) where {O<:Braket.Observables.Observable} =
-    apply_observable!(observable, deepcopy(sv_or_dm), target...)
+apply_observable(observable::O, sv_or_dm, target::Int...) where {O<:Observables.Observable} = apply_observable!(observable, deepcopy(sv_or_dm), target...)
 
-function calculate(variance::Braket.Variance, sim::AbstractSimulator)
+function calculate(variance::Variance, sim::AbstractSimulator)
     obs     = variance.observable
     targets = isnothing(variance.targets) ? collect(0:qubit_count(sim)-1) : variance.targets
     obs_qubit_count = qubit_count(obs)
@@ -242,7 +237,7 @@ function calculate(variance::Braket.Variance, sim::AbstractSimulator)
     end
 end
 
-function calculate(dm::Braket.DensityMatrix, sim::AbstractSimulator)
+function calculate(dm::DensityMatrix, sim::AbstractSimulator)
     ρ = density_matrix(sim)
     full_qubits = collect(0:qubit_count(sim)-1)
     (collect(dm.targets) == full_qubits || isempty(dm.targets)) && return ρ

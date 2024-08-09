@@ -77,7 +77,7 @@ function _validate_ir_instructions_compatibility(
     circuit::Union{Program,Circuit},
     supported_operations,
 )
-    circuit_instruction_names = map(ix->replace(lowercase(string(typeof(ix.operator))), "_"=>"", "braket."=>""), circuit.instructions)
+    circuit_instruction_names = map(ix->replace(lowercase(string(typeof(ix.operator))), "_"=>"", "braketsimulator."=>""), circuit.instructions)
     supported_instructions    = Set(map(op->replace(lowercase(op), "_"=>""), supported_operations))
     no_noise = true
     for name in circuit_instruction_names
@@ -95,8 +95,11 @@ function _validate_ir_instructions_compatibility(
 end
 _validate_ir_instructions_compatibility(simulator::D, circuit::Union{Program,Circuit}, v::Val{V}) where {D<:AbstractSimulator, V} = _validate_ir_instructions_compatibility(circuit, supported_operations(simulator, v))
 
-_validate_result_type_qubits_exist(rt::Braket.StateVector, qubit_count::Int) = return
-_validate_result_type_qubits_exist(rt::Braket.Amplitude, qubit_count::Int) = return
+_validate_result_type_qubits_exist(rt::StateVector, qubit_count::Int) = return
+_validate_result_type_qubits_exist(rt::Amplitude, qubit_count::Int) = return
+# exclude adjoint gradient validation from coverage for now
+# as we don't yet implement this, so don't have a test for it
+# COV_EXCL_START
 function _validate_result_type_qubits_exist(rt::AdjointGradient, qubit_count::Int)
     isempty(rt.targets) && return
     targets = reduce(vcat, targets)
@@ -106,7 +109,8 @@ function _validate_result_type_qubits_exist(rt::AdjointGradient, qubit_count::In
             )
     return
 end
-# don't need to check for `isnothing` here as the `Braket.QubitSet` being empty covers this
+# COV_EXCL_STOP
+# don't need to check for `isnothing` here as the `QubitSet` being empty covers this
 function _validate_result_type_qubits_exist(rt::RT, qubit_count::Int) where {RT<:Result}
     isempty(rt.targets) && return
     maximum(rt.targets) > qubit_count &&
