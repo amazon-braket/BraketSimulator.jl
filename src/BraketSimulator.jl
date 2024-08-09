@@ -19,7 +19,6 @@ const AbstractStateVector{T} = AbstractVector{T}
 const AbstractDensityMatrix{T} = AbstractMatrix{T}
 
 abstract type AbstractSimulator end
-name(s::AbstractSimulator) = device_id(s)
 ap_size(shots::Int, qubit_count::Int) = (shots > 0 && qubit_count < 30) ? 2^qubit_count : 0
 
 """
@@ -198,28 +197,16 @@ _translate_result_type(r::IR.StateVector, qc::Int)   = StateVector()
 # to apply to all qubits.
 _translate_result_type(r::IR.DensityMatrix, qc::Int) = isnothing(r.targets) ? DensityMatrix(collect(0:qc-1)) : DensityMatrix(r.targets)
 _translate_result_type(r::IR.Probability, qc::Int)   = isnothing(r.targets) ? Probability(collect(0:qc-1)) : Probability(r.targets)
-function _translate_result_type(r::IR.Expectation, qc::Int)
-    targets = isnothing(r.targets) ? collect(0:qc-1) : r.targets
-    obs     = StructTypes.constructfrom(Observables.Observable, r.observable)
-    Expectation(obs, QubitSet(targets))
+for (RT, IRT) in ((:Expectation, :(IR.Expectation)), (:Variance, :(IR.Variance)), (:Sample, :(IR.Sample)))
+    @eval begin
+        function _translate_result_type(r::$IRT, qc::Int)
+            targets = isnothing(r.targets) ? collect(0:qc-1) : r.targets
+            obs     = StructTypes.constructfrom(Observables.Observable, r.observable)
+            $RT(obs, QubitSet(targets))
+        end
+    end
 end
-function _translate_result_type(r::IR.Variance, qc::Int)
-    targets = isnothing(r.targets) ? collect(0:qc-1) : r.targets
-    obs     = StructTypes.constructfrom(Observables.Observable, r.observable)
-    Variance(obs, QubitSet(targets))
-end
-function _translate_result_type(r::IR.Sample, qc::Int)
-    targets = isnothing(r.targets) ? collect(0:qc-1) : r.targets
-    obs     = StructTypes.constructfrom(Observables.Observable, r.observable)
-    Sample(obs, QubitSet(targets))
-end
-
-function _translate_result_types(
-    results::Vector{AbstractProgramResult},
-    qubit_count::Int,
-)
-    return map(result->_translate_result_type(result, qubit_count), results)
-end
+_translate_result_types(results::Vector{AbstractProgramResult}, qubit_count::Int) = map(result->_translate_result_type(result, qubit_count), results)
 
 function _compute_exact_results(d::AbstractSimulator, program::Program, qc::Int)
     result_types = _translate_result_types(program.results, qc)
@@ -244,7 +231,6 @@ function _verify_openqasm_shots_observables(circuit::Circuit)
     end
     for result in filter(rt->rt isa ObservableResult, circuit.result_types)
         result.observable isa Observables.I && continue
-        observable_qubits = result.targets
         if result.observable isa Observables.TensorProduct
             result_targets = collect(result.targets)
             for observable in result.observable.factors
@@ -278,6 +264,10 @@ function simulate(
     inputs = get(kwargs, :inputs, ir_inputs)
     inputs = isnothing(inputs) || isempty(inputs) ? ir_inputs : Dict{String, Any}(k=>v for (k,v) in inputs)
     circuit = Circuit(circuit_ir.source, inputs)
+    if shots > 0
+        _verify_openqasm_shots_observables(circuit)
+        basis_rotation_instructions!(circuit)
+    end
     measure_ixs     = splice!(circuit.instructions, findall(ix->ix.operator isa Measure, circuit.instructions))
     measure_targets = (convert(Vector{Int}, measure.target) for measure in measure_ixs) 
     measured_qubits = convert(Vector{Int}, unique(reduce(vcat, measure_targets, init=Int[])))::Vector{Int}
@@ -304,8 +294,7 @@ function simulate(
         ResultTypeValue[ResultTypeValue(result_type, 0.0) for result_type in program.results]
     end
     isempty(measured_qubits) && (measured_qubits = collect(0:n_qubits-1))
-    res = _bundle_results(results, circuit_ir, simulator, measured_qubits)
-    return res
+    return _bundle_results(results, circuit_ir, simulator, measured_qubits)
 end
 function simulate(simulator::AbstractSimulator,
                   task_specs::Vector{<:Union{Program, OpenQasmProgram}},
@@ -399,8 +388,7 @@ function simulate(
     end
     measured_qubits = get(kwargs, :measured_qubits, collect(0:qubit_count-1))
     isempty(measured_qubits) && (measured_qubits = collect(0:qubit_count-1))
-    res = _bundle_results(results, circuit_ir, simulator, measured_qubits)
-    return res
+    return _bundle_results(results, circuit_ir, simulator, measured_qubits)
 end
 simulate(simulator::AbstractSimulator, circuit_ir::Program, shots::Int; kwargs...) = simulate(simulator, circuit_ir, qubit_count(circuit_ir), shots; kwargs...)
 

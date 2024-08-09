@@ -656,6 +656,7 @@ LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
 
         new_sv_props = BraketSimulator.StructTypes.constructfrom(BraketSimulator.GateModelSimulatorDeviceCapabilities, new_sv_props_dict)
         @test new_sv_props.paradigm.qubitCount == new_sv_qubit_count
+        @test BraketSimulator.supported_result_types(sim) == BraketSimulator.supported_result_types(sim, Val(:OpenQASM))
     end
     @testset "inputs handling" begin
         sv_adder_qasm = """

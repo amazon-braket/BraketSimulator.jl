@@ -4,8 +4,6 @@
 Abstract type representing a quantum noise operation.
 """
 abstract type Noise <: QuantumOperator end
-StructTypes.StructType(::Type{Noise}) = StructTypes.AbstractType()
-StructTypes.subtypes(::Type{Noise}) = (noise=Noise, kraus=Kraus, bit_flip=BitFlip, phase_flip=PhaseFlip, pauli_channel=PauliChannel, amplitude_damping=AmplitudeDamping, phase_damping=PhaseDamping, depolarizing=Depolarizing, two_qubit_dephasing=TwoQubitDephasing, two_qubit_depolarizing=TwoQubitDepolarizing, generalized_amplitude_damping=GeneralizedAmplitudeDamping, multi_qubit_pauli_channel=MultiQubitPauliChannel)
 
 """
     Kraus <: Noise

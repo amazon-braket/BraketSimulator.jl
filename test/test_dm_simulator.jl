@@ -468,5 +468,6 @@ LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
                 "phase_damping",
                 "kraus",
             ]
+        @test BraketSimulator.supported_result_types(sim) == BraketSimulator.supported_result_types(sim, Val(:OpenQASM))
     end
 end

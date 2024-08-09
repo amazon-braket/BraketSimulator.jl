@@ -4,8 +4,6 @@
 Abstract type representing a quantum gate.
 """
 abstract type Gate <: QuantumOperator end
-StructTypes.StructType(::Type{Gate}) = StructTypes.AbstractType()
-StructTypes.subtypes(::Type{Gate}) = (h=H, i=I, x=X, y=Y, z=Z, s=S, si=Si, t=T, ti=Ti, v=V, vi=Vi, cnot=CNot, swap=Swap, iswap=ISwap, cv=CV, cy=CY, cz=CZ, ecr=ECR, ccnot=CCNot, cswap=CSwap, unitary=Unitary, rx=Rx, ry=Ry, rz=Rz, phaseshift=PhaseShift, pswap=PSwap, xy=XY, cphaseshift=CPhaseShift, cphaseshift00=CPhaseShift00, cphaseshift01=CPhaseShift01, cphaseshift10=CPhaseShift10, xx=XX, yy=YY, zz=ZZ, gpi=GPi, gpi2=GPi2, ms=MS, prx=PRx, u=U, gphase=GPhase)
 
 """
     AngledGate{NA} <: Gate

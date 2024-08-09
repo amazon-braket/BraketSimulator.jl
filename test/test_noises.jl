@@ -20,6 +20,10 @@ struct CustomNoise <: BraketSimulator.Noise end
         @test BraketSimulator.qubit_count(n) == 1
         ix = BraketSimulator.Instruction(n, 0)
         @test BraketSimulator.Parametrizable(n) == BraketSimulator.Parametrized()
+        n = BraketSimulator.MultiQubitPauliChannel(Dict("X"=>0.1, "Y"=>0.2))
+        @test BraketSimulator.qubit_count(n) == 1
+        ix = BraketSimulator.Instruction(n, 0)
+        @test BraketSimulator.Parametrizable(n) == BraketSimulator.Parametrized()
     end
     @testset "noise = BraketSimulator.TwoQubitPauliChannel" begin
         n = BraketSimulator.TwoQubitPauliChannel(Dict("XX"=>0.1, "YY"=>0.2))
