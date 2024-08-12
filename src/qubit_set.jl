@@ -29,7 +29,6 @@ Base.:(==)(q1::Qubit, q2::Qubit) = q1.index==q2.index
 
 Base.convert(::Type{Int}, q::Qubit) = q.index
 Base.Int(q::Qubit) = q.index
-Base.hash(q::Qubit, h::UInt) = hash(q.index, h)
 Base.show(io::IO, q::Qubit) = print(io, "Qubit($(q.index))")
 const IntOrQubit    = Union{Int, Qubit}
 
@@ -109,7 +108,6 @@ function Base.show(io::IO, qs::QubitSet)
     print(io, join(q_strs, ", "))
     print(io, ")")
 end
-Base.convert(::Type{QubitSet}, q::Integer) = QubitSet(q)
 Base.convert(::Type{QubitSet}, v::Vector{<:Integer}) = QubitSet(v)
 Base.sort(qs::QubitSet; kwargs...) = QubitSet(sort(collect(qs); kwargs...))
 

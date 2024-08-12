@@ -25,8 +25,6 @@ abstract type AbstractIR end
 const IRObservable = Union{Vector{Union{String, Vector{Vector{Vector{Float64}}}}}, String}
 
 abstract type AbstractProgramResult <: AbstractIR end
-StructTypes.StructType(::Type{AbstractProgramResult}) = StructTypes.AbstractType()
-StructTypes.subtypes(::Type{AbstractProgramResult}) = (amplitude=Amplitude, expectation=Expectation, probability=Probability, sample=Sample, statevector=StateVector, densitymatrix=DensityMatrix, variance=Variance, adjoint_gradient=AdjointGradient)
 
 struct Program <: AbstractProgram
     braketSchemaHeader::braketSchemaHeader

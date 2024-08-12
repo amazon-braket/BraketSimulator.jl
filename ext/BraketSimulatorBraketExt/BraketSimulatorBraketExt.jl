@@ -30,11 +30,9 @@ function Base.convert(::Type{Braket.GateModelTaskResult}, r::BraketSimulator.Gat
                                       addl_meta)
 end
 
-Braket.qubit_count(g::G) where {G<:BraketSimulator.Gate}  = BraketSimulator.qubit_count(g)
-Braket.qubit_count(n::N) where {N<:BraketSimulator.Noise} = BraketSimulator.qubit_count(n)
+Braket.qubit_count(o::O) where {O<:BraketSimulator.Operator}  = BraketSimulator.qubit_count(o)
 Braket.qubit_count(o::O) where {O<:BraketSimulator.Observables.Observable}  = BraketSimulator.qubit_count(o)
-Braket.qubit_count(::Type{G}) where {G<:BraketSimulator.Gate}  = BraketSimulator.qubit_count(G)
-Braket.qubit_count(::Type{N}) where {N<:BraketSimulator.Noise} = BraketSimulator.qubit_count(N)
+Braket.qubit_count(::Type{O}) where {O<:BraketSimulator.Operator}  = BraketSimulator.qubit_count(O)
 
 for (braket_sim, simulator_sym) in ((:(Braket.X), :(BraketSimulator.X)),
                                     (:(Braket.Y), :(BraketSimulator.Y)),
