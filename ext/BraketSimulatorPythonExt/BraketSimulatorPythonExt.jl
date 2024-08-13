@@ -53,18 +53,20 @@ end
                       shots::Int=0,
                       kwargs...
                      )
-        jl_specs  = convert(Vector{Union{BraketSimulator.OpenQasmProgram, BraketSimulator.Program}}, task_specs)
-        if !isnothing(inputs)
-            py_inputs = inputs isa PyDict ? [inputs] : inputs
-            n_inputs  = length(py_inputs)
-            jl_inputs = Vector{Dict{String, Float64}}(undef, n_inputs)
-            for input_ix in 1:n_inputs
-                jl_inputs[input_ix] = Dict{String, Float64}(pyconvert(String, k)=>pyconvert(Float64, v) for (k,v) in py_inputs[input_ix])
+        jl_inputs = Dict{String, Float64}()
+        jl_specs = Vector{Union{BraketSimulator.OpenQasmProgram, BraketSimulator.Program}}(undef, length(task_specs))
+        PythonCall.GIL.@lock begin
+            jl_specs  = convert(Vector{Union{BraketSimulator.OpenQasmProgram, BraketSimulator.Program}}, task_specs)
+            if !isnothing(inputs)
+                py_inputs = inputs isa PyDict ? [inputs] : inputs
+                n_inputs  = length(py_inputs)
+                jl_inputs = Vector{Dict{String, Float64}}(undef, n_inputs)
+                for input_ix in 1:n_inputs
+                    jl_inputs[input_ix] = Dict{String, Float64}(pyconvert(String, k)=>pyconvert(Float64, v) for (k,v) in py_inputs[input_ix])
+                end
             end
-            jl_kwargs = (max_parallel=max_parallel, inputs=jl_inputs)
-        else
-            jl_kwargs = (max_parallel=max_parallel,)
         end
+        jl_kwargs = (max_parallel=max_parallel, inputs=jl_inputs)
         jl_results = simulate(simulator, jl_specs, shots; jl_kwargs...)
         return PythonCall.GIL.@lock map(Py, jl_results)
     end
