@@ -11,8 +11,6 @@ using
     Random,
     PrecompileTools
 
-#PrecompileTools.verbose[] = true
-
 export StateVectorSimulator, DensityMatrixSimulator, evolve!, simulate, ValidationError
 
 const AbstractStateVector{T} = AbstractVector{T}

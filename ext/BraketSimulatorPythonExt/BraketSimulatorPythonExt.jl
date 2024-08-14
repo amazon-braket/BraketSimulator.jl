@@ -6,14 +6,19 @@ using PrecompileTools
     using BraketSimulator, PythonCall, JSON3
 end
 
-import BraketSimulator: simulate
+using BraketSimulator: simulate
 
-function simulate(simulator, task_spec::PyList{Any}, shots; inputs=Dict{String,Float64}(), kwargs...)
-    jl_inputs  = inputs isa Dict ? inputs : [pyconvert(Dict{String, Any}, input) for input in inputs]
-    jl_results = simulate(simulator, BraketSimulator.OpenQasmProgram[t for t in task_spec], shots; inputs=jl_inputs, kwargs...)
-    jsons      = (JSON3.write(r) for r in jl_results)
-    py_results = pylist(jsons)
-    return py_results
+function BraketSimulator.simulate(simulator, task_spec::String, inputs::Dict{String, Any}, shots::Int; kwargs...)
+    jl_specs   = BraketSimulator.OpenQasmProgram(BraketSimulator.braketSchemaHeader("braket.ir.openqasm.program", "1"), task_spec, inputs)
+    jl_results = simulate(simulator, jl_specs, shots; kwargs...)
+    json       = JSON3.write(jl_results)
+    return json
+end
+function BraketSimulator.simulate(simulator, task_specs::Vector{String}, inputs::Vector{Dict{String, Any}}, shots::Int; kwargs...)
+    jl_specs   = [BraketSimulator.OpenQasmProgram(BraketSimulator.braketSchemaHeader("braket.ir.openqasm.program", "1"), task_spec, input) for (task_spec, input) in zip(task_specs, inputs)]
+    jl_results = simulate(simulator, jl_specs, shots; kwargs...)
+    jsons      = [JSON3.write(r) for r in jl_results]
+    return jsons
 end
 
 end

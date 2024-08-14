@@ -29,6 +29,7 @@ Base.:(==)(q1::Qubit, q2::Qubit) = q1.index==q2.index
 
 Base.convert(::Type{Int}, q::Qubit) = q.index
 Base.Int(q::Qubit) = q.index
+Base.hash(q::Qubit, h::UInt) = hash(q.index, h)
 Base.show(io::IO, q::Qubit) = print(io, "Qubit($(q.index))")
 const IntOrQubit    = Union{Int, Qubit}
 

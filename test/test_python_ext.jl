@@ -43,23 +43,22 @@ using Test, JSON3, PythonCall, BraketSimulator
         #pragma braket result probability cout
         #pragma braket result probability b
         """
-        oq3_program = BraketSimulator.OpenQasmProgram(BraketSimulator.braketSchemaHeader("braket.ir.openqasm.program", "1"), sv_adder, Dict("a_in"=>3, "b_in"=>7))
         @testset "Full Python circuit execution" begin
             @testset "OpenQASM3" begin
                 n_qubits = 5
                 # test a "batch"
                 sv_simulator = StateVectorSimulator(n_qubits, 0)
-                py_inputs    = PyList{Any}([pydict(Dict("a_in"=>2, "b_in"=>5)), pydict(Dict("a_in"=>3, "b_in"=>2))])
-                oq3_results  = BraketSimulator.simulate(sv_simulator, PyList{Any}([oq3_program, oq3_program]), 0; inputs=py_inputs)
+                py_inputs    = [Dict{String, Any}("a_in"=>2, "b_in"=>5), Dict{String, Any}("a_in"=>3, "b_in"=>2)]
+                oq3_results  = BraketSimulator.simulate(sv_simulator, [sv_adder, sv_adder], py_inputs, 0)
                 for oq3_result in oq3_results
-                    @test oq3_result isa Py
+                    @test oq3_result isa String
                 end
                 # test a "batch" of length 1
                 sv_simulator = StateVectorSimulator(n_qubits, 0)
-                py_inputs    = PyList{Any}([pydict(Dict("a_in"=>2, "b_in"=>5))])
-                oq3_results  = BraketSimulator.simulate(sv_simulator, PyList{Any}([oq3_program]), 0; inputs=py_inputs)
+                py_inputs    = [Dict{String, Any}("a_in"=>2, "b_in"=>5)]
+                oq3_results  = BraketSimulator.simulate(sv_simulator, [sv_adder], py_inputs, 0)
                 for oq3_result in oq3_results
-                    @test oq3_result isa Py 
+                    @test oq3_result isa String 
                 end
                 simple_bell_qasm = """
                 h \$0;
@@ -67,10 +66,9 @@ using Test, JSON3, PythonCall, BraketSimulator
                 #pragma braket result state_vector
                 """
                 sv_simulator = StateVectorSimulator(2, 0)
-                oq3_program  = BraketSimulator.OpenQasmProgram(BraketSimulator.braketSchemaHeader("braket.ir.openqasm.program", "1"), simple_bell_qasm, nothing)
-                oq3_results  = BraketSimulator.simulate(sv_simulator, PyList{Any}([oq3_program]), 0)
+                oq3_results  = BraketSimulator.simulate(sv_simulator, [simple_bell_qasm], [Dict{String, Any}()], 0)
                 for oq3_result in oq3_results
-                    @test oq3_result isa Py
+                    @test oq3_result isa String
                 end
             end
         end
