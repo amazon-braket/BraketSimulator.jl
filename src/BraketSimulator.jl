@@ -122,7 +122,7 @@ function _bundle_results(
         nothing,
         nothing,
     )
-    formatted_samples = simulator.shots > 0 ? _formatted_measurements(simulator, measured_qubits) : Vector{Int}[]
+    formatted_samples = simulator.shots > 0 ? _formatted_measurements(simulator, measured_qubits) : nothing
     return GateModelTaskResult(
         braketSchemaHeader("braket.task_result.gate_model_task_result", "1"),
         formatted_samples,
@@ -162,7 +162,7 @@ function _bundle_results(
         nothing,
     )
     sorted_qubits = sort(collect(measured_qubits))
-    formatted_samples = simulator.shots > 0 ? _formatted_measurements(simulator, sorted_qubits) : Vector{Int}[]
+    formatted_samples = simulator.shots > 0 ? _formatted_measurements(simulator, sorted_qubits) : nothing
     return GateModelTaskResult(
         braketSchemaHeader("braket.task_result.gate_model_task_result", "1"),
         formatted_samples,
@@ -300,7 +300,7 @@ function simulate(simulator::AbstractSimulator,
                   task_specs::Vector{<:Union{Program, OpenQasmProgram}},
                   shots::Int=0;
                   max_parallel::Int=-1,
-                  inputs::Union{Vector{Dict{String, Float64}}, Dict{String, Float64}} = Dict{String, Float64}(),
+                  inputs = Dict{String, Float64}(),
                   kwargs...
                  )
     is_single_task  = length(task_specs) == 1

@@ -106,6 +106,25 @@ struct ResultTypeValue
     type::AbstractProgramResult
     value::Union{Vector, Float64, Dict}
 end
+# for custom lowering of ComplexF64
+StructTypes.StructType(::Type{ResultTypeValue}) = StructTypes.CustomStruct()
+function StructTypes.lower(rtv::ResultTypeValue)
+    typ = rtv.type
+    function lower_complex(v::ComplexF64)
+        abs(imag(v)) < eps(real(v)) && return real(v)
+        return [real(v), imag(v)]
+    end
+    lower_complex(v) = v
+    if rtv.value isa Float64
+        return (type=typ, value=rtv.value)
+    elseif rtv.value isa Vector 
+        lowered_vec = [lower_complex(val) for val in rtv.value]
+        return (type=typ, value=lowered_vec)
+    elseif rtv.value isa Dict
+        lowered_dict = Dict(k=>lower_complex(v) for (k, v) in rtv.value)
+        return (type=typ, value=lowered_dict)
+    end
+end
 
 struct JaqcdDeviceActionProperties <: DeviceActionProperties
     version::Vector{String}
