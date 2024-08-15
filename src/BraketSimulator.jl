@@ -277,7 +277,6 @@ function simulate(
     _validate_shots_and_ir_results(shots, program.results, n_qubits)
     operations = program.instructions
     if shots > 0 && !isempty(program.basis_rotation_instructions)
-        _verify_openqasm_shots_observables(circuit)
         operations = vcat(operations, program.basis_rotation_instructions)
     end
     _validate_operation_qubits(vcat(operations, measure_ixs))
