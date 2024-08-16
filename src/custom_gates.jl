@@ -380,6 +380,12 @@ function matrix_rep(g::FermionicSWAP)
     return SMatrix{4,4,ComplexF64}([1.0 0 0 0; 0 eiϕ2 * cosϕ -ieiϕ2 * sinϕ 0; 0 -ieiϕ2 * sinϕ eiϕ2 * cosϕ 0; 0 0 0 eiϕ])
 end
 
+"""
+    MultiRz(angle)
+
+Multi-qubit Z-rotation gate. The 2-qubit version is equivalent to the `ZZ` gate,
+and the single-qubit version is equivalent to the `Rz` gate.
+"""
 struct MultiRZ <: AngledGate{1}
     angle::NTuple{1,Union{Float64,FreeParameter}}
     MultiRZ(angle::T) where {T<:NTuple{1,Union{Float64,FreeParameter}}} = new(angle)
@@ -388,6 +394,12 @@ Braket.chars(::Type{MultiRZ}) = "MultiRZ(ang)"
 Braket.qubit_count(g::MultiRZ) = 1
 Base.inv(g::MultiRZ) = MultiRZ(-g.angle[1])
 
+"""
+    U(θ, ϕ, λ)
+
+3-angle single qubit unitary gate. Equivalent to
+the OpenQASM3 built-in [`U` gate](https://openqasm.com/language/gates.html#U).
+"""
 struct U <: AngledGate{3}
     angle::NTuple{3,Union{Float64,FreeParameter}}
     U(angle::T) where {T<:NTuple{3,Union{Float64,FreeParameter}}} =
@@ -402,6 +414,15 @@ Braket.chars(::Type{U}) = "U(ang)"
 Braket.qubit_count(g::U) = 1
 Base.inv(g::U) = U(-g.angle[1], -g.angle[3], -g.angle[2])
 
+"""
+    MultiQubitPhaseShift{N}(angle)
+
+Global phase shift on `N` qubits. Equivalent to
+the OpenQASM3 built-in [`gphase` gate](https://openqasm.com/language/gates.html#gphase).
+Controls/negative controls applied to this gate control
+which states are rotated, so that `Control(g::MultiQubitPhaseShift{2})` will apply the rotation
+to the `|11>` state.
+"""
 struct MultiQubitPhaseShift{N} <: AngledGate{1}
     angle::NTuple{1,Union{Float64,FreeParameter}}
     MultiQubitPhaseShift{N}(angle::NTuple{1,<:Union{Float64,FreeParameter}}) where {N} = new(angle)
@@ -490,6 +511,7 @@ end
 Control(g::G, bitvals::NTuple{B, Int}) where {G<:Gate, B} = Control{G, B}(g, bitvals)
 Control(g::Control{G, BC}, bitvals::NTuple{B, Int}) where {G<:Gate, BC, B} = Control(g.g, (g.bitvals..., bitvals...))
 Control(g::G, bitvals::NTuple{0, Int}) where {G<:Gate} = g
+Base.copy(c::Control{G, B}) where {G<:Gate, B} = Control(copy(c.g), c.bitvals)
 Braket.qubit_count(c::Control{G, B}) where {G<:Gate, B} = qubit_count(c.g) + B
 Braket.qubit_count(c::Control{MultiQubitPhaseShift{N}, B}) where {N, B} = N
 function matrix_rep(c::Control{G, B}) where {G<:Gate, B}

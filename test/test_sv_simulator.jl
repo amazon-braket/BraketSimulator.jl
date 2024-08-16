@@ -348,6 +348,28 @@ LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
         @test 0.4 < samples[3] / (samples[0] + samples[3]) < 0.6
         @test samples[0] + samples[3] == 10000
     end
+    @testset "batch" begin
+        function make_ghz(num_qubits)
+            ghz = Circuit()
+            ghz(H, 0)
+            for ii in 0:num_qubits-2
+                ghz(CNot, ii, ii+1)
+            end
+            return ir(ghz)
+        end
+        num_qubits = 5
+        @testset for n_circuits in (1, 100)
+            shots   = 1000
+            jl_ghz  = [make_ghz(num_qubits) for ix in 1:n_circuits]
+            jl_sim  = StateVectorSimulator(num_qubits, 0);
+            results = simulate(jl_sim, jl_ghz, shots)
+            for (r_ix, r) in enumerate(results)
+                @test length(r.measurements) == shots
+                @test 400 < count(m->m == fill(0, num_qubits), r.measurements) < 600
+                @test 400 < count(m->m == fill(1, num_qubits), r.measurements) < 600
+            end
+        end
+    end
     @testset "similar, copy and copyto!" begin
         qubit_count = 10
         orig = StateVectorSimulator(qubit_count, 0)
@@ -361,6 +383,38 @@ LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
         sim.state_vector = 1/√2^qubit_count .* [exp(im*rand()) for ix in 1:2^qubit_count]
         copyto!(sim2, sim)
         @test sim2.state_vector ≈ sim.state_vector
+    end
+    @testset "Measure with no gates" begin
+        qasm = """
+        bit[4] b;
+        qubit[4] q;
+        b[0] = measure q[0];
+        b[1] = measure q[1];
+        b[2] = measure q[2];
+        b[3] = measure q[3];
+        """
+        simulator = StateVectorSimulator(0, 0)
+        res = simulate(simulator, ir(Circuit(qasm), Val(:OpenQASM)), 1000)
+        @test all(m -> m == zeros(Int, 4), res.measurements)
+        @test length(res.measurements) == 1000
+        @test res.measuredQubits == collect(0:3)
+    end
+    @testset "Measure with qubits not used" begin
+        qasm = """
+        bit[4] b;
+        qubit[4] q;
+        h q[0];
+        cnot q[0], q[1];
+        b = measure q;
+        """ 
+        simulator = StateVectorSimulator(0, 0)
+        res = simulate(simulator, ir(Circuit(qasm), Val(:OpenQASM)), 1000)
+        @test res.measuredQubits == collect(0:3)
+        @test 400 < sum(m[1] for m in res.measurements) < 600
+        @test 400 < sum(m[2] for m in res.measurements) < 600
+        @test sum(m[3] for m in res.measurements) == 0
+        @test sum(m[4] for m in res.measurements) == 0
+        @test all(m->length(m) == 4, res.measurements)
     end
     @testset "supported operations and results" begin
         qubit_count = 10
@@ -407,5 +461,52 @@ LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
                 "z",
                 "zz",
             ]
+    end
+    @testset "inputs handling" begin
+        sv_adder_qasm = """
+            OPENQASM 3;
+
+            input uint[4] a_in;
+            input uint[4] b_in;
+
+            gate majority a, b, c {
+                cnot c, b;
+                cnot c, a;
+                ccnot a, b, c;
+            }
+
+            gate unmaj a, b, c {
+                ccnot a, b, c;
+                cnot c, a;
+                cnot a, b;
+            }
+
+            qubit cin;
+            qubit[4] a;
+            qubit[4] b;
+            qubit cout;
+
+            // set input states
+            for int[8] i in [0: 3] {
+              if(bool(a_in[i])) x a[i];
+              if(bool(b_in[i])) x b[i];
+            }
+
+            // add a to b, storing result in b
+            majority cin, b[3], a[3];
+            for int[8] i in [3: -1: 1] { majority a[i], b[i - 1], a[i - 1]; }
+            cnot a[0], cout;
+            for int[8] i in [1: 3] { unmaj a[i], b[i - 1], a[i - 1]; }
+            unmaj cin, b[3], a[3];
+
+            // todo: subtle bug when trying to get a result type for both at once
+            #pragma braket result probability cout, b
+            #pragma braket result probability cout
+            #pragma braket result probability b
+            """
+        simulator = StateVectorSimulator(6, 0)
+        oq3_program = Braket.OpenQasmProgram(Braket.header_dict[Braket.OpenQasmProgram], sv_adder_qasm, Dict("a_in"=>3, "b_in"=>7))
+        # should NOT throw a missing input error
+        simulate(simulator, oq3_program, 0; inputs=Dict{String, Float64}())
     end
 end
