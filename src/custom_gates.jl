@@ -13,7 +13,6 @@ This gate performs an SO(2) rotation in the subspace ``{|1100\\rangle, |0011\\ra
 # Examples
 
 ```jldoctest
-
 julia> using BraketSimulator
 
 julia> ϕ = 3.56;
@@ -29,8 +28,8 @@ julia> eq2 = m * [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0];
 julia> eq1 ==  [0, 0, 0, cos(ϕ/2), 0, 0, 0, 0, 0, 0, 0, 0, sin(ϕ/2), 0, 0, 0] == true;
 
 julia> eq2 ==  [0, 0, 0, -sin(ϕ/2), 0, 0, 0, 0, 0, 0, 0, 0, cos(ϕ/2), 0, 0, 0] == true;
-
 ```
+
 """
 struct DoubleExcitation <: AngledGate{1}
     angle::NTuple{1,Union{Float64,FreeParameter}}
@@ -68,9 +67,7 @@ This gate performs an SO(2) rotation in the subspace ``{|1100\\rangle, |0011\\ra
 
 # Examples
 
-
 ```jldoctest
-
 julia> using BraketSimulator
 
 julia> ϕ = 3.56;
@@ -86,7 +83,6 @@ julia> eq2 = m * [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1];
 julia> eq1 ==  [exp(im*ϕ/2), 0, 0, cos(ϕ/2), 0, 0, 0, 0, 0, 0, 0, 0, sin(ϕ/2), 0, 0, exp(im*ϕ/2)] == true;
 
 julia> eq2 ==  [exp(im*ϕ/2), 0, 0, -sin(ϕ/2), 0, 0, 0, 0, 0, 0, 0, 0, cos(ϕ/2), 0, 0, exp(im*ϕ/2)] == true;
-
 ```
 
 """
@@ -132,7 +128,6 @@ This gate performs an SO(2) rotation in the subspace ``{|1100\\rangle, |0011\\ra
 # Examples
 
 ```jldoctest
-
 julia> using BraketSimulator
 
 julia> ϕ = 3.56;
@@ -148,7 +143,6 @@ julia> eq2 = m * [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1];
 julia> eq1 ==  [exp(-im*ϕ/2), 0, 0, cos(ϕ/2), 0, 0, 0, 0, 0, 0, 0, 0, sin(ϕ/2), 0, 0, exp(-im*ϕ/2)] == true;
 
 julia> eq2 ==  [exp(-im*ϕ/2), 0, 0, -sin(ϕ/2), 0, 0, 0, 0, 0, 0, 0, 0, cos(ϕ/2), 0, 0, exp(-im*ϕ/2)] == true;
-
 ```
 
 """
@@ -189,7 +183,6 @@ This gate performs a rotation in the subspace ``{|01\\rangle, |10\\rangle}``.
 # Examples
 
 ```jldoctest
-
 julia> using BraketSimulator
 
 julia> ϕ = 3.56;
@@ -205,7 +198,6 @@ julia> eq2 = m * [0, 0, 1, 0];
 julia> eq1 == [0, cos(ϕ/2), - sin(ϕ/2), 0] == true;
  
 julia> eq2 == [0, sin(ϕ/2), cos(ϕ/2), 0] == true;
-
 ```
 
 """
@@ -234,7 +226,6 @@ This gate performs a rotation in the subspace ``{|01\\rangle, |10\\rangle}`` wit
 # Examples
 
 ```jldoctest
-
 julia> using BraketSimulator
 
 julia> ϕ = 3.56;
@@ -250,7 +241,6 @@ julia> eq2 = m * [1, 0, 1, 0];
 julia> eq1 == [exp(im*ϕ/2), cos(ϕ/2), - sin(ϕ/2), 0] == true; 
 
 julia> eq2 == [exp(im*ϕ/2), sin(ϕ/2), cos(ϕ/2), 0] == true;
-
 ```
 
 """
@@ -280,7 +270,6 @@ This gate performs a rotation in the subspace ``{|01\\rangle, |10\\rangle}`` wit
 # Examples
 
 ```jldoctest
-
 julia> using BraketSimulator
 
 julia> ϕ = 3.56;
@@ -296,7 +285,6 @@ julia> eq2 = m * [1, 0, 1, 0];
 julia> eq1 == [exp(-im*ϕ/2), cos(ϕ/2), - sin(ϕ/2), 0] == true;
 
 julia> eq2 == [exp(-im*ϕ/2), sin(ϕ/2), cos(ϕ/2), 0] == true;
-
 ```
 
 """
@@ -333,7 +321,6 @@ This gate performs a rotation in adjacent fermionic modes under the Jordan-Wigne
 # Examples
 
 ```jldoctest
-
 julia> using BraketSimulator
 
 julia> ϕ = 3.56;
@@ -357,7 +344,6 @@ julia> eq2 == [0, exp(im*ϕ/2.0)*cos(ϕ / 2.0), - im*exp(im*ϕ/2.0)*sin(ϕ/2.0),
 julia> eq3 == [0, - im*exp(im*ϕ/2.0)*sin(ϕ/2.0), exp(im*ϕ/2.0)*cos(ϕ/2.0), 0] == true;
 
 julia> eq4 == [0, 0, 0, exp(im * ϕ)] == true;
-
 ```
 
 """
