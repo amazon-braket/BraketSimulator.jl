@@ -527,7 +527,7 @@ get_tol(shots::Int) = return (
         x q[0];
         reset q[0];
         """
-        @test_throws Quasar.QasmParseError parse_qasm(qasm)
+        @test_warn "reset expression encountered -- currently `reset` is a no-op" parse_qasm(qasm)
     end
     @testset "Gate call missing/extra args" begin
         qasm = """

@@ -65,6 +65,7 @@ const qasm_tokens = [
         :power_mod    => re"pow",
         :measure      => re"measure",
         :arrow_token  => re"->",
+        :reset_token  => re"reset",
         :void         => re"void",
         :const_token  => re"const",
         :assignment   => re"=|-=|\+=|\*=|/=|^=|&=|\|=|<<=|>>=",
@@ -102,7 +103,7 @@ const qasm_tokens = [
         :newline         => re"\r?\n",
         :spaces          => re"[\t ]+",
         :classical_type    => re"bool|uint|int|float|angle|complex|array|bit",
-        :forbidden_keyword => re"cal|defcal|duration|durationof|stretch|reset|delay|barrier|extern",
+        :forbidden_keyword => re"cal|defcal|duration|durationof|stretch|delay|barrier|extern",
 ]
 
 @eval @enum Token error $(first.(qasm_tokens)...)
@@ -993,9 +994,14 @@ function parse_qasm(clean_tokens::Vector{Tuple{Int64, Int32, Token}}, qasm::Stri
         elseif token == box
             @warn "box expression encountered -- currently boxed and delayed expressions are not supported"
             box_expr = QasmExpression(:box)
-            # handle condition
             parse_block_body(box_expr, clean_tokens, stack, start, qasm)
             push!(stack, box_expr)
+        elseif token == reset_token 
+            @warn "reset expression encountered -- currently `reset` is a no-op"
+            eol = findfirst(triplet->triplet[end] == semicolon, clean_tokens)
+            reset_tokens = splice!(clean_tokens, 1:eol)
+            targets = parse_expression(reset_tokens, stack, start, qasm)
+            push!(stack, QasmExpression(:reset, targets))
         elseif token == end_token
             push!(stack, QasmExpression(:end))
         elseif token == identifier || token == builtin_gate
@@ -1588,6 +1594,8 @@ function (v::AbstractVisitor)(program_expr::QasmExpression)
             v(expr)
         end
     elseif head(program_expr) == :version
+        return v
+    elseif head(program_expr) == :reset
         return v
     elseif head(program_expr) == :input
         var_name = name(program_expr)
