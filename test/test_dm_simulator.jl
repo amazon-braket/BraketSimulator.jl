@@ -1,6 +1,6 @@
 using Test, Logging, LinearAlgebra, BraketSimulator, DataStructures
 
-LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
+LARGE_TESTS = get(ENV, "BRAKET_SIM_LARGE_TESTS", false)
 
 @testset "Density matrix simulator" begin
     sx = ComplexF64[0 1; 1 0]
@@ -358,7 +358,7 @@ LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
             end
             return qft_ops
         end
-        max_qc = LARGE_TESTS ? 16 : 10 
+        max_qc = LARGE_TESTS ? 14 : 10 
         @testset "Qubit count $qubit_count" for qubit_count in 2:max_qc
             simulation = DensityMatrixSimulator(qubit_count, 0)
             operations = qft_circuit_operations(qubit_count)

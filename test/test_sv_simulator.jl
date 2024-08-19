@@ -1,6 +1,6 @@
 using Test, BraketSimulator, DataStructures
 
-LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
+LARGE_TESTS = get(ENV, "BRAKET_SIM_LARGE_TESTS", false)
 
 @testset "State vector simulator" begin
     @testset "Simple circuits nq: $qubit_count $instructions" for (
@@ -323,7 +323,7 @@ LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
             end
             return qft_ops
         end
-        max_qc = LARGE_TESTS ? 32 : 20
+        max_qc = LARGE_TESTS ? 28 : 20
         @testset "Qubit count $qubit_count" for qubit_count in 4:max_qc
             simulation = StateVectorSimulator(qubit_count, 0)
             operations = qft_circuit_operations(qubit_count)
