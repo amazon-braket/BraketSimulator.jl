@@ -1,13 +1,11 @@
 module Quasar
 
 using ..BraketSimulator
-using Automa, AbstractTrees, DataStructures, Braket
-using PrecompileTools: @setup_workload, @compile_workload
+using Automa, AbstractTrees, DataStructures
 using DataStructures: Stack
-using Braket: Instruction, bind_value!, remap
-using BraketSimulator: Control
+using BraketSimulator: Control, Instruction, Result, bind_value!, remap, qubit_count, Circuit
 
-export parse_qasm, QasmProgramVisitor
+export parse_qasm, QasmProgramVisitor, Circuit
 
 struct QasmParseError <: Exception
     message::String
@@ -67,6 +65,7 @@ const qasm_tokens = [
         :power_mod    => re"pow",
         :measure      => re"measure",
         :arrow_token  => re"->",
+        :reset_token  => re"reset",
         :void         => re"void",
         :const_token  => re"const",
         :assignment   => re"=|-=|\+=|\*=|/=|^=|&=|\|=|<<=|>>=",
@@ -104,7 +103,7 @@ const qasm_tokens = [
         :newline         => re"\r?\n",
         :spaces          => re"[\t ]+",
         :classical_type    => re"bool|uint|int|float|angle|complex|array|bit",
-        :forbidden_keyword => re"cal|defcal|duration|durationof|stretch|reset|delay|barrier|extern",
+        :forbidden_keyword => re"cal|defcal|duration|durationof|stretch|delay|barrier|extern",
 ]
 
 @eval @enum Token error $(first.(qasm_tokens)...)
@@ -291,28 +290,40 @@ end
 
 struct SizedBitVector <: AbstractArray{Bool, 1}
     size::QasmExpression
+    SizedBitVector(size::QasmExpression) = new(size)
+    SizedBitVector(sbv::SizedBitVector) = new(sbv.size)
 end
 Base.length(s::SizedBitVector) = s.size
 Base.size(s::SizedBitVector) = (s.size,)
 Base.show(io::IO, s::SizedBitVector) = print(io, "SizedBitVector{$(s.size.args[end])}")
 struct SizedInt <: Integer
     size::QasmExpression
+    SizedInt(size::QasmExpression) = new(size)
+    SizedInt(sint::SizedInt) = new(sint.size)
 end
 Base.show(io::IO, s::SizedInt) = print(io, "SizedInt{$(s.size.args[end])}")
 struct SizedUInt <: Unsigned 
     size::QasmExpression
+    SizedUInt(size::QasmExpression) = new(size)
+    SizedUInt(suint::SizedUInt) = new(suint.size)
 end
 Base.show(io::IO, s::SizedUInt) = print(io, "SizedUInt{$(s.size.args[end])}")
 struct SizedFloat <: AbstractFloat
     size::QasmExpression
+    SizedFloat(size::QasmExpression) = new(size)
+    SizedFloat(sfloat::SizedFloat) = new(sfloat.size)
 end
 Base.show(io::IO, s::SizedFloat) = print(io, "SizedFloat{$(s.size.args[end])}")
 struct SizedAngle <: AbstractFloat
     size::QasmExpression
+    SizedAngle(size::QasmExpression) = new(size)
+    SizedAngle(sangle::SizedAngle) = new(sangle.size)
 end
 Base.show(io::IO, s::SizedAngle) = print(io, "SizedAngle{$(s.size.args[end])}")
 struct SizedComplex <: Number
     size::QasmExpression
+    SizedComplex(size::QasmExpression) = new(size)
+    SizedComplex(scomplex::SizedComplex) = new(scomplex.size)
 end
 Base.show(io::IO, s::SizedComplex) = print(io, "SizedComplex{$(s.size.args[end])}")
 
@@ -396,7 +407,7 @@ const binary_assignment_ops = Dict{String, Symbol}(
                                                   )
 function parse_assignment_op(op_token, qasm)
     op_string = parse_identifier(op_token, qasm)
-    return binary_assignment_ops[op_string.args[1]]
+    return binary_assignment_ops[op_string.args[1]::String]
 end
 
 parse_string_literal(token, qasm)  = QasmExpression(:string_literal, String(qasm[token[1]:token[1]+token[2]-1]))
@@ -983,9 +994,14 @@ function parse_qasm(clean_tokens::Vector{Tuple{Int64, Int32, Token}}, qasm::Stri
         elseif token == box
             @warn "box expression encountered -- currently boxed and delayed expressions are not supported"
             box_expr = QasmExpression(:box)
-            # handle condition
             parse_block_body(box_expr, clean_tokens, stack, start, qasm)
             push!(stack, box_expr)
+        elseif token == reset_token 
+            @warn "reset expression encountered -- currently `reset` is a no-op"
+            eol = findfirst(triplet->triplet[end] == semicolon, clean_tokens)
+            reset_tokens = splice!(clean_tokens, 1:eol)
+            targets = parse_expression(reset_tokens, stack, start, qasm)
+            push!(stack, QasmExpression(:reset, targets))
         elseif token == end_token
             push!(stack, QasmExpression(:end))
         elseif token == identifier || token == builtin_gate
@@ -1062,7 +1078,7 @@ mutable struct QasmProgramVisitor <: AbstractVisitor
     qubit_count::Int
     instructions::Vector{Instruction}
     results::Vector{Result}
-    function QasmProgramVisitor(inputs = Dict{String, Any}())
+    function QasmProgramVisitor(inputs::Dict{String, <:Any} = Dict{String, Any}())
         new(inputs,
             Dict{String, ClassicalVariable}(),
             Dict{String, FunctionDefinition}(),
@@ -1078,7 +1094,7 @@ end
 
 mutable struct QasmGateDefVisitor <: AbstractVisitor
     parent::AbstractVisitor
-    params::Dict{String, FreeParameter}
+    params::Dict{String, BraketSimulator.FreeParameter}
     qubit_defs::Dict{String, Qubit}
     qubit_mapping::Dict{String, Vector{Int}}
     qubit_count::Int
@@ -1103,7 +1119,8 @@ mutable struct QasmFunctionVisitor <: AbstractVisitor
     qubit_mapping::Dict{String, Vector{Int}}
     qubit_count::Int
     instructions::Vector{Instruction}
-    function QasmFunctionVisitor(parent::AbstractVisitor, declared_arguments::Vector{QasmExpression}, provided_arguments::Vector{QasmExpression})
+    # nosemgrep
+    function QasmFunctionVisitor(@nospecialize(parent::AbstractVisitor), declared_arguments::Vector{QasmExpression}, provided_arguments::Vector{QasmExpression})
         v = new(parent, 
             classical_defs(parent),
             deepcopy(parent.qubit_defs),
@@ -1156,10 +1173,10 @@ qubit_mapping(v::QasmProgramVisitor)  = v.qubit_mapping
 qubit_mapping(v::QasmFunctionVisitor) = v.qubit_mapping
 qubit_mapping(v::QasmGateDefVisitor)  = v.qubit_mapping
 
-Braket.qubit_count(v::AbstractVisitor)     = qubit_count(parent(v))
-Braket.qubit_count(v::QasmProgramVisitor)  = v.qubit_count
-Braket.qubit_count(v::QasmFunctionVisitor) = v.qubit_count
-Braket.qubit_count(v::QasmGateDefVisitor)  = v.qubit_count
+BraketSimulator.qubit_count(v::AbstractVisitor)     = qubit_count(parent(v))
+BraketSimulator.qubit_count(v::QasmProgramVisitor)  = v.qubit_count
+BraketSimulator.qubit_count(v::QasmFunctionVisitor) = v.qubit_count
+BraketSimulator.qubit_count(v::QasmGateDefVisitor)  = v.qubit_count
 
 classical_defs(v::AbstractVisitor)     = classical_defs(parent(v))
 classical_defs(v::QasmProgramVisitor)  = v.classical_defs
@@ -1178,11 +1195,9 @@ Base.push!(v::QasmProgramVisitor, rts::Vector{<:Result}) = append!(v.results, rt
 Base.push!(v::AbstractVisitor, @nospecialize(rt::Result))    = push!(parent(v), rt)
 Base.push!(v::QasmProgramVisitor, @nospecialize(rt::Result)) = push!(v.results, rt)
 
-function generate_gate_body(v::AbstractVisitor, argument_names::Vector{String}, qubits::Vector{String}, raw_expressions::QasmExpression)
-    params = Dict{String, FreeParameter}()
-    for arg in argument_names
-        params[arg] = FreeParameter(arg)
-    end
+# nosemgrep
+function generate_gate_body(@nospecialize(v::AbstractVisitor), argument_names::Vector{String}, qubits::Vector{String}, raw_expressions::QasmExpression)
+    params        = Dict{String, BraketSimulator.FreeParameter}(arg=>BraketSimulator.FreeParameter(arg) for arg in argument_names)
     qubit_defs    = Dict(q=>Qubit(q, 1) for q in qubits)
     qubit_mapping = Dict(qubits[ix+1]=>[ix] for ix in 0:length(qubits)-1)
     for ix in 0:length(qubits)-1
@@ -1241,12 +1256,13 @@ function name(expr::QasmExpression)::String
     throw(QasmVisitorError("name not defined for expressions of type $(head(expr))"))
 end
 
-evaluate(v::AbstractVisitor, i::Number) = i
-evaluate(v::AbstractVisitor, i::String) = i
-evaluate(v::AbstractVisitor, i::BitVector) = i
-evaluate(v::AbstractVisitor, i::NTuple{N,<:Number}) where {N} = i
-evaluate(v::AbstractVisitor, i::Vector{<:Number}) = i
-function evaluate(v::AbstractVisitor, expr::QasmExpression)
+evaluate(@nospecialize(v::AbstractVisitor), i::Number) = i
+evaluate(@nospecialize(v::AbstractVisitor), i::String) = i
+evaluate(@nospecialize(v::AbstractVisitor), i::BitVector) = i
+evaluate(@nospecialize(v::AbstractVisitor), i::NTuple{N,<:Number}) where {N} = i
+evaluate(@nospecialize(v::AbstractVisitor), i::Vector{<:Number}) = i
+# nosemgrep
+function evaluate(@nospecialize(v::AbstractVisitor), expr::QasmExpression)
     if head(expr) == :identifier
         id_name = name(expr)
         haskey(classical_defs(v), id_name) && return classical_defs(v)[id_name].val
@@ -1293,20 +1309,20 @@ function evaluate(v::AbstractVisitor, expr::QasmExpression)
         raw_obs = expr.args[1]::QasmExpression
         if head(raw_obs) == :array_literal
             new_obs = map(arg->evaluate(v, QasmExpression(:observable, arg)), convert(Vector{QasmExpression}, raw_obs.args))
-            return Braket.Observables.TensorProduct(convert(Vector{Braket.Observables.Observable}, new_obs))
+            return BraketSimulator.Observables.TensorProduct(convert(Vector{BraketSimulator.Observables.Observable}, new_obs))
         elseif head(raw_obs) == :identifier
             obs_name = raw_obs.args[1]::String
-            obs_name == "x" && return Braket.Observables.X()
-            obs_name == "y" && return Braket.Observables.Y()
-            obs_name == "z" && return Braket.Observables.Z()
-            obs_name == "i" && return Braket.Observables.I()
-            obs_name == "h" && return Braket.Observables.H()
+            obs_name == "x" && return BraketSimulator.Observables.X()
+            obs_name == "y" && return BraketSimulator.Observables.Y()
+            obs_name == "z" && return BraketSimulator.Observables.Z()
+            obs_name == "i" && return BraketSimulator.Observables.I()
+            obs_name == "h" && return BraketSimulator.Observables.H()
         elseif head(raw_obs) == :hermitian
             h_mat = similar(raw_obs.args[1], ComplexF64)::Matrix{ComplexF64}
             for ii in eachindex(h_mat)
                 h_mat[ii] = convert(ComplexF64, evaluate(v, raw_obs.args[1][ii]))::ComplexF64
             end
-            return Braket.Observables.HermitianObservable(h_mat)
+            return BraketSimulator.Observables.HermitianObservable(h_mat)
         end
     elseif head(expr) == :power_mod
         pow_expr = QasmExpression(:pow, evaluate(v, expr.args[1]::QasmExpression))
@@ -1352,7 +1368,7 @@ function evaluate(v::AbstractVisitor, expr::QasmExpression)
         end
     elseif head(expr) == :measure
         qubits_to_measure = evaluate_qubits(v, expr.args[1])
-        push!(v, [Instruction(Measure(), q) for q in qubits_to_measure])
+        push!(v, [Instruction(BraketSimulator.Measure(), q) for q in qubits_to_measure])
         return false
     elseif head(expr) == :function_call
         function_name = name(expr)
@@ -1422,7 +1438,7 @@ end
 evaluate(v::AbstractVisitor, exprs::Vector{QasmExpression}) = [evaluate(v, expr) for expr in exprs] 
 
 function evaluate_qubits(v::AbstractVisitor, qubit_targets::Vector{QasmExpression})::Vector{Int}
-    mapping = qubit_mapping(v)
+    mapping = qubit_mapping(v)::Dict{String, Vector{Int}}
     final_qubits = Int[]
     for qubit_expr in qubit_targets
         if head(qubit_expr) == :identifier
@@ -1457,34 +1473,31 @@ function process_gate_arguments(v::AbstractVisitor, gate_name::String, defined_a
         def_has_arguments && throw(QasmVisitorError("gate $gate_name requires arguments but none were provided.")) 
         call_has_arguments && throw(QasmVisitorError("gate $gate_name does not accept arguments but arguments were provided."))
     end
-    if !isempty(called_arguments)
-        evaled_args     = map(Float64, Iterators.flatten(evaluate(v, called_arguments)))
-        argument_values = Dict{Symbol, Number}(Symbol(arg_name)=>argument for (arg_name, argument) in zip(defined_arguments, evaled_args))
+    if def_has_arguments
+        evaled_args     = only(evaluate(v, called_arguments))
+        argument_values = Dict{Symbol, Real}(Symbol(arg_name)=>argument for (arg_name, argument) in zip(defined_arguments, evaled_args))
+        return [bind_value!(ix, argument_values) for ix in gate_body]
     else
-        argument_values = Dict{Symbol, Number}()
+        return deepcopy(gate_body)
     end
-    applied_arguments = Vector{Instruction}(undef, length(gate_body))
-    for (ii, ix) in enumerate(gate_body)
-        applied_arguments[ii] = def_has_arguments ? bind_value!(ix, argument_values) : ix
-    end
-    return applied_arguments
 end
 
-function handle_gate_modifiers(ixs::Vector{Instruction}, mods::Vector{QasmExpression}, control_qubits::Vector{Int}, is_gphase::Bool)
+# nosemgrep
+function handle_gate_modifiers(@nospecialize(ixs::Vector{<:Instruction}), mods::Vector{QasmExpression}, control_qubits::Vector{Int}, is_gphase::Bool)
     for mod in Iterators.reverse(mods)
         control_qubit = (head(mod) ∈ (:negctrl, :ctrl) && !is_gphase) ? pop!(control_qubits) : -1
         for (ii, ix) in enumerate(ixs)
             if head(mod) == :pow
-                ixs[ii] = Instruction(ix.operator ^ mod.args[1], ix.target)
+                ixs[ii].operator.pow_exponent *= mod.args[1]
             elseif head(mod) == :inv
-                ixs[ii] = Instruction(inv(ix.operator), ix.target)
+                ixs[ii].operator.pow_exponent *= -1
             # need to handle "extra" target
             elseif head(mod) ∈ (:negctrl, :ctrl)
                 bit = head(mod) == :ctrl ? (1,) : (0,)
                 if is_gphase
                     ixs[ii] = Instruction(Control(ix.operator, bit), ix.target)
                 else
-                    ixs[ii] = Instruction(Control(ix.operator, bit), vcat(control_qubit, ix.target...))
+                    ixs[ii] = Instruction(Control(ix.operator, bit), BraketSimulator.QubitSet(control_qubit::Int, ix.target...))
                 end
             end
         end
@@ -1517,7 +1530,7 @@ function visit_gphase_call(v::AbstractVisitor, program_expr::QasmExpression)
     gate_targets::Vector{Int} = collect(0:n_called_with-1)
     provided_arg::QasmExpression = only(program_expr.args[2].args)
     evaled_arg     = Float64(evaluate(v, provided_arg))
-    applied_arguments = Instruction[Instruction(MultiQubitPhaseShift{n_called_with}(evaled_arg), gate_targets)]
+    applied_arguments = Instruction[Instruction(BraketSimulator.MultiQubitPhaseShift{n_called_with}(evaled_arg), gate_targets)]
     mods::Vector{QasmExpression} = length(program_expr.args) == 4 ? program_expr.args[4].args : QasmExpression[]
     applied_arguments = handle_gate_modifiers(applied_arguments, mods, Int[], true)
     target_mapper = Dict{Int, Int}(g_ix=>gate_targets[g_ix+1][1] for g_ix in 0:n_called_with-1)
@@ -1528,7 +1541,7 @@ function visit_gphase_call(v::AbstractVisitor, program_expr::QasmExpression)
 end
 
 function visit_gate_call(v::AbstractVisitor, program_expr::QasmExpression)
-    gate_name     = name(program_expr)::String
+    gate_name        = name(program_expr)::String
     raw_call_targets = program_expr.args[3]::QasmExpression
     call_targets::Vector{QasmExpression}  = convert(Vector{QasmExpression}, head(raw_call_targets.args[1]) == :array_literal ? raw_call_targets.args[1].args : raw_call_targets.args)::Vector{QasmExpression}
     provided_args::Vector{QasmExpression} = convert(Vector{QasmExpression}, program_expr.args[2].args)::Vector{QasmExpression}
@@ -1558,10 +1571,10 @@ function visit_gate_call(v::AbstractVisitor, program_expr::QasmExpression)
     return
 end
 
-function _check_observable_targets(observable::Braket.Observables.HermitianObservable, targets)
+function _check_observable_targets(observable::BraketSimulator.Observables.HermitianObservable, targets)
     qubit_count(observable) == 1 && (isempty(targets) || length(targets) == 1) && return
     qubit_count(observable) == length(targets) && return
-    matrix_ir = Braket.complex_matrix_to_ir(observable.matrix)
+    matrix_ir = BraketSimulator.complex_matrix_to_ir(observable.matrix)
     throw(QasmVisitorError("Invalid observable specified: $matrix_ir, targets: $targets", "ValueError"))
 end
 _check_observable_targets(observable, targets) = nothing 
@@ -1581,6 +1594,8 @@ function (v::AbstractVisitor)(program_expr::QasmExpression)
             v(expr)
         end
     elseif head(program_expr) == :version
+        return v
+    elseif head(program_expr) == :reset
         return v
     elseif head(program_expr) == :input
         var_name = name(program_expr)
@@ -1798,51 +1813,51 @@ function (v::AbstractVisitor)(program_expr::QasmExpression)
         if pragma_type == :result
             result_type = program_expr.args[2]
             if result_type == :state_vector
-                push!(v, Braket.StateVector())
+                push!(v, BraketSimulator.StateVector())
             elseif result_type == :probability
                 has_targets = !isempty(program_expr.args[3].args)
-                targets = has_targets ? evaluate_qubits(v, program_expr.args[3].args[1]) : QubitSet()
-                push!(v, Probability(targets))
+                targets = has_targets ? evaluate_qubits(v, program_expr.args[3].args[1]) : BraketSimulator.QubitSet()
+                push!(v, BraketSimulator.Probability(targets))
             elseif result_type == :density_matrix
                 has_targets = !isempty(program_expr.args[3].args)
-                targets = has_targets ? evaluate_qubits(v, program_expr.args[3].args[1]) : QubitSet()
-                push!(v, DensityMatrix(targets))
+                targets = has_targets ? evaluate_qubits(v, program_expr.args[3].args[1]) : BraketSimulator.QubitSet()
+                push!(v, BraketSimulator.DensityMatrix(targets))
             elseif result_type == :amplitude
                 states = head(program_expr.args[3]) == :array_literal ? program_expr.args[3].args : program_expr.args[3]
                 clean_states = map(states) do state
                     return replace(state.args[1], "\""=>"", "\'"=>"")
                 end
-                push!(v, Amplitude(clean_states))
+                push!(v, BraketSimulator.Amplitude(clean_states))
             elseif result_type == :expectation
                 raw_obs, raw_targets = program_expr.args[3:end]
                 has_targets = !isempty(raw_targets.args)
-                targets = has_targets ? evaluate_qubits(v, raw_targets.args[1]) : QubitSet()
+                targets = has_targets ? evaluate_qubits(v, raw_targets.args[1]) : BraketSimulator.QubitSet()
                 observable = evaluate(v, raw_obs)
-                if observable isa Braket.Observables.StandardObservable && length(targets) > 1
+                if observable isa BraketSimulator.Observables.StandardObservable && length(targets) > 1
                     throw(QasmVisitorError("Standard observable target must be exactly 1 qubit.", "ValueError"))
                 end
                 _check_observable_targets(observable, targets)
-                push!(v, Expectation(observable, targets))
+                push!(v, BraketSimulator.Expectation(observable, targets))
             elseif result_type == :variance
                 raw_obs, raw_targets = program_expr.args[3:end]
                 has_targets = !isempty(raw_targets.args)
-                targets = has_targets ? evaluate_qubits(v, raw_targets.args[1]) : QubitSet()
+                targets = has_targets ? evaluate_qubits(v, raw_targets.args[1]) : BraketSimulator.QubitSet()
                 observable = evaluate(v, raw_obs)
-                if observable isa Braket.Observables.StandardObservable && length(targets) > 1
+                if observable isa BraketSimulator.Observables.StandardObservable && length(targets) > 1
                     throw(QasmVisitorError("Standard observable target must be exactly 1 qubit.", "ValueError"))
                 end
                 _check_observable_targets(observable, targets)
-                push!(v, Variance(observable, targets))
+                push!(v, BraketSimulator.Variance(observable, targets))
             elseif result_type == :sample
                 raw_obs, raw_targets = program_expr.args[3:end]
                 has_targets = !isempty(raw_targets.args)
-                targets = has_targets ? evaluate_qubits(v, raw_targets.args[1]) : QubitSet()
+                targets = has_targets ? evaluate_qubits(v, raw_targets.args[1]) : BraketSimulator.QubitSet()
                 observable = evaluate(v, raw_obs)
-                if observable isa Braket.Observables.StandardObservable && length(targets) > 1
+                if observable isa BraketSimulator.Observables.StandardObservable && length(targets) > 1
                     throw(QasmVisitorError("Standard observable target must be exactly 1 qubit.", "ValueError"))
                 end
                 _check_observable_targets(observable, targets)
-                push!(v, Sample(observable, targets))
+                push!(v, BraketSimulator.Sample(observable, targets))
             elseif result_type == :adjoint_gradient
                 throw(QasmVisitorError("Result type adjoint_gradient is not supported.", "TypeError"))
             end
@@ -1853,7 +1868,7 @@ function (v::AbstractVisitor)(program_expr::QasmExpression)
                 unitary_matrix[ii] = evaluate(v, raw_mat[ii])
             end
             targets = evaluate_qubits(v, program_expr.args[end].args[1])
-            push!(v, Instruction(Unitary(unitary_matrix), targets))
+            push!(v, Instruction(BraketSimulator.Unitary(unitary_matrix), targets))
         elseif pragma_type == :noise
             noise_type::String = program_expr.args[2].args[1]
             raw_args::QasmExpression = program_expr.args[3].args[1]
@@ -1868,7 +1883,7 @@ function (v::AbstractVisitor)(program_expr::QasmExpression)
                     end
                     kraus_matrix
                 end
-                push!(v, Instruction(Kraus(kraus_matrices), targets))
+                push!(v, Instruction(BraketSimulator.Kraus(kraus_matrices), targets))
             else
                 braket_noise_type = noise_types[noise_type]
                 args = map(Float64, evaluate(v, raw_args))
@@ -1886,15 +1901,15 @@ function (v::AbstractVisitor)(program_expr::QasmExpression)
     return v
 end
 
-function Braket.Circuit(v::QasmProgramVisitor)
-    c = Circuit()
-    foreach(ix->Braket.add_instruction!(c, ix), v.instructions)
+function BraketSimulator.Circuit(v::QasmProgramVisitor)
+    c = BraketSimulator.Circuit()
+    foreach(ix->BraketSimulator.add_instruction!(c, ix), v.instructions)
     for rt in v.results
-        obs = Braket.extract_observable(rt)
-        if !isnothing(obs) && c.observables_simultaneously_measureable && !(rt isa AdjointGradient)
-            Braket.add_to_qubit_observable_mapping!(c, obs, rt.targets)
+        obs = BraketSimulator.extract_observable(rt)
+        if !isnothing(obs) && c.observables_simultaneously_measureable && !(rt isa BraketSimulator.AdjointGradient)
+            BraketSimulator.add_to_qubit_observable_mapping!(c, obs, rt.targets)
         end
-        Braket.add_to_qubit_observable_set!(c, rt)
+        BraketSimulator.add_to_qubit_observable_set!(c, rt)
         push!(c.result_types, rt)
     end
     return c
@@ -1902,7 +1917,7 @@ end
 
 # semgrep rules can't handle this macro properly yet
 # nosemgrep
-function Braket.Circuit(qasm_source::String, @nospecialize(inputs::Dict{String, <:Any}=Dict{String, Any}()))
+function BraketSimulator.Circuit(qasm_source::String, @nospecialize(inputs::Dict{String, <:Any}=Dict{String, Any}()))
     input_qasm = if endswith(qasm_source, ".qasm") && isfile(qasm_source)
         read(qasm_source, String)
     else
@@ -1912,7 +1927,7 @@ function Braket.Circuit(qasm_source::String, @nospecialize(inputs::Dict{String, 
     parsed  = parse_qasm(input_qasm)
     visitor = QasmProgramVisitor(inputs)
     visitor(parsed)
-    return Circuit(visitor) 
+    return BraketSimulator.Circuit(visitor) 
 end
 
 end # module Quasar

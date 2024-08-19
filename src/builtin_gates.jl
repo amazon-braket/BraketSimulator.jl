@@ -1,92 +1,92 @@
 # OpenQASM 3 Braket Standard Gates
 builtin_gates() = Dict{String, GateDefinition}(
     # identity gate
-    "i"=>GateDefinition("i", String[], ["a"], [Instruction(Braket.I(), 0)]),
+    "i"=>GateDefinition("i", String[], ["a"], Instruction(BraketSimulator.I(), 0)),
     # phase gate
-    "phaseshift"=>GateDefinition("phaseshift", ["λ"], ["a"], [Instruction(PhaseShift(FreeParameter(:λ)), 0)]),
+    "phaseshift"=>GateDefinition("phaseshift", ["λ"], ["a"], Instruction(BraketSimulator.PhaseShift(BraketSimulator.FreeParameter(:λ)), 0)),
     # pauli X gate
-    "x"=>GateDefinition("x", String[], ["a"], [Instruction(X(), 0)]),
+    "x"=>GateDefinition("x", String[], ["a"], Instruction(BraketSimulator.X(), 0)),
     # pauli Y gate
-    "y"=>GateDefinition("y", String[], ["a"], [Instruction(Y(), 0)]),
+    "y"=>GateDefinition("y", String[], ["a"], Instruction(BraketSimulator.Y(), 0)),
     # pauli Z gate
-    "z"=>GateDefinition("z", String[], ["a"], [Instruction(Z(), 0)]),
+    "z"=>GateDefinition("z", String[], ["a"], Instruction(BraketSimulator.Z(), 0)),
     # Hadamard gate
-    "h"=>GateDefinition("h", String[], ["a"], [Instruction(H(), 0)]),
+    "h"=>GateDefinition("h", String[], ["a"], Instruction(BraketSimulator.H(), 0)),
     # S gate
-    "s"=>GateDefinition("s", String[], ["a"], [Instruction(S(), 0)]),
+    "s"=>GateDefinition("s", String[], ["a"], Instruction(BraketSimulator.S(), 0)),
     # Si gate
-    "si"=>GateDefinition("si", String[], ["a"], [Instruction(Si(), 0)]),
+    "si"=>GateDefinition("si", String[], ["a"], Instruction(BraketSimulator.Si(), 0)),
     # T gate
-    "t"=>GateDefinition("t", String[], ["a"], [Instruction(T(), 0)]),
+    "t"=>GateDefinition("t", String[], ["a"], Instruction(BraketSimulator.T(), 0)),
     # Ti gate
-    "ti"=>GateDefinition("ti", String[], ["a"], [Instruction(Ti(), 0)]),
+    "ti"=>GateDefinition("ti", String[], ["a"], Instruction(BraketSimulator.Ti(), 0)),
     # V gate
-    "v"=>GateDefinition("v", String[], ["a"], [Instruction(V(), 0)]),
+    "v"=>GateDefinition("v", String[], ["a"], Instruction(BraketSimulator.V(), 0)),
     # Vi gate
-    "vi"=>GateDefinition("vi", String[], ["a"], [Instruction(Vi(), 0)]),
+    "vi"=>GateDefinition("vi", String[], ["a"], Instruction(BraketSimulator.Vi(), 0)),
     # RotX gate
-    "rx"=>GateDefinition("rx", ["θ"], ["a"], [Instruction(Rx(FreeParameter(:θ)), 0)]),
+    "rx"=>GateDefinition("rx", ["θ"], ["a"], Instruction(BraketSimulator.Rx(BraketSimulator.FreeParameter(:θ)), 0)),
     # RotY gate
-    "ry"=>GateDefinition("ry", ["θ"], ["a"], [Instruction(Ry(FreeParameter(:θ)), 0)]),
+    "ry"=>GateDefinition("ry", ["θ"], ["a"], Instruction(BraketSimulator.Ry(BraketSimulator.FreeParameter(:θ)), 0)),
     # RotZ gate
-    "rz"=>GateDefinition("rz", ["θ"], ["a"], [Instruction(Rz(FreeParameter(:θ)), 0)]),
+    "rz"=>GateDefinition("rz", ["θ"], ["a"], Instruction(BraketSimulator.Rz(BraketSimulator.FreeParameter(:θ)), 0)),
     # CNot gate
-    "cnot"=>GateDefinition("cnot", String[], ["a", "b"], [Instruction(CNot(), QubitSet(0, 1))]),
+    "cnot"=>GateDefinition("cnot", String[], ["a", "b"], Instruction(BraketSimulator.CNot(), BraketSimulator.QubitSet(0, 1))),
     # CY gate
-    "cy"=>GateDefinition("cy", String[], ["a", "b"], [Instruction(CY(), QubitSet(0, 1))]),
+    "cy"=>GateDefinition("cy", String[], ["a", "b"], Instruction(BraketSimulator.CY(), BraketSimulator.QubitSet(0, 1))),
     # CZ gate
-    "cz"=>GateDefinition("cz", String[], ["a", "b"], [Instruction(CZ(), QubitSet(0, 1))]),
+    "cz"=>GateDefinition("cz", String[], ["a", "b"], Instruction(BraketSimulator.CZ(), BraketSimulator.QubitSet(0, 1))),
     # CV gate
-    "cv"=>GateDefinition("cv", String[], ["a", "b"], [Instruction(CV(), QubitSet(0, 1))]),
+    "cv"=>GateDefinition("cv", String[], ["a", "b"], Instruction(BraketSimulator.CV(), BraketSimulator.QubitSet(0, 1))),
     # controlled-phase
-    "cphaseshift"=>GateDefinition("cphaseshift", ["λ"], ["a", "b"], [Instruction(CPhaseShift(FreeParameter(:λ)), QubitSet(0, 1))]),
+    "cphaseshift"=>GateDefinition("cphaseshift", ["λ"], ["a", "b"], Instruction(BraketSimulator.CPhaseShift(BraketSimulator.FreeParameter(:λ)), BraketSimulator.QubitSet(0, 1))),
     # controlled-phase-00
-    "cphaseshift00"=>GateDefinition("cphaseshift00", ["λ"], ["a", "b"], [Instruction(CPhaseShift00(FreeParameter(:λ)), QubitSet(0, 1))]),
+    "cphaseshift00"=>GateDefinition("cphaseshift00", ["λ"], ["a", "b"], Instruction(BraketSimulator.CPhaseShift00(BraketSimulator.FreeParameter(:λ)), BraketSimulator.QubitSet(0, 1))),
     # controlled-phase-01
-    "cphaseshift01"=>GateDefinition("cphaseshift01", ["λ"], ["a", "b"], [Instruction(CPhaseShift01(FreeParameter(:λ)), QubitSet(0, 1))]),
+    "cphaseshift01"=>GateDefinition("cphaseshift01", ["λ"], ["a", "b"], Instruction(BraketSimulator.CPhaseShift01(BraketSimulator.FreeParameter(:λ)), BraketSimulator.QubitSet(0, 1))),
     # controlled-phase-10
-    "cphaseshift10"=>GateDefinition("cphaseshift10", ["λ"], ["a", "b"], [Instruction(CPhaseShift10(FreeParameter(:λ)), QubitSet(0, 1))]),
+    "cphaseshift10"=>GateDefinition("cphaseshift10", ["λ"], ["a", "b"], Instruction(BraketSimulator.CPhaseShift10(BraketSimulator.FreeParameter(:λ)), BraketSimulator.QubitSet(0, 1))),
     # Swap gate
-    "swap"=>GateDefinition("swap", String[], ["a", "b"], [Instruction(Swap(), QubitSet(0, 1))]),
+    "swap"=>GateDefinition("swap", String[], ["a", "b"], Instruction(BraketSimulator.Swap(), BraketSimulator.QubitSet(0, 1))),
     # ISwap gate
-    "iswap"=>GateDefinition("iswap", String[], ["a", "b"], [Instruction(ISwap(), QubitSet(0, 1))]),
+    "iswap"=>GateDefinition("iswap", String[], ["a", "b"], Instruction(BraketSimulator.ISwap(), BraketSimulator.QubitSet(0, 1))),
     # ISwap gate
-    "pswap"=>GateDefinition("pswap", ["θ"], ["a", "b"], [Instruction(PSwap(FreeParameter(:θ)), QubitSet(0, 1))]),
+    "pswap"=>GateDefinition("pswap", ["θ"], ["a", "b"], Instruction(BraketSimulator.PSwap(BraketSimulator.FreeParameter(:θ)), BraketSimulator.QubitSet(0, 1))),
     # controlled-swap gate
-    "cswap"=>GateDefinition("cswap", String[], ["a", "b", "c"], [Instruction(CSwap(), QubitSet(0, 1, 2))]),
+    "cswap"=>GateDefinition("cswap", String[], ["a", "b", "c"], Instruction(BraketSimulator.CSwap(), BraketSimulator.QubitSet(0, 1, 2))),
     # ccnot/Toffoli gate
-    "ccnot"=>GateDefinition("ccnot", String[], ["a", "b", "c"], [Instruction(CCNot(), QubitSet(0, 1, 2))]),
+    "ccnot"=>GateDefinition("ccnot", String[], ["a", "b", "c"], Instruction(BraketSimulator.CCNot(), BraketSimulator.QubitSet(0, 1, 2))),
     # XX gate
-    "xx"=>GateDefinition("xx", ["θ"], ["a", "b"], [Instruction(XX(FreeParameter(:θ)), QubitSet(0, 1))]),
+    "xx"=>GateDefinition("xx", ["θ"], ["a", "b"], Instruction(BraketSimulator.XX(BraketSimulator.FreeParameter(:θ)), BraketSimulator.QubitSet(0, 1))),
     # XY gate
-    "xy"=>GateDefinition("xy", ["θ"], ["a", "b"], [Instruction(XY(FreeParameter(:θ)), QubitSet(0, 1))]),
+    "xy"=>GateDefinition("xy", ["θ"], ["a", "b"], Instruction(BraketSimulator.XY(BraketSimulator.FreeParameter(:θ)), BraketSimulator.QubitSet(0, 1))),
     # YY gate
-    "yy"=>GateDefinition("yy", ["θ"], ["a", "b"], [Instruction(YY(FreeParameter(:θ)), QubitSet(0, 1))]),
+    "yy"=>GateDefinition("yy", ["θ"], ["a", "b"], Instruction(BraketSimulator.YY(BraketSimulator.FreeParameter(:θ)), BraketSimulator.QubitSet(0, 1))),
     # ZZ gate
-    "zz"=>GateDefinition("zz", ["θ"], ["a", "b"], [Instruction(ZZ(FreeParameter(:θ)), QubitSet(0, 1))]),
+    "zz"=>GateDefinition("zz", ["θ"], ["a", "b"], Instruction(BraketSimulator.ZZ(BraketSimulator.FreeParameter(:θ)), BraketSimulator.QubitSet(0, 1))),
     # ECR gate
-    "ecr"=>GateDefinition("ecr", String[], ["a", "b"], [Instruction(ECR(), QubitSet(0, 1))]),
+    "ecr"=>GateDefinition("ecr", String[], ["a", "b"], Instruction(BraketSimulator.ECR(), BraketSimulator.QubitSet(0, 1))),
     # MS gate
-    "ms"=>GateDefinition("ms", ["ϕ", "θ", "λ"], ["a", "b"], [Instruction(MS(FreeParameter(:ϕ), FreeParameter(:θ), FreeParameter(:λ)), QubitSet(0, 1))]),
+    "ms"=>GateDefinition("ms", ["ϕ", "θ", "λ"], ["a", "b"], Instruction(BraketSimulator.MS(BraketSimulator.FreeParameter(:ϕ), BraketSimulator.FreeParameter(:θ), BraketSimulator.FreeParameter(:λ)), BraketSimulator.QubitSet(0, 1))),
     # GPi gate
-    "gpi"=>GateDefinition("gpi", ["θ"], ["a"], [Instruction(GPi(FreeParameter(:θ)), 0)]),
+    "gpi"=>GateDefinition("gpi", ["θ"], ["a"], Instruction(BraketSimulator.GPi(BraketSimulator.FreeParameter(:θ)), 0)),
     # GPi2 gate
-    "gpi2"=>GateDefinition("gpi2", ["θ"], ["a"], [Instruction(GPi2(FreeParameter(:θ)), 0)]),
+    "gpi2"=>GateDefinition("gpi2", ["θ"], ["a"], Instruction(BraketSimulator.GPi2(BraketSimulator.FreeParameter(:θ)), 0)),
     # PRx gate
-    "prx"=>GateDefinition("prx", ["θ", "ϕ"], ["a"], [Instruction(PRx(FreeParameter(:θ), FreeParameter(:ϕ)), 0)]),
+    "prx"=>GateDefinition("prx", ["θ", "ϕ"], ["a"], Instruction(BraketSimulator.PRx(BraketSimulator.FreeParameter(:θ), BraketSimulator.FreeParameter(:ϕ)), 0)),
     # 3-angle U gate
-    "U"=>GateDefinition("U", ["θ", "ϕ", "λ"], ["a"], [Instruction(U(FreeParameter(:θ), FreeParameter(:ϕ), FreeParameter(:λ)), 0)]),
+    "U"=>GateDefinition("U", ["θ", "ϕ", "λ"], ["a"], Instruction(BraketSimulator.U(BraketSimulator.FreeParameter(:θ), BraketSimulator.FreeParameter(:ϕ), BraketSimulator.FreeParameter(:λ)), 0)),
 )
 
 const noise_types = Dict{String, Type}(
-                                       "bit_flip"=>BitFlip,
-                                       "phase_flip"=>PhaseFlip,
-                                       "pauli_channel"=>PauliChannel,
-                                       "depolarizing"=>Depolarizing,
-                                       "two_qubit_depolarizing"=>TwoQubitDepolarizing,
-                                       "two_qubit_dephasing"=>TwoQubitDephasing,
-                                       "amplitude_damping"=>AmplitudeDamping,
-                                       "generalized_amplitude_damping"=>GeneralizedAmplitudeDamping,
-                                       "phase_damping"=>PhaseDamping,
-                                       "kraus"=>Kraus,
+                                       "bit_flip"=>BraketSimulator.BitFlip,
+                                       "phase_flip"=>BraketSimulator.PhaseFlip,
+                                       "pauli_channel"=>BraketSimulator.PauliChannel,
+                                       "depolarizing"=>BraketSimulator.Depolarizing,
+                                       "two_qubit_depolarizing"=>BraketSimulator.TwoQubitDepolarizing,
+                                       "two_qubit_dephasing"=>BraketSimulator.TwoQubitDephasing,
+                                       "amplitude_damping"=>BraketSimulator.AmplitudeDamping,
+                                       "generalized_amplitude_damping"=>BraketSimulator.GeneralizedAmplitudeDamping,
+                                       "phase_damping"=>BraketSimulator.PhaseDamping,
+                                       "kraus"=>BraketSimulator.Kraus,
                                       )

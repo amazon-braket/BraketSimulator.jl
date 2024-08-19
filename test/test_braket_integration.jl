@@ -1,31 +1,46 @@
 using Test,
     Statistics,
     LinearAlgebra,
-    Braket,
-    Braket.Observables,
     BraketSimulator
+using Braket
 using Braket: I, name
 
-@testset "Basic integration of local simulators with Braket.jl" begin
+@testset "Basic integration of local simulators with BraketSimulator.jl" begin
     @testset "Simulator $sim_type" for (sim_type, rt) in (
         ("braket_sv_v2", Braket.StateVector),
         ("braket_dm_v2", Braket.DensityMatrix),
     )
         d = LocalSimulator(sim_type)
         @test d.backend == sim_type
-        c = Circuit()
-        H(c, 0, 1, 2)
-        Rx(c, 0, 1, 2, 0.5)
+        c = Braket.Circuit()
+        Braket.H(c, 0, 1, 2)
+        Braket.Rx(c, 0, 1, 2, 0.5)
         rt(c)
         if sim_type == "braket_sv_v2"
-            Amplitude(c, ["000", "111"])
+            Braket.Amplitude(c, ["000", "111"])
         end
         r = d(c, shots = 0)
     end
 end
 
+@testset "Type conversions" begin
+    @test convert(Braket.Operator, convert(BraketSimulator.Operator, Braket.Measure(2))) == Braket.Measure(2)
+    angle1 = 0.2
+    angle2 = 0.1
+    angle3 = π
+    prob = 0.015
+    prob2 = 0.1
+    prob3 = 0.002
+    gamma = 0.23
+    @test convert(Braket.Operator, convert(BraketSimulator.Operator, Braket.MS(angle1, angle2, angle3))) == Braket.MS(angle1, angle2, angle3)
+    @test convert(Braket.Operator, convert(BraketSimulator.Operator, Braket.U(angle1, angle2, angle3))) == Braket.U(angle1, angle2, angle3)
+    @test convert(Braket.Operator, convert(BraketSimulator.Operator, Braket.PRx(angle1, angle2))) == Braket.PRx(angle1, angle2)
+    @test convert(Braket.Operator, convert(BraketSimulator.Operator, Braket.GeneralizedAmplitudeDamping(prob, gamma))) == Braket.GeneralizedAmplitudeDamping(prob, gamma)
+    @test convert(Braket.Operator, convert(BraketSimulator.Operator, Braket.PauliChannel(prob, prob3, prob3))) == Braket.PauliChannel(prob, prob3, prob3)
+    @test convert(Braket.AbstractProgramResult, convert(BraketSimulator.AbstractProgramResult, Braket.IR.StateVector("statevector"))) == Braket.IR.StateVector("statevector")
+end
+
 @testset "Correctness" begin
-    Braket.IRType[] = :JAQCD
     PURE_DEVICE = LocalSimulator("braket_sv_v2")
     NOISE_DEVICE = LocalSimulator("braket_dm_v2")
     ALL_DEVICES = [PURE_DEVICE, NOISE_DEVICE]
@@ -39,21 +54,21 @@ end
         shots > 0 ? Dict("atol" => 0.2, "rtol" => 0.25) : Dict("atol" => 0.01, "rtol" => 0)
     )
 
-    bell_circ() = Circuit([(H, 0), (CNot, 0, 1)])
+    bell_circ() = Braket.Circuit([(Braket.H, 0), (Braket.CNot, 0, 1)])
     three_qubit_circuit(
         θ::Float64,
         ϕ::Float64,
         φ::Float64,
-        obs::Observables.Observable,
+        obs::Braket.Observables.Observable,
         obs_targets::Vector{Int},
-    ) = Circuit([
-        (Rx, 0, θ),
-        (Rx, 1, ϕ),
-        (Rx, 2, φ),
-        (CNot, 0, 1),
-        (CNot, 1, 2),
-        (Variance, obs, obs_targets),
-        (Expectation, obs, obs_targets),
+    ) = Braket.Circuit([
+        (Braket.Rx, 0, θ),
+        (Braket.Rx, 1, ϕ),
+        (Braket.Rx, 2, φ),
+        (Braket.CNot, 0, 1),
+        (Braket.CNot, 1, 2),
+        (Braket.Variance, obs, obs_targets),
+        (Braket.Expectation, obs, obs_targets),
     ])
 
     @inline function variance_expectation_sample_result(
@@ -100,7 +115,7 @@ end
             ("braket_dm_v2", "DensityMatrixSimulator"),
         ]
             local_simulator_device = LocalSimulator(backend)
-            @test name(local_simulator_device) == device_name
+            @test Braket.name(local_simulator_device) == device_name
         end
         @testset "Device $DEVICE, shots $SHOTS" for DEVICE in ALL_DEVICES,
             SHOTS in SHOT_LIST
@@ -108,8 +123,8 @@ end
             if SHOTS > 0
                 @testset "qubit ordering" begin
                     device = DEVICE
-                    state_110 = Circuit([(X, 0), (X, 1), (I, 2)])
-                    state_001 = Circuit([(I, 0), (I, 1), (X, 2)])
+                    state_110 = Braket.Circuit([(Braket.X, 0), (Braket.X, 1), (Braket.I, 2)])
+                    state_001 = Braket.Circuit([(Braket.I, 0), (Braket.I, 1), (Braket.X, 2)])
                     @testset for (state, most_com) in
                                  ((state_110, "110"), (state_001, "001"))
                         tasks = (state, ir(state, Val(:JAQCD)), ir(state, Val(:OpenQASM)))
@@ -123,25 +138,25 @@ end
 
                 @testset "Bell pair nonzero shots" begin
                     circuit = bell_circ()
-                    circuit(Expectation, Observables.H() * Observables.X(), [0, 1])
-                    circuit(Sample, Observables.H() * Observables.X(), [0, 1])
+                    circuit(Braket.Expectation, Braket.Observables.H() * Braket.Observables.X(), [0, 1])
+                    circuit(Braket.Sample, Braket.Observables.H() * Braket.Observables.X(), [0, 1])
                     tasks = (circuit, ir(circuit, Val(:JAQCD)), ir(circuit, Val(:OpenQASM)))
                     @testset for task in tasks
                         device = DEVICE
                         res = result(device(task; shots = SHOTS))
                         @test length(res.result_types) == 2
                         @test 0.6 <
-                              res[Expectation(Observables.H() * Observables.X(), [0, 1])] <
+                              res[Braket.Expectation(Braket.Observables.H() * Braket.Observables.X(), [0, 1])] <
                               0.8
                         @test length(
-                            res[Sample(Observables.H() * Observables.X(), [0, 1])],
+                            res[Braket.Sample(Braket.Observables.H() * Braket.Observables.X(), [0, 1])],
                         ) == SHOTS
                     end
                 end
             end
             @testset "Bell pair full probability" begin
                 circuit = bell_circ()
-                circuit(Probability)
+                circuit(Braket.Probability)
                 tasks = (circuit, ir(circuit, Val(:JAQCD)), ir(circuit, Val(:OpenQASM)))
                 tol = get_tol(SHOTS)
                 @testset for task in tasks
@@ -158,7 +173,7 @@ end
             end
             @testset "Bell pair marginal probability" begin
                 circuit = bell_circ()
-                circuit(Probability, 0)
+                circuit(Braket.Probability, 0)
                 tasks = (circuit, ir(circuit, Val(:JAQCD)), ir(circuit, Val(:OpenQASM)))
                 tol = get_tol(SHOTS)
                 @testset for task in tasks
@@ -166,7 +181,7 @@ end
                     res = result(device(task, shots = SHOTS))
                     @test length(res.result_types) == 1
                     @test isapprox(
-                        res[Probability(0)],
+                        res[Braket.Probability(0)],
                         [0.5, 0.5],
                         rtol = tol["rtol"],
                         atol = tol["atol"],
@@ -190,11 +205,11 @@ end
                 device = DEVICE
                 shots = SHOTS
                 @testset "Obs $obs" for obs in (
-                    Observables.X() * Observables.Y(),
-                    Observables.HermitianObservable(kron([0 1; 1 0], [0 -im; im 0])),
+                    Braket.Observables.X() * Braket.Observables.Y(),
+                    Braket.Observables.HermitianObservable(kron([0 1; 1 0], [0 -im; im 0])),
                 )
                     circuit = three_qubit_circuit(θ, ϕ, φ, obs, obs_targets)
-                    shots > 0 && circuit(Sample, obs, obs_targets)
+                    shots > 0 && circuit(Braket.Sample, obs, obs_targets)
                     tasks = (circuit, ir(circuit, Val(:JAQCD)), ir(circuit, Val(:OpenQASM)))
                     for task in tasks
                         res = result(device(task, shots = shots))
@@ -212,7 +227,7 @@ end
                 θ = 0.432
                 ϕ = 0.123
                 φ = -0.543
-                obs = Observables.Z() * Observables.H() * Observables.Y()
+                obs = Braket.Observables.Z() * Braket.Observables.H() * Braket.Observables.Y()
                 obs_targets = [0, 1, 2]
                 circuit = three_qubit_circuit(θ, ϕ, φ, obs, obs_targets)
                 expected_mean = -(cos(φ) * sin(ϕ) + sin(φ) * cos(θ)) / √2
@@ -224,18 +239,22 @@ end
                 expected_eigs = [-1.0, 1.0]
                 device = DEVICE
                 shots = SHOTS
-                circuit = three_qubit_circuit(θ, ϕ, φ, obs, obs_targets)
-                shots > 0 && circuit(Sample, obs, obs_targets)
-                tasks = (circuit, ir(circuit, Val(:JAQCD)), ir(circuit, Val(:OpenQASM)))
-                for task in tasks
-                    res = result(device(task, shots = shots))
-                    variance_expectation_sample_result(
-                        res,
-                        shots,
-                        expected_var,
-                        expected_mean,
-                        expected_eigs,
-                    )
+                @testset for obs in (
+                    Braket.Observables.Z() * Braket.Observables.H() * Braket.Observables.Y(),
+                )
+                    circuit = three_qubit_circuit(θ, ϕ, φ, obs, obs_targets)
+                    shots > 0 && circuit(Braket.Sample, obs, obs_targets)
+                    tasks = (circuit, ir(circuit, Val(:JAQCD)), ir(circuit, Val(:OpenQASM)))
+                    for task in tasks
+                        res = result(device(task, shots = shots))
+                        variance_expectation_sample_result(
+                            res,
+                            shots,
+                            expected_var,
+                            expected_mean,
+                            expected_eigs,
+                        )
+                    end
                 end
             end
             @testset "Result types z x z" begin
@@ -248,14 +267,14 @@ end
                 expected_eigs = [-1.0, 1.0]
                 device = DEVICE
                 shots = SHOTS
-                for obs in (
-                    Observables.Z() * Observables.Z(),
-                    Observables.HermitianObservable(kron([1 0; 0 -1], [1 0; 0 -1])),
+                @testset for obs in (
+                    Braket.Observables.Z() * Braket.Observables.Z(),
+                    Braket.Observables.HermitianObservable(kron([1 0; 0 -1], [1 0; 0 -1])),
                 )
                     circuit = three_qubit_circuit(θ, ϕ, φ, obs, obs_targets)
-                    shots > 0 && circuit(Sample, obs, obs_targets)
+                    shots > 0 && circuit(Braket.Sample, obs, obs_targets)
                     tasks = (circuit, ir(circuit, Val(:JAQCD)), ir(circuit, Val(:OpenQASM)))
-                    for task in tasks
+                    @testset for task in tasks
                         res = result(device(task, shots = shots))
                         variance_expectation_sample_result(
                             res,
@@ -278,13 +297,13 @@ end
                     -5-2im -5-4im -4-3im -6
                 ]
                 @test ishermitian(ho_mat)
-                ho = Observables.HermitianObservable(ComplexF64.(ho_mat))
+                ho = Braket.Observables.HermitianObservable(ComplexF64.(ho_mat))
                 ho_mat2 = [1 2; 2 4]
-                ho2 = Observables.HermitianObservable(ComplexF64.(ho_mat2))
+                ho2 = Braket.Observables.HermitianObservable(ComplexF64.(ho_mat2))
                 ho_mat3 = [-6 2+im; 2-im 0]
-                ho3 = Observables.HermitianObservable(ComplexF64.(ho_mat3))
+                ho3 = Braket.Observables.HermitianObservable(ComplexF64.(ho_mat3))
                 ho_mat4 = kron([1 0; 0 1], [-6 2+im; 2-im 0])
-                ho4 = Observables.HermitianObservable(ComplexF64.(ho_mat4))
+                ho4 = Braket.Observables.HermitianObservable(ComplexF64.(ho_mat4))
                 meani = -5.7267957792059345
                 meany = 1.4499810303182408
                 meanz =
@@ -330,23 +349,23 @@ end
                 obs_targets = [0, 1, 2]
                 @testset "Obs $obs" for (obs, expected_mean, expected_var, expected_eigs) in
                                         [
-                    (Observables.I() * ho, meani, vari, eigsi),
-                    (Observables.Y() * ho, meany, vary, eigsy),
-                    (Observables.Z() * ho, meanz, varz, eigsz),
+                    (Braket.Observables.I() * ho, meani, vari, eigsi),
+                    (Braket.Observables.Y() * ho, meany, vary, eigsy),
+                    (Braket.Observables.Z() * ho, meanz, varz, eigsz),
                     (ho2 * ho, meanh, varh, eigsh),
                     (
-                        Observables.HermitianObservable(kron(ho_mat2, ho_mat)),
+                        Braket.Observables.HermitianObservable(kron(ho_mat2, ho_mat)),
                         meanh,
                         varh,
                         eigsh,
                     ),
-                    (Observables.I() * Observables.I() * ho3, meanii, varii, eigsii),
-                    (Observables.I() * ho4, meanii, varii, eigsii),
+                    (Braket.Observables.I() * Braket.Observables.I() * ho3, meanii, varii, eigsii),
+                    (Braket.Observables.I() * ho4, meanii, varii, eigsii),
                 ]
                     device = DEVICE
                     shots = SHOTS
                     circuit = three_qubit_circuit(θ, ϕ, φ, obs, obs_targets)
-                    shots > 0 && circuit(Sample, obs, obs_targets)
+                    shots > 0 && circuit(Braket.Sample, obs, obs_targets)
                     tasks = (circuit, ir(circuit, Val(:JAQCD)), ir(circuit, Val(:OpenQASM)))
                     for task in tasks
                         res = result(device(task, shots = shots))
@@ -371,14 +390,14 @@ end
                     -5-2im -5-4im -4-3im -6
                 ]
                 @test ishermitian(ho_mat)
-                ho = Observables.HermitianObservable(ComplexF64.(ho_mat))
+                ho = Braket.Observables.HermitianObservable(ComplexF64.(ho_mat))
                 ho_mat2 = [1 2; 2 4]
-                ho2 = Observables.HermitianObservable(ho_mat2)
+                ho2 = Braket.Observables.HermitianObservable(ho_mat2)
                 ho_mat3 = [-6 2+im; 2-im 0]
-                ho3 = Observables.HermitianObservable(ho_mat3)
+                ho3 = Braket.Observables.HermitianObservable(ho_mat3)
                 ho_mat4 = kron([1 0; 0 1], [-6 2+im; 2-im 0])
-                ho4 = Observables.HermitianObservable(ho_mat4)
-                h = Observables.HermitianObservable(kron(ho_mat2, ho_mat))
+                ho4 = Braket.Observables.HermitianObservable(ho_mat4)
+                h = Braket.Observables.HermitianObservable(kron(ho_mat2, ho_mat))
                 meani = -5.7267957792059345
                 meanh = -4.30215023196904
                 meanii = -5.78059066879935
@@ -407,7 +426,7 @@ end
                     device = DEVICE
                     shots = SHOTS
                     circuit = three_qubit_circuit(θ, ϕ, φ, obs, targets)
-                    shots > 0 && circuit(Sample, obs, targets)
+                    shots > 0 && circuit(Braket.Sample, obs, targets)
                     tasks = (circuit, ir(circuit, Val(:JAQCD)), ir(circuit, Val(:OpenQASM)))
                     for task in tasks
                         res = result(device(task; shots = shots))
@@ -425,7 +444,7 @@ end
             @testset "Result types all selected" begin
                 θ = 0.543
                 ho_mat = [1 2im; -2im 0]
-                ho = Observables.HermitianObservable(ho_mat)
+                ho = Braket.Observables.HermitianObservable(ho_mat)
                 expected_mean = 2 * sin(θ) + 0.5 * cos(θ) + 0.5
                 var_ = 0.25 * (sin(θ) - 4 * cos(θ))^2
                 expected_var = [var_, var_]
@@ -433,9 +452,10 @@ end
                 device = DEVICE
                 shots = SHOTS
                 circuit =
-                    Circuit([(Rx, 0, θ), (Rx, 1, θ), (Variance, ho), (Expectation, ho, 0)])
-                shots > 0 && circuit(Sample, ho, 1)
-                for task in (circuit, ir(circuit, Val(:JAQCD)), ir(circuit, Val(:OpenQASM)))
+                    Braket.Circuit([(Braket.Rx, 0, θ), (Braket.Rx, 1, θ), (Braket.Variance, ho), (Braket.Expectation, ho, 0)])
+                shots > 0 && circuit(Braket.Sample, ho, 1)
+                tasks = (circuit, ir(circuit, Val(:JAQCD)), ir(circuit, Val(:OpenQASM)))
+                for task in tasks 
                     res = result(device(task; shots = shots))
                     tol = get_tol(shots)
                     variance = res.values[1]
@@ -486,16 +506,16 @@ end
                     -3 2+im 0 -4+3im
                     -5-2im -5-4im -4-3im -6
                 ]
-                obs1 = Observables.X() * Observables.Y()
+                obs1 = Braket.Observables.X() * Braket.Observables.Y()
                 obs1_targets = [0, 2]
-                obs2 = Observables.Z() * Observables.Z()
+                obs2 = Braket.Observables.Z() * Braket.Observables.Z()
                 obs2_targets = [0, 2]
-                obs3 = Observables.Y() * Observables.HermitianObservable(ho_mat)
+                obs3 = Braket.Observables.Y() * Braket.Observables.HermitianObservable(ho_mat)
                 obs3_targets = [0, 1, 2]
                 obs3_targets = [0, 1, 2]
                 circuit = three_qubit_circuit(θ, ϕ, φ, obs1, obs1_targets)
-                circuit(Expectation, obs2, obs2_targets)
-                circuit(Expectation, obs3, obs3_targets)
+                circuit(Braket.Expectation, obs2, obs2_targets)
+                circuit(Braket.Expectation, obs3, obs3_targets)
 
                 expected_mean1 = sin(θ) * sin(ϕ) * sin(φ)
                 expected_var1 =
@@ -520,9 +540,9 @@ end
             end
             @testset "Result types noncommuting flipped targets" begin
                 circuit = bell_circ()
-                tp      = Observables.TensorProduct(["h", "x"])
-                circuit = Expectation(circuit, tp, [0, 1])
-                circuit = Expectation(circuit, tp, [1, 0])
+                tp      = Braket.Observables.TensorProduct(["h", "x"])
+                circuit = Braket.Expectation(circuit, tp, [0, 1])
+                circuit = Braket.Expectation(circuit, tp, [1, 0])
                 tasks   = (circuit, ir(circuit, Val(:JAQCD)), ir(circuit, Val(:OpenQASM)))
                 @testset for task in tasks
                     device = DEVICE
@@ -534,8 +554,8 @@ end
             @testset "Result types all noncommuting" begin
                 circuit = bell_circ()
                 ho = [1 2im; -2im 0]
-                circuit(Expectation, Observables.HermitianObservable(ho))
-                circuit(Expectation, Observables.X())
+                circuit(Braket.Expectation, Braket.Observables.HermitianObservable(ho))
+                circuit(Braket.Expectation, Braket.Observables.X())
                 tasks   = (circuit, ir(circuit, Val(:JAQCD)), ir(circuit, Val(:OpenQASM)))
                 @testset for task in tasks
                     device = DEVICE
@@ -546,13 +566,13 @@ end
             end
             @testset "Result types observable not in instructions" begin
                 bell = bell_circ()
-                bell(Expectation, Observables.X(), 2)
-                bell(Variance, Observables.Y(), 3)
+                bell(Braket.Expectation, Braket.Observables.X(), 2)
+                bell(Braket.Variance, Braket.Observables.Y(), 3)
                 bell_qasm = ir(bell, Val(:OpenQASM))
                 @test qubit_count(bell) == 4
                 shots = SHOTS
                 device = DEVICE
-                @testset for task in (bell, bell_qasm)
+                @testset for task in (bell, ir(bell, Val(:JAQCD)), bell_qasm)
                     tol = get_tol(shots)
                     res = result(device(task, shots = shots))
                     @test isapprox(res.values[1], 0, rtol = tol["rtol"], atol = tol["atol"])
@@ -564,8 +584,8 @@ end
             @testset "Result types no shots" begin
                 @testset for include_amplitude in [true, false]
                     circuit = bell_circ()
-                    circuit(Expectation, Observables.H() * Observables.X(), 0, 1)
-                    include_amplitude && circuit(Amplitude, ["01", "10", "00", "11"])
+                    circuit(Braket.Expectation, Braket.Observables.H() * Braket.Observables.X(), 0, 1)
+                    include_amplitude && circuit(Braket.Amplitude, ["01", "10", "00", "11"])
                     tasks   = (circuit, ir(circuit, Val(:JAQCD)), ir(circuit, Val(:OpenQASM)))
                     @testset for task in tasks
                         device = DEVICE
@@ -573,11 +593,11 @@ end
                         res = result(device(task, shots = 0))
                         @test length(res.result_types) == (include_amplitude ? 2 : 1)
                         @test isapprox(
-                            res[Expectation(Observables.H() * Observables.X(), [0, 1])],
+                            res[Braket.Expectation(Braket.Observables.H() * Braket.Observables.X(), [0, 1])],
                             1 / √2,
                         )
                         if include_amplitude
-                            amps = res[Amplitude(["01", "10", "00", "11"])]
+                            amps = res[Braket.Amplitude(["01", "10", "00", "11"])]
                             @test isapprox(amps["01"], 0)
                             @test isapprox(amps["10"], 0)
                             @test isapprox(amps["00"], 1 / √2)
@@ -589,13 +609,11 @@ end
             if SHOTS > 0
                 @testset "Multithreaded Bell pair" begin
                     tol = get_tol(SHOTS)
-                    tasks = (bell_circ, (()->ir(bell_circ(), Val(:OpenQASM))), (()->ir(bell_circ(), Val(:JAQCD))))
+                    tasks = (bell_circ, (()->ir(bell_circ(), Val(:JAQCD))), (()->ir(bell_circ(), Val(:OpenQASM))))
                     device = DEVICE
-                    @testset for task in tasks
-                        run_circuit(circuit) = result(simulate(device, circuit; shots = SHOTS))
-                        batch_size = 5
-                        task_array = [task() for ii = 1:batch_size]
-                        batch_results = results(simulate(device, task_array; shots=SHOTS))
+                    @testset for task in tasks, task_count in (1, 10)
+                        task_array = [task() for ii = 1:task_count]
+                        batch_results = results(device(task_array, shots=SHOTS))
                         for r in batch_results
                             @test isapprox(
                                 r.measurement_probabilities["00"],
@@ -619,9 +637,9 @@ end
             @testset "noisy circuit 1 qubit noise full probability" begin
                 shots = SHOTS
                 tol = get_tol(shots)
-                circuit = Circuit([(X, 0), (X, 1), (BitFlip, 0, 0.1), (Probability,)])
+                circuit = Braket.Circuit([(Braket.X, 0), (Braket.X, 1), (Braket.BitFlip, 0, 0.1), (Braket.Probability,)])
                 tasks   = (circuit, ir(circuit, Val(:JAQCD)), ir(circuit, Val(:OpenQASM)))
-                device = DEVICE
+                device  = DEVICE
                 for task in tasks
                     res = result(device(task, shots = shots))
                     @test length(res.result_types) == 1
@@ -639,14 +657,14 @@ end
                 K0 = √0.9 * diagm(ones(4))
                 K1 = √0.1 * kron([0.0 1.0; 1.0 0.0], [0.0 1.0; 1.0 0.0])
                 circuit =
-                    Circuit([(X, 0), (X, 1), (Kraus, [0, 1], [K0, K1]), (Probability,)])
+                    Braket.Circuit([(Braket.X, 0), (Braket.X, 1), (Braket.Kraus, [0, 1], [K0, K1]), (Braket.Probability,)])
                 tasks   = (circuit, ir(circuit, Val(:JAQCD)), ir(circuit, Val(:OpenQASM)))
                 device = DEVICE
                 for task in tasks
                     res = result(device(task, shots = shots))
                     @test length(res.result_types) == 1
                     @test isapprox(
-                        res[Probability()],
+                        res[Braket.Probability()],
                         [0.1, 0.0, 0, 0.9],
                         rtol = tol["rtol"],
                         atol = tol["atol"],

@@ -60,24 +60,24 @@ end
 Create a `DensityMatrixSimulator` with `2^qubit_count x 2^qubit_count` elements and `shots` shots to be measured. The default element type is `ComplexF64`.
 """
 DensityMatrixSimulator(::Type{T}, qubit_count::Int, shots::Int) where {T<:Number} =
-    DensityMatrixSimulator{T,DensityMatrix{T}}(qubit_count, shots)
+    DensityMatrixSimulator{T,Matrix{T}}(qubit_count, shots)
 DensityMatrixSimulator(qubit_count::Int, shots::Int) =
     DensityMatrixSimulator(ComplexF64, qubit_count, shots)
-Braket.qubit_count(dms::DensityMatrixSimulator) = dms.qubit_count
+qubit_count(dms::DensityMatrixSimulator) = dms.qubit_count
 """
     properties(svs::DensityMatrixSimulator) -> GateModelSimulatorDeviceCapabilities
 
 Query the properties and capabilities of a `DensityMatrixSimulator`, including which gates and result types are supported and the minimum and maximum shot and qubit counts.
 """
-Braket.properties(d::DensityMatrixSimulator) = dm_props
+properties(d::DensityMatrixSimulator) = dm_props
 supported_operations(d::DensityMatrixSimulator, ::Val{:OpenQASM}) = dm_props.action["braket.ir.openqasm.program"].supportedOperations
 supported_operations(d::DensityMatrixSimulator, ::Val{:JAQCD}) = dm_props.action["braket.ir.jaqcd.program"].supportedOperations
 supported_operations(d::DensityMatrixSimulator) = supported_operations(d::DensityMatrixSimulator, Val(:OpenQASM))
 supported_result_types(d::DensityMatrixSimulator, ::Val{:OpenQASM}) = dm_props.action["braket.ir.openqasm.program"].supportedResultTypes
 supported_result_types(d::DensityMatrixSimulator, ::Val{:JAQCD}) = dm_props.action["braket.ir.jaqcd.program"].supportedResultTypes
 supported_result_types(d::DensityMatrixSimulator) = supported_result_types(d::DensityMatrixSimulator, Val(:OpenQASM))
-Braket.device_id(dms::DensityMatrixSimulator) = "braket_dm_v2"
-Braket.name(dms::DensityMatrixSimulator) = "DensityMatrixSimulator"
+device_id(dms::DensityMatrixSimulator) = "braket_dm_v2"
+name(dms::DensityMatrixSimulator) = "DensityMatrixSimulator"
 Base.show(io::IO, dms::DensityMatrixSimulator) =
     print(io, "DensityMatrixSimulator(qubit_count=$(qubit_count(dms)), shots=$(dms.shots))")
 Base.similar(
@@ -181,8 +181,8 @@ function apply_observable!(
     return dm
 end
 function apply_observable!(
-    observable::Braket.Observables.HermitianObservable,
-    dm::DensityMatrix{T},
+    observable::Observables.HermitianObservable,
+    dm::AbstractDensityMatrix{T},
     targets::Int...,
 ) where {T<:Complex}
     n_amps    = size(dm, 1)
@@ -251,7 +251,6 @@ function expectation(
     dm_copy = apply_observable(observable, dms.density_matrix, targets...)
     return real(sum(diag(dm_copy)))
 end
-state_vector(dms::DensityMatrixSimulator)   = diag(dms.density_matrix)
 density_matrix(dms::DensityMatrixSimulator) = copy(dms.density_matrix)
 probabilities(dms::DensityMatrixSimulator)  = real.(diag(dms.density_matrix))
 

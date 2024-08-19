@@ -4,7 +4,7 @@
     return n_amps, endian_qubits(n_qubits, qubits...)
 end
 
-function apply_noise!(n::PhaseFlip, dm::DensityMatrix{T}, qubit::Int) where {T}
+function apply_noise!(n::PhaseFlip, dm::AbstractDensityMatrix{T}, qubit::Int) where {T}
     # K₀ = √(1.0 - n.probability) * I
     # K₁ = √(n.probability) * Z
     # ρ = ∑ᵢ Kᵢ ρ Kᵢ\^†
@@ -102,7 +102,7 @@ end
 apply_noise!(n::N, dm::S, qubits::Int...) where {T,S<:AbstractDensityMatrix{T},N<:Noise} =
     apply_noise!(kraus_rep(n), dm, qubits...)
 
-function apply_noise!(n::Kraus, dm::DensityMatrix{T}, qubit::Int) where {T}
+function apply_noise!(n::Kraus, dm::AbstractDensityMatrix{T}, qubit::Int) where {T}
     k_mats = ntuple(ix -> SMatrix{2,2,ComplexF64}(n.matrices[ix]), length(n.matrices))
     k_mats_conj =
         ntuple(ix -> SMatrix{2,2,ComplexF64}(adjoint(n.matrices[ix])), length(n.matrices))
@@ -132,7 +132,7 @@ function apply_noise!(n::Kraus, dm::DensityMatrix{T}, qubit::Int) where {T}
     end
 end
 
-function apply_noise!(n::Kraus, dm::DensityMatrix{T}, target1::Int, target2::Int) where {T}
+function apply_noise!(n::Kraus, dm::AbstractDensityMatrix{T}, target1::Int, target2::Int) where {T}
     k_mats = ntuple(ix -> SMatrix{4,4,ComplexF64}(n.matrices[ix]), length(n.matrices))
     k_mats_conj =
         ntuple(ix -> SMatrix{4,4,ComplexF64}(adjoint(n.matrices[ix])), length(n.matrices))
@@ -167,7 +167,7 @@ function apply_noise!(n::Kraus, dm::DensityMatrix{T}, target1::Int, target2::Int
     end
 end
 
-function apply_noise!(n::Kraus, dm::DensityMatrix{T}, targets::Int...) where {T}
+function apply_noise!(n::Kraus, dm::AbstractDensityMatrix{T}, targets::Int...) where {T}
     k_mats = n.matrices
     k_mats_conj = ntuple(ix -> adjoint(n.matrices[ix]), length(n.matrices))
     # ρ = ∑ᵢ Kᵢ ρ Kᵢ\^†
