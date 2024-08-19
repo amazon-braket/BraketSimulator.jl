@@ -239,7 +239,7 @@ function _combine_operations(program::Program, shots::Int)
     return operations
 end
 """
-    _compute_results(::Type{T}, simulator, program::Program, n_qubits::Int, shots::Int) -> Vector{ResultTypeValue}
+    _compute_results(::, simulator, program::Program, n_qubits::Int, shots::Int) -> Vector{ResultTypeValue}
 
 Compute the results once `simulator` has finished applying all the instructions. The results depend on the IR type if `shots>0`:
 
@@ -248,8 +248,7 @@ Compute the results once `simulator` has finished applying all the instructions.
   the results array is populated with the parsed result types (to help the Braket SDK compute them from the sampled measurements)
   and a placeholder zero value.
 """
-# nosemgrep
-function _compute_results(::Type{OpenQasmProgram}, simulator, program, n_qubits, shots)
+function _compute_results(::Type{OpenQasmProgram}, simulator, program, n_qubits, shots) # nosemgrep
     analytic_results = shots == 0 && !isnothing(program.results) && !isempty(program.results)
     if analytic_results
         return _compute_exact_results(simulator, program, n_qubits)
@@ -259,8 +258,7 @@ function _compute_results(::Type{OpenQasmProgram}, simulator, program, n_qubits,
         return ResultTypeValue[ResultTypeValue(result_type, 0.0) for result_type in program.results]
     end
 end
-# nosemgrep
-function _compute_results(::Type{Program}, simulator, program, n_qubits, shots)
+function _compute_results(::Type{Program}, simulator, program, n_qubits, shots) # nosemgrep
     analytic_results = shots == 0 && !isnothing(program.results) && !isempty(program.results)
     if analytic_results
         return _compute_exact_results(simulator, program, n_qubits)
