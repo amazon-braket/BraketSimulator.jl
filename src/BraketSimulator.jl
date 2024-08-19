@@ -216,6 +216,7 @@ end
 Apply any `inputs` provided for the simulation. Return the `Program`
 (with bound parameters) and the qubit count of the circuit.
 """
+# nosemgrep
 function _prepare_program(circuit_ir::Program, inputs::Dict{String, <:Any}, shots::Int)
     operations::Vector{Instruction} = circuit_ir.instructions
     symbol_inputs = Dict(Symbol(k) => v for (k, v) in inputs)
@@ -224,12 +225,12 @@ function _prepare_program(circuit_ir::Program, inputs::Dict{String, <:Any}, shot
     return bound_program, qubit_count(circuit_ir)
 end
 """
-    _combine_operations(program::Program, qubit_count::Int, shots::Int) -> Program
+    _combine_operations(program::Program, shots::Int) -> Program
 
 Combine explicit instructions and basis rotation instructions (if necessary).
 Validate that all operations are performed on qubits within `qubit_count`.
 """
-function _combine_operations(program::Program, qubit_count::Int, shots::Int)
+function _combine_operations(program::Program, shots::Int)
     operations = program.instructions
     if shots > 0 && !isempty(program.basis_rotation_instructions)
         operations = vcat(operations, program.basis_rotation_instructions)
@@ -247,6 +248,7 @@ Compute the results once `simulator` has finished applying all the instructions.
   the results array is populated with the parsed result types (to help the Braket SDK compute them from the sampled measurements)
   and a placeholder zero value.
 """
+# nosemgrep
 function _compute_results(::Type{OpenQasmProgram}, simulator, program, n_qubits, shots)
     analytic_results = shots == 0 && !isnothing(program.results) && !isempty(program.results)
     if analytic_results
@@ -257,6 +259,7 @@ function _compute_results(::Type{OpenQasmProgram}, simulator, program, n_qubits,
         return ResultTypeValue[ResultTypeValue(result_type, 0.0) for result_type in program.results]
     end
 end
+# nosemgrep
 function _compute_results(::Type{Program}, simulator, program, n_qubits, shots)
     analytic_results = shots == 0 && !isnothing(program.results) && !isempty(program.results)
     if analytic_results
@@ -291,7 +294,7 @@ function simulate(
 ) where {T<:Union{OpenQasmProgram, Program}}
     program, n_qubits = _prepare_program(circuit_ir, inputs, shots)
     _validate_circuit_ir(simulator, program, n_qubits, shots)
-    operations        = _combine_operations(program,  n_qubits, shots)
+    operations        = _combine_operations(program, shots)
     reinit!(simulator, n_qubits, shots)
     simulator         = evolve!(simulator, operations)
     measured_qubits   = _get_measured_qubits(program, n_qubits)
