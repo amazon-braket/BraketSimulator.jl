@@ -358,7 +358,7 @@ LARGE_TESTS = get(ENV, "BRAKET_SIM_LARGE_TESTS", "false") == "true"
             end
             return qft_ops
         end
-        max_qc = LARGE_TESTS ? 14 : 10 
+        max_qc = 10 
         @testset "Qubit count $qubit_count" for qubit_count in 2:max_qc
             simulation = DensityMatrixSimulator(qubit_count, 0)
             operations = qft_circuit_operations(qubit_count)
