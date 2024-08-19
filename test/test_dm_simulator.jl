@@ -1,6 +1,6 @@
 using Test, Logging, LinearAlgebra, BraketSimulator, DataStructures
 
-LARGE_TESTS = get(ENV, "BRAKET_SIM_LARGE_TESTS", false)
+LARGE_TESTS = get(ENV, "BRAKET_SIM_LARGE_TESTS", "false") == "true"
 
 @testset "Density matrix simulator" begin
     sx = ComplexF64[0 1; 1 0]

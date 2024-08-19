@@ -1,6 +1,6 @@
 using Test, BraketSimulator, DataStructures
 
-LARGE_TESTS = get(ENV, "BRAKET_SIM_LARGE_TESTS", false)
+LARGE_TESTS = get(ENV, "BRAKET_SIM_LARGE_TESTS", "false") == "true"
 
 @testset "State vector simulator" begin
     @testset "Simple circuits nq: $qubit_count $instructions" for (

@@ -2,7 +2,7 @@ using Test, BraketSimulator, LinearAlgebra
 
 const NUM_SAMPLES = 1000
 
-LARGE_TESTS = get(ENV, "BRAKET_SIM_LARGE_TESTS", false)
+LARGE_TESTS = get(ENV, "BRAKET_SIM_LARGE_TESTS", "false") == "true"
 
 observables_testdata = [
     (
