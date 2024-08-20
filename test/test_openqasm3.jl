@@ -557,6 +557,13 @@ get_tol(shots::Int) = return (
         """
         @test_throws Quasar.QasmParseError parse_qasm(qasm)
     end
+    @testset "Delay" begin
+        qasm = """
+        qubit[4] q;
+        delay[200dt] q[0], q[1];
+        """
+        @test_warn "delay expression encountered -- currently `delay` is a no-op" parse_qasm(qasm)
+    end
     @testset "Barrier" begin
         qasm = """
         qubit[4] q;

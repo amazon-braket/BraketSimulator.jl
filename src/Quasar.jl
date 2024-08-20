@@ -463,7 +463,7 @@ function extract_braced_block(tokens::Vector{Tuple{Int64, Int32, Token}}, stack,
         next_token[end] == rbracket && (closers_met += 1)
         push!(braced_tokens, next_token)
     end
-    pop!(braced_tokens) # closing }
+    pop!(braced_tokens) # closing ]
     push!(braced_tokens, (-1, Int32(-1), semicolon))
     return braced_tokens
 end
@@ -1005,7 +1005,7 @@ function parse_qasm(clean_tokens::Vector{Tuple{Int64, Int32, Token}}, qasm::Stri
             line_exprs = collect(Iterators.reverse(line_body))[2:end]
             push!(stack, QasmExpression(:return, line_exprs))
         elseif token == box
-            @warn "box expression encountered -- currently boxed and delayed expressions are not supported"
+            @warn "box expression encountered -- currently `box` is a no-op"
             box_expr = QasmExpression(:box)
             parse_block_body(box_expr, clean_tokens, stack, start, qasm)
             push!(stack, box_expr)
@@ -1021,6 +1021,21 @@ function parse_qasm(clean_tokens::Vector{Tuple{Int64, Int32, Token}}, qasm::Stri
             barrier_tokens = splice!(clean_tokens, 1:eol)
             targets = parse_expression(barrier_tokens, stack, start, qasm)
             push!(stack, QasmExpression(:barrier, targets))
+        elseif token == delay_token
+            @warn "delay expression encountered -- currently `delay` is a no-op"
+            eol = findfirst(triplet->triplet[end] == semicolon, clean_tokens)
+            delay_tokens = splice!(clean_tokens, 1:eol)
+            delay_expr   = QasmExpression(:delay)
+            # format is delay[duration]; or delay[duration] targets;
+            delay_duration = extract_braced_block(delay_tokens, stack, start, qasm)
+            push!(delay_expr, QasmExpression(:duration, parse_expression(delay_duration, stack, start, qasm)))
+            target_expr = QasmExpression(:targets)
+            if first(delay_tokens)[end] != semicolon # targets present
+                targets = parse_expression(delay_tokens, stack, start, qasm)
+                push!(target_expr, targets)
+            end
+            push!(delay_expr, target_expr)
+            push!(stack, delay_expr)
         elseif token == duration_token
             @warn "duration expression encountered -- currently `duration` is a no-op"
             eol = findfirst(triplet->triplet[end] == semicolon, clean_tokens)
@@ -1632,6 +1647,8 @@ function (v::AbstractVisitor)(program_expr::QasmExpression)
     elseif head(program_expr) == :reset
         return v
     elseif head(program_expr) == :barrier
+        return v
+    elseif head(program_expr) == :delay
         return v
     elseif head(program_expr) == :stretch
         return v
