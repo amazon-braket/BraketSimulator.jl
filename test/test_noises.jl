@@ -24,6 +24,8 @@ struct CustomNoise <: BraketSimulator.Noise end
         @test BraketSimulator.qubit_count(n) == 1
         ix = BraketSimulator.Instruction(n, 0)
         @test BraketSimulator.Parametrizable(n) == BraketSimulator.Parametrized()
+        m = BraketSimulator.MultiQubitPauliChannel{1}(Dict("X"=>0.1, "Y"=>0.3))
+        @test !(n == m)
     end
     @testset "noise = BraketSimulator.TwoQubitPauliChannel" begin
         n = BraketSimulator.TwoQubitPauliChannel(Dict("XX"=>0.1, "YY"=>0.2))
@@ -55,6 +57,12 @@ struct CustomNoise <: BraketSimulator.Noise end
         @test BraketSimulator.bind_value!(n, Dict(:theta=>0.1)) === n
         @test BraketSimulator.parameters(n) == BraketSimulator.FreeParameter[]
         @test BraketSimulator.Parametrizable(n) == BraketSimulator.NonParametrized()
+    end
+    @testset "bind_value!" begin
+        n = BraketSimulator.BitFlip(BraketSimulator.FreeParameter(:p))
+        @test BraketSimulator.bind_value!(n, Dict(:p=>0.1)) == BraketSimulator.BitFlip(0.1)
+        @test BraketSimulator.parameters(n) == BraketSimulator.FreeParameter[BraketSimulator.FreeParameter(:p)]
+        @test BraketSimulator.Parametrizable(n) == BraketSimulator.Parametrized()
     end
     @test BraketSimulator.StructTypes.StructType(Noise) == BraketSimulator.StructTypes.AbstractType()
 end

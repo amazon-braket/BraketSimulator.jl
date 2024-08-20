@@ -8,7 +8,7 @@ single_qubit_tests = [
                       (Observables.Y(), (BraketSimulator.Z(), BraketSimulator.S(), BraketSimulator.H()), BraketSimulator.PauliEigenvalues(Val(1))),
                       (Observables.Z(), (), BraketSimulator.PauliEigenvalues(Val(1))),
                       (Observables.I(), (), [1, 1]),
-                      (Observables.HermitianObservable([1 1-im; 1+im -1]), (BraketSimulator.Unitary(herm_mat),), [-√3, √3]),
+                      (Observables.HermitianObservable([1.0 1.0-im; 1.0+im -1.0]), (BraketSimulator.Unitary(herm_mat),), [-√3, √3]),
                      ]
 
 @testset "Observables" begin
@@ -24,11 +24,17 @@ single_qubit_tests = [
         @test copy(obs) == obs
         if !(obs isa Observables.HermitianObservable)
             @test BraketSimulator.Observables.unscaled(2.0 * obs) == obs
+        else
+            scaled = 2.0 * obs
+            @test scaled.matrix == obs.matrix .* 2.0
         end
     end
+    @test_throws ArgumentError("Observable of type \"c\" provided, only \"i\", \"x\", \"y\", \"z\", and \"h\" are valid.") BraketSimulator.StructTypes.constructfrom(Observables.Observable, "c")
     @testset "Tensor product of BraketSimulator.Pauli-like (with eigenvalues ±1) observables" begin
         tensor = Observables.TensorProduct(["h", "x", "z", "y"])
         @test eigvals(tensor) == BraketSimulator.PauliEigenvalues(Val(4))
+        @test BraketSimulator.StructTypes.constructfrom(Observables.Observable, ["h", "x", "z", "y"]) == tensor
+        @test eigvals(tensor)[[1, 2]] == [1, -1]
 
         actual_gates = BraketSimulator.basis_rotation_gates(tensor)
         @test length(actual_gates) == 4

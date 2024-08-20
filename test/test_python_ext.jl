@@ -70,6 +70,26 @@ using Test, JSON3, PythonCall, BraketSimulator
                 for oq3_result in oq3_results
                     @test oq3_result isa String
                 end
+                simple_bell_qasm = """
+                h \$0;
+                cy \$0, \$1;
+                #pragma braket result amplitude '00', '01', '10', '11' 
+                """
+                sv_simulator = StateVectorSimulator(2, 0)
+                oq3_results  = BraketSimulator.simulate(sv_simulator, [simple_bell_qasm], [Dict{String, Any}()], 0)
+                for oq3_result in oq3_results
+                    @test oq3_result isa String
+                end
+                simple_bell_qasm = """
+                h \$0;
+                cy \$0, \$1;
+                #pragma braket result expectation z(\$0)
+                """
+                sv_simulator = StateVectorSimulator(2, 0)
+                oq3_results  = BraketSimulator.simulate(sv_simulator, [simple_bell_qasm], [Dict{String, Any}()], 0)
+                for oq3_result in oq3_results
+                    @test oq3_result isa String
+                end
             end
         end
     end

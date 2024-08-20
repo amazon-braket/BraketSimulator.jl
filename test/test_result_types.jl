@@ -2,6 +2,8 @@ using Test, BraketSimulator, LinearAlgebra
 
 const NUM_SAMPLES = 1000
 
+LARGE_TESTS = get(ENV, "BRAKET_SIM_LARGE_TESTS", "false") == "true"
+
 observables_testdata = [
     (
         BraketSimulator.Observables.TensorProduct([BraketSimulator.Observables.X(), BraketSimulator.Observables.H()]),
@@ -214,5 +216,14 @@ all_qubit_observables_testdata = [
         @test sv ≈ conj(state_vector()) .* state_vector()
         dm = BraketSimulator.calculate(BraketSimulator.DensityMatrix(reverse(0:3)), sim)
         @test dm ≈ kron(adjoint(state_vector()), state_vector())
+    end
+    @testset "Direct sampling" begin
+        if LARGE_TESTS
+            sim = BraketSimulator.StateVectorSimulator(30, 10)
+            sim.state_vector[1]   = 1/√2
+            sim.state_vector[end] = 1/√2
+            shot_results = BraketSimulator.samples(sim)
+            @test all(s->s ∈ [0, 2^30-1], shot_results)
+        end
     end
 end

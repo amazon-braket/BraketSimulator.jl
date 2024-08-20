@@ -20,25 +20,24 @@ for (typ, ir_typ, label) in ((:Expectation, :(IR.Expectation), "expectation"), (
         struct $typ <: Result
             observable::Observables.Observable
             targets::QubitSet
-            $typ(observable::Observables.Observable, targets::QubitSet) = new(observable, targets)
-        end
-        @doc """
-            $($typ)(o, targets) -> $($typ)
-            $($typ)(o) -> $($typ)
-        
-        Constructs a $($typ) of an observable `o` on qubits `targets`.
-        
-        `o` may be one of:
-          - Any [`Observable`](@ref Observables.Observable)
-          - A `String` corresponding to an `Observable` (e.g. `\"x\"``)
-          - A `Vector{String}` in which each element corresponds to an `Observable`
+            @doc """
+                $($typ)(o, targets) -> $($typ)
+                $($typ)(o) -> $($typ)
+            
+            Constructs a $($typ) of an observable `o` on qubits `targets`.
+            
+            `o` may be one of:
+              - Any [`Observable`](@ref Observables.Observable)
+              - A `String` corresponding to an `Observable` (e.g. `\"x\"``)
+              - A `Vector{String}` in which each element corresponds to an `Observable`
 
-        `targets` may be one of:
-          - A [`QubitSet`](@ref)
-          - A `Vector` of `Int`s and/or [`Qubit`](@ref)s
-          - An `Int` or `Qubit`
-          - Absent, in which case the observable `o` will be applied to all qubits provided it is a single qubit observable.
-        """ $typ(o, targets) = $typ(o, QubitSet(targets))
+            `targets` may be one of:
+              - A [`QubitSet`](@ref)
+              - A `Vector` of `Int`s and/or [`Qubit`](@ref)s
+              - An `Int` or `Qubit`
+              - Absent, in which case the observable `o` will be applied to all qubits provided it is a single qubit observable.
+            """ $typ(o::Observables.Observable, targets) = new(o, QubitSet(targets))
+        end
         StructTypes.lower(x::$typ) = $ir_typ(StructTypes.lower(x.observable), (isempty(x.targets) ? nothing : Int.(x.targets)), $label)
     end
 end

@@ -50,7 +50,7 @@ function make_alias_table!(
     for i = 1:ks
         @inbounds acceptance_probs[smalls[i]] = 1.0
     end
-    nothing
+    return
 end
 
 function samples(simulator::AbstractSimulator)

@@ -279,6 +279,7 @@ apply_gate!(::Val{false}, g::I, state_vec::AbstractStateVector{T}, qubits::Int..
     return
 apply_gate!(::Val{true}, g::I, state_vec::AbstractStateVector{T}, qubits::Int...) where {T<:Complex} =
     return
+apply_gate!(::Measure, state_vec, args...) = return
 
 function apply_gate!(
     g_matrix::Union{SMatrix{2,2,T}, Diagonal{T,SVector{2,T}}},
@@ -513,7 +514,6 @@ for (control_gate, target_gate, n_controls) in (
         apply_gate!(::Val{$Vc}, gate::$control_gate, state_vec::AbstractStateVector{T}, qubits::Int...,) where {T<:Complex} = apply_controlled_gate!(Val($Vc), Val($n_controls), gate, $target_gate() ^ gate.pow_exponent, state_vec, ntuple(control_bit->1, Val($n_controls)), qubits...)
     end
 end
-
 
 function apply_gate!(
     factor::Complex,

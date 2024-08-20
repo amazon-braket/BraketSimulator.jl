@@ -65,3 +65,4 @@ end
 Measure() = Measure(-1)
 Parametrizable(m::Measure) = NonParametrized()
 qubit_count(::Type{Measure}) = 1
+qubit_count(m::Measure) = qubit_count(Measure)

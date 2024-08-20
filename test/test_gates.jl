@@ -34,6 +34,7 @@ T_mat = round.(reduce(hcat, [[1.0, 0], [0, 0.70710678 + 0.70710678im]]), digits=
         @test BraketSimulator.Parametrizable(g) == BraketSimulator.NonParametrized()
         @test BraketSimulator.parameters(g) == BraketSimulator.FreeParameter[]
         @test BraketSimulator.n_angles(g) == 0
+        @test BraketSimulator.angles(g) == ()
         @test BraketSimulator.qubit_count(g) == 1
     end
     @testset for g in (BraketSimulator.CNot(),
@@ -73,6 +74,7 @@ T_mat = round.(reduce(hcat, [[1.0, 0], [0, 0.70710678 + 0.70710678im]]), digits=
     α = BraketSimulator.FreeParameter(:α)
     β = BraketSimulator.FreeParameter(:β)
     γ = BraketSimulator.FreeParameter(:γ)
+    @test copy(α) === α
     @testset for (angle1, angle2, angle3) in ((rand(), rand(), rand()), (π, rand(), rand()))
         @testset for g in (BraketSimulator.Rx(angle1), BraketSimulator.Ry(angle1), BraketSimulator.Rz(angle1), BraketSimulator.PhaseShift(angle1))
             @test qubit_count(g) == 1

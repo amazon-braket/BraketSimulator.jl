@@ -15,7 +15,9 @@ function BraketSimulator.simulate(simulator, task_spec::String, inputs::Dict{Str
     return json
 end
 function BraketSimulator.simulate(simulator, task_specs::Vector{String}, inputs::Vector{Dict{String, Any}}, shots::Int; kwargs...)
-    jl_specs   = [BraketSimulator.OpenQasmProgram(BraketSimulator.braketSchemaHeader("braket.ir.openqasm.program", "1"), task_spec, input) for (task_spec, input) in zip(task_specs, inputs)]
+    jl_specs   = map(zip(task_specs, inputs)) do (task_spec, input)
+        BraketSimulator.OpenQasmProgram(BraketSimulator.braketSchemaHeader("braket.ir.openqasm.program", "1"), task_spec, input)
+    end
     jl_results = simulate(simulator, jl_specs, shots; kwargs...)
     jsons      = [JSON3.write(r) for r in jl_results]
     return jsons

@@ -48,7 +48,7 @@ julia> push!(c.result_types, Amplitude([repeat("0", n_qubits), repeat("1", n_qub
 
 julia> sim = StateVectorSimulator(n_qubits, 0); # use the state vector simulator (without noise)
 
-julia> res = simulate(sim, Program(c), n_qubits, 0);
+julia> res = simulate(sim, Program(c), 0);
 
 julia> res.resultTypes[1].value
 Dict{String, ComplexF64} with 2 entries:

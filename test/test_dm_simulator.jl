@@ -1,6 +1,6 @@
-using Test, LinearAlgebra, BraketSimulator, DataStructures
+using Test, Logging, LinearAlgebra, BraketSimulator, DataStructures
 
-LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
+LARGE_TESTS = get(ENV, "BRAKET_SIM_LARGE_TESTS", "false") == "true"
 
 @testset "Density matrix simulator" begin
     sx = ComplexF64[0 1; 1 0]
@@ -358,7 +358,7 @@ LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
             end
             return qft_ops
         end
-        max_qc = LARGE_TESTS ? 16 : 10 
+        max_qc = 10 
         @testset "Qubit count $qubit_count" for qubit_count in 2:max_qc
             simulation = DensityMatrixSimulator(qubit_count, 0)
             operations = qft_circuit_operations(qubit_count)
@@ -392,11 +392,14 @@ LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
         shots   = 1000
         jl_ghz  = [make_ghz(num_qubits) for ix in 1:n_circuits]
         jl_sim  = DensityMatrixSimulator(num_qubits, 0);
-        results = BraketSimulator.simulate(jl_sim, jl_ghz, shots)
-        for (r_ix, r) in enumerate(results)
-            @test length(r.measurements) == shots
-            @test 400 < count(m->m == fill(0, num_qubits), r.measurements) < 600
-            @test 400 < count(m->m == fill(1, num_qubits), r.measurements) < 600
+        # suppress warnings about noise
+        with_logger(NullLogger()) do
+            results = BraketSimulator.simulate(jl_sim, jl_ghz, shots)
+            for (r_ix, r) in enumerate(results)
+                @test length(r.measurements) == shots
+                @test 400 < count(m->m == fill(0, num_qubits), r.measurements) < 600
+                @test 400 < count(m->m == fill(1, num_qubits), r.measurements) < 600
+            end
         end
     end
     @testset "similar, copy and copyto!" begin

@@ -9,7 +9,7 @@ end
 Braket.name(d::BraketSimulator.AbstractSimulator) = BraketSimulator.name(d)
 Braket.properties(d::BraketSimulator.AbstractSimulator) = BraketSimulator.properties(d)
 Braket.simulate(d::BraketSimulator.AbstractSimulator, program::Braket.OpenQasmProgram, args...; kwargs...) = convert(Braket.GateModelTaskResult, BraketSimulator.simulate(d, convert(BraketSimulator.OpenQasmProgram, program), args...; kwargs...))
-Braket.simulate(d::BraketSimulator.AbstractSimulator, program::Braket.Program, args...; kwargs...) = convert(Braket.GateModelTaskResult, BraketSimulator.simulate(d, convert(BraketSimulator.Program, program), args...; kwargs...))
+Braket.simulate(d::BraketSimulator.AbstractSimulator, program::Braket.Program, qubit_count::Int, shots::Int; kwargs...) = convert(Braket.GateModelTaskResult, BraketSimulator.simulate(d, convert(BraketSimulator.Program, program), shots; kwargs...))
 
 Base.convert(::Type{Braket.TaskMetadata}, tm::BraketSimulator.TaskMetadata) = Braket.TaskMetadata(Braket.braketSchemaHeader("braket.task_result.task_metadata", "1"), tm.id, tm.shots, tm.deviceId, tm.deviceParameters, tm.createdAt, tm.endedAt, tm.status, tm.failureReason)
 Base.convert(::Type{Braket.AdditionalMetadata}, am::BraketSimulator.AdditionalMetadata) = Braket.AdditionalMetadata(convert(Braket.AbstractProgram, am.action), nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing)

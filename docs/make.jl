@@ -20,6 +20,7 @@ makedocs(;
         "Noises" => "noises.md",
         "Observables" => "observables.md",
         "Results" => "results.md",
+        "Internals" => "internals.md",
     ],
 )
 
