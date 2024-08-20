@@ -66,9 +66,10 @@ for mode in (:noise, :pure), n_qubits in 4:max_qubits(Val(mode))
             g["Julia"]           = @benchmarkable simulate(sim, circ, $shots) setup = (sim=DensityMatrixSimulator($n_qubits, $shots); circ = BraketSimulator.Program(ghz_circuit($n_qubits, $shots, true)))
         end
         if shots > 0 && mode == :pure && n_qubits <= 30
-            if n_qubits <= 27
-                #g["BraketSV"]    = @benchmarkable sim.execute(circ) setup = (sim=qml.device("braket.local.qubit", backend="braket_sv", wires=$n_qubits, shots=$shots); circ = pl_ghz($n_qubits))
-            end
+            # disabled for now as the existing Python simulator is very slow above 20 qubits 
+            #=if n_qubits <= 27
+                g["BraketSV"]    = @benchmarkable sim.execute(circ) setup = (sim=qml.device("braket.local.qubit", backend="braket_sv", wires=$n_qubits, shots=$shots); circ = pl_ghz($n_qubits))
+            end=#
             g["Lightning.Qubit"] = @benchmarkable sim.execute(circ) setup = (sim=qml.device("lightning.qubit", wires=$n_qubits, shots=$pl_shots); circ = pl_ghz($n_qubits))
             g["Qiskit.Aer"]      = @benchmarkable sim.run(circ, shots=$shots).result() setup = (sim=qiskit_aer.SamplerV2(); circ = [qiskit_ghz($n_qubits)])
         end

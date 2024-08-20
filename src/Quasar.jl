@@ -1025,7 +1025,8 @@ function parse_qasm(clean_tokens::Vector{Tuple{Int64, Int32, Token}}, qasm::Stri
             @warn "duration expression encountered -- currently `duration` is a no-op"
             eol = findfirst(triplet->triplet[end] == semicolon, clean_tokens)
             duration_tokens = splice!(clean_tokens, 1:eol)
-            # TODO
+            # TODO: add proper parsing of duration expressions, including
+            # support for units and algebraic durations like 2*a.
             #dur_expr = parse_expression(duration_tokens, stack, start, qasm)
             push!(stack, QasmExpression(:duration))
         elseif token == stretch_token

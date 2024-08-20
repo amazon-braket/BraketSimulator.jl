@@ -131,7 +131,10 @@ for n_qubits = 4:2:max_qubits(Val(:pure))
                 @benchmarkable py_sv.evolve([$py_gate]) setup =
                     (py_sv = local_sv.StateVectorSimulation($n_qubits, 0, 1))
         end
-        for q2 in [mod(q+1, n_qubits)] #setdiff(0:n_qubits-1, q)
+        # do just one pair rather than setdiff(0:n_qubits-1, q)
+        # to avoid redundancies (benchmark results shouldn't depend
+        # on input qubits)
+        for q2 in [mod(q+1, n_qubits)] 
             for (gate_str, gate, py_gate) in zip(
                 [
                     "XX",
@@ -204,7 +207,10 @@ for n_qubits = 4:2:max_qubits(Val(:pure))
                     @benchmarkable py_sv.evolve([$py_gate]) setup =
                         (py_sv = local_sv.StateVectorSimulation($n_qubits, 0, 1))
             end
-            for q3 in [mod(q+2, n_qubits)] #setdiff(0:n_qubits - 1, q, q2)
+            # do just one pair rather than setdiff(0:n_qubits - 1, q, q2)
+            # to avoid redundancies (benchmark results shouldn't depend
+            # on input qubits)
+            for q3 in [mod(q+2, n_qubits)]
                 for (gate_str, gate, py_gate) in zip(
                     ["CCNot", "CSwap"],
                     [BraketSimulator.CCNot(), BraketSimulator.CSwap()],
@@ -236,7 +242,9 @@ for n_qubits = 2:2:max_qubits(Val(:noise))
     n_amps = 2^n_qubits
     prob = 0.1
     gamma = 0.2
-    for q in 0:0#n_qubits-1
+    # do just qubit rather than 0:n_qubits - 1
+    # to avoid redundancies
+    for q in 0:0
         for (noise_str, noise, py_noise) in zip(
             ["BitFlip", "PhaseFlip", "Depolarizing", "AmplitudeDamping", "PhaseDamping"],
             [
@@ -261,7 +269,10 @@ for n_qubits = 2:2:max_qubits(Val(:noise))
                 @benchmarkable py_sv.evolve([$py_noise]) setup =
                     (py_sv = local_dm.DensityMatrixSimulation($n_qubits, 0))
         end
-        for q2 in [mod(q+1, n_qubits)] #setdiff(0:n_qubits-1, q)
+        # do just one pair rather than setdiff(0:n_qubits - 1, q, q2)
+        # to avoid redundancies (benchmark results shouldn't depend
+        # on input qubits)
+        for q2 in [mod(q+1, n_qubits)]
             for (noise_str, noise, py_noise) in zip(
                 ["TwoQubitDepolarizing", "TwoQubitDephasing"],
                 [BraketSimulator.TwoQubitDepolarizing(prob),

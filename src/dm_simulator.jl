@@ -148,7 +148,10 @@ function _evolve_op!(
 ) where {T<:Complex,S<:AbstractDensityMatrix{T},N<:Noise}
     apply_noise!(op, dms.density_matrix, target...)
 end
-
+# Measure operators are no-ops for now as measurement is handled at the end
+# of simulation, in the results computation step. If/when mid-circuit
+# measurement is supported, this operation will collapse the density
+# matrix on the measured qubits.
 _evolve_op!(dms::DensityMatrixSimulator{T,S}, m::Measure, args...) where {T<:Complex,S<:AbstractDensityMatrix{T}} = return
 
 """
