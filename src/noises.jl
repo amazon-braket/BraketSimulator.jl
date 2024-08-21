@@ -144,8 +144,6 @@ Parametrizable(g::Noise) = NonParametrized()
 parameters(g::Noise) = parameters(Parametrizable(g), g)
 parameters(::Parametrized, g::N) where {N<:Noise} = filter(x->x isa FreeParameter, [getproperty(g, fn) for fn in fieldnames(N)])
 parameters(::NonParametrized, g::Noise) = FreeParameter[]
-bind_value!(n::N, params::Dict{Symbol, <:Real}) where {N<:Noise} = bind_value!(Parametrizable(n), n, params)
-bind_value!(::NonParametrized, n::N, params::Dict{Symbol, <:Real}) where {N<:Noise} = n
 
 # nosemgrep
 function bind_value!(::Parametrized, g::N, params::Dict{Symbol, <:Real}) where {N<:Noise}

@@ -148,11 +148,15 @@ function _evolve_op!(
 ) where {T<:Complex,S<:AbstractDensityMatrix{T},N<:Noise}
     apply_noise!(op, dms.density_matrix, target...)
 end
-# Measure operators are no-ops for now as measurement is handled at the end
-# of simulation, in the results computation step. If/when mid-circuit
-# measurement is supported, this operation will collapse the density
-# matrix on the measured qubits.
+# Measure, barrier, reset, and delay operators are no-ops for now as
+# measurement is handled at the end of simulation, in the results
+# computation step. If/when mid-circuit # measurement is supported,
+# this operation will collapse the density # matrix on the measured qubits.
+# Barrier, reset, and delay are also to-do implementations.
 _evolve_op!(dms::DensityMatrixSimulator{T,S}, m::Measure, args...) where {T<:Complex,S<:AbstractDensityMatrix{T}} = return
+_evolve_op!(dms::DensityMatrixSimulator{T,S}, b::Barrier, args...) where {T<:Complex,S<:AbstractDensityMatrix{T}} = return
+_evolve_op!(dms::DensityMatrixSimulator{T,S}, r::Reset, args...) where {T<:Complex,S<:AbstractDensityMatrix{T}} = return
+_evolve_op!(dms::DensityMatrixSimulator{T,S}, d::Delay, args...) where {T<:Complex,S<:AbstractDensityMatrix{T}} = return
 
 """
     evolve!(dms::DensityMatrixSimulator{T, S<:AbstractMatrix{T}}, operations::Vector{Instruction}) -> DensityMatrixSimulator{T, S}

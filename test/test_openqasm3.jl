@@ -570,9 +570,21 @@ get_tol(shots::Int) = return (
         qubit[4] q;
         x q[0];
         barrier q[0];
+        #pragma braket result state_vector
         """
         @test_warn "barrier expression encountered -- currently `barrier` is a no-op" parse_qasm(qasm)
-        @test BraketSimulator.Circuit(qasm).instructions == [BraketSimulator.Instruction(BraketSimulator.X(), 0), BraketSimulator.Instruction(BraketSimulator.Barrier(), 0)]
+        circuit = BraketSimulator.Circuit(qasm)
+        @test circuit.instructions == [BraketSimulator.Instruction(BraketSimulator.X(), 0), BraketSimulator.Instruction(BraketSimulator.Barrier(), 0)]
+        simulation = BraketSimulator.StateVectorSimulator(4, 0)
+        ref_circ   = BraketSimulator.Circuit()
+        push!(ref_circ.instructions, BraketSimulator.Instruction(BraketSimulator.X(), 0))
+        push!(ref_circ.instructions, BraketSimulator.Instruction(BraketSimulator.I(), 1))
+        push!(ref_circ.instructions, BraketSimulator.Instruction(BraketSimulator.I(), 2))
+        push!(ref_circ.instructions, BraketSimulator.Instruction(BraketSimulator.I(), 3))
+        ref_sim    = BraketSimulator.StateVectorSimulator(4, 0)
+        BraketSimulator.evolve!(simulation, circuit.instructions)
+        BraketSimulator.evolve!(ref_sim, ref_circ.instructions)
+        @test simulation.state_vector ≈ ref_sim.state_vector
     end
     @testset "Stretch" begin
         qasm = """

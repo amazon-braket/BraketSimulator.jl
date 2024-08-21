@@ -22,4 +22,6 @@ end
 Instruction(o::O, target) where {O<:Operator} = Instruction{O}(o, QubitSet(target...))
 Base.:(==)(ix1::Instruction{O}, ix2::Instruction{O}) where {O<:Operator} = (ix1.operator == ix2.operator && ix1.target == ix2.target)
 bind_value!(ix::Instruction{O}, param_values::Dict{Symbol, <:Real}) where {O<:Operator} = Instruction{O}(bind_value!(ix.operator, param_values), ix.target)
+bind_value!(o::O, params::Dict{Symbol, <:Real}) where {O<:Operator} = bind_value!(Parametrizable(o), o, params)
+bind_value!(::NonParametrized, o::O, params::Dict{Symbol, <:Real}) where {O<:Operator} = o
 remap(@nospecialize(ix::Instruction{O}), mapping::Dict{<:Integer, <:Integer}) where {O} = Instruction{O}(copy(ix.operator), [mapping[q] for q in ix.target])

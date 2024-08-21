@@ -282,6 +282,9 @@ apply_gate!(::Val{false}, g::I, state_vec::AbstractStateVector{T}, qubits::Int..
 apply_gate!(::Val{true}, g::I, state_vec::AbstractStateVector{T}, qubits::Int...) where {T<:Complex} =
     return
 apply_gate!(::Measure, state_vec, args...) = return
+apply_gate!(::Reset, state_vec, args...) = return
+apply_gate!(::Barrier, state_vec, args...) = return
+apply_gate!(::Delay, state_vec, args...) = return
 
 function apply_gate!(
     g_matrix::Union{SMatrix{2,2,T}, Diagonal{T,SVector{2,T}}},
