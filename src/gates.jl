@@ -115,6 +115,7 @@ qubit_count(g::Unitary) = convert(Int, log2(size(g.matrix, 1)))
 Parametrizable(g::AngledGate) = Parametrized()
 Parametrizable(g::Gate)       = NonParametrized()
 parameters(g::AngledGate)     = collect(filter(a->a isa FreeParameter, angles(g)))
+parameters(g::Gate)           = FreeParameter[] 
 # nosemgrep
 function bind_value!(::Parametrized, g::G, params::Dict{Symbol, <:Real}) where {G<:AngledGate}
     new_angles = map(angles(g)) do angle
