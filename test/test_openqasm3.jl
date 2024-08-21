@@ -1,6 +1,4 @@
-using BraketSimulator.Quasar, Braket, Statistics, LinearAlgebra, BraketSimulator, Braket.Observables
-
-using Braket: Instruction
+using BraketSimulator.Quasar, Statistics, LinearAlgebra, BraketSimulator, BraketSimulator.Observables
 
 get_tol(shots::Int) = return (
     shots > 0 ? Dict("atol" => 0.1, "rtol" => 0.15) : Dict("atol" => 0.01, "rtol" => 0)
@@ -10,6 +8,19 @@ get_tol(shots::Int) = return (
         @testset "Printing" begin
             expr = Quasar.QasmExpression(:head, Quasar.QasmExpression(:integer_literal, 2))
             @test sprint(show, expr) == "QasmExpression :head\n└─ QasmExpression :integer_literal\n   └─ 2\n"
+            bad_expression = Quasar.QasmExpression(:invalid_expression, Quasar.QasmExpression(:error))
+            err = Quasar.QasmVisitorError("unable to evaluate expression $bad_expression")
+            @test sprint(showerror, err) == "QasmVisitorError: unable to evaluate expression $bad_expression"
+        end
+        @testset "Expression basics" begin
+            expr = Quasar.QasmExpression(:head, Quasar.QasmExpression(:integer_literal, 2))
+            @test length(expr) == 1
+            push!(expr, Quasar.QasmExpression(:integer_literal, 3))
+            @test length(expr.args) == 2
+            append!(expr, Quasar.QasmExpression(:integer_literal, 4))
+            @test length(expr.args) == 3 
+            append!(expr, [Quasar.QasmExpression(:integer_literal, 5), Quasar.QasmExpression(:integer_literal, 6)])
+            @test length(expr.args) == 5
         end
         @testset "Equality" begin
             expr_a = Quasar.QasmExpression(:head, Quasar.QasmExpression(:integer_literal, 2))
@@ -29,6 +40,9 @@ get_tol(shots::Int) = return (
         @test_throws Quasar.QasmVisitorError("cannot visit expression $bad_expression.") visitor(bad_expression)
         @test_throws Quasar.QasmVisitorError("unable to evaluate expression $bad_expression") Quasar.evaluate(visitor, bad_expression)
         bad_expression = Quasar.QasmExpression(:invalid_expression, Quasar.QasmExpression(:error))
+        @test_throws Quasar.QasmVisitorError("unable to evaluate qubits for expression $bad_expression.") Quasar.evaluate_qubits(visitor, bad_expression)
+        cast_expression = Quasar.QasmExpression(:cast, Quasar.QasmExpression(:type_expr, Int32), Quasar.QasmExpression(:float_literal, 2.0))
+        @test_throws Quasar.QasmVisitorError("unable to evaluate cast expression $cast_expression") Quasar.evaluate(visitor, cast_expression)
     end
     @testset "Visitors and parents" begin
         qasm = """
@@ -44,20 +58,20 @@ get_tol(shots::Int) = return (
         for_visitor = Quasar.QasmForLoopVisitor(visitor)
         @test Quasar.function_defs(for_visitor) == Quasar.function_defs(visitor)
         @test Quasar.qubit_defs(for_visitor) == Quasar.qubit_defs(visitor)
-        @test Braket.qubit_count(for_visitor) == Quasar.qubit_count(visitor)
-        push!(for_visitor, Amplitude("00"))
-        @test visitor.results[1] == Amplitude("00")
-        push!(for_visitor, [Braket.StateVector(), Probability()])
-        @test visitor.results[2] == Braket.StateVector()
-        @test visitor.results[3] == Probability()
-        push!(for_visitor, [Instruction(X(), 0), Instruction(Y(), 1)])
-        @test visitor.instructions == [Instruction(X(), 0), Instruction(X(), 0), Instruction(Y(), 1)]
-        gate_visitor = Quasar.QasmGateDefVisitor(visitor, Dict{String, FreeParameter}(), Dict{String, Quasar.Qubit}(), Dict{String, Vector{Int}}(), 0, Instruction[])
-        push!(gate_visitor, [Instruction(X(), 0), Instruction(Y(), 1)])
-        @test gate_visitor.instructions == [Instruction(X(), 0), Instruction(Y(), 1)]
+        @test BraketSimulator.qubit_count(for_visitor) == Quasar.qubit_count(visitor)
+        push!(for_visitor, BraketSimulator.Amplitude("00"))
+        @test visitor.results[1] == BraketSimulator.Amplitude("00")
+        push!(for_visitor, [BraketSimulator.StateVector(), BraketSimulator.Probability()])
+        @test visitor.results[2] == BraketSimulator.StateVector()
+        @test visitor.results[3] == BraketSimulator.Probability()
+        push!(for_visitor, [BraketSimulator.Instruction(BraketSimulator.X(), 0), BraketSimulator.Instruction(BraketSimulator.Y(), 1)])
+        @test visitor.instructions == [BraketSimulator.Instruction(BraketSimulator.X(), 0), BraketSimulator.Instruction(BraketSimulator.X(), 0), BraketSimulator.Instruction(BraketSimulator.Y(), 1)]
+        gate_visitor = Quasar.QasmGateDefVisitor(visitor, Dict{String, FreeParameter}(), Dict{String, Quasar.Qubit}(), Dict{String, Vector{Int}}(), 0, BraketSimulator.Instruction[])
+        push!(gate_visitor, [BraketSimulator.Instruction(BraketSimulator.X(), 0), BraketSimulator.Instruction(BraketSimulator.Y(), 1)])
+        @test gate_visitor.instructions == [BraketSimulator.Instruction(BraketSimulator.X(), 0), BraketSimulator.Instruction(BraketSimulator.Y(), 1)]
         function_visitor = Quasar.QasmFunctionVisitor(visitor, Quasar.QasmExpression[], Quasar.QasmExpression[])
-        push!(function_visitor, [Instruction(X(), 0), Instruction(Y(), 1)])
-        @test function_visitor.instructions == [Instruction(X(), 0), Instruction(Y(), 1)]
+        push!(function_visitor, [BraketSimulator.Instruction(BraketSimulator.X(), 0), BraketSimulator.Instruction(BraketSimulator.Y(), 1)])
+        @test function_visitor.instructions == [BraketSimulator.Instruction(BraketSimulator.X(), 0), BraketSimulator.Instruction(BraketSimulator.Y(), 1)]
     end
     @testset "Sized types" begin
         for (t_string, T) in (("SizedBitVector", Quasar.SizedBitVector),
@@ -72,10 +86,12 @@ get_tol(shots::Int) = return (
             @test sprint(show, array_object) == "SizedArray{" * t_string * "{4}, 1}"
             @test_throws BoundsError size(array_object, 1)
             @test size(array_object, 0) == 10
+            new_object = T(object)
+            @test sprint(show, new_object) == t_string * "{4}"
         end
         bitvector = Quasar.SizedBitVector(Quasar.QasmExpression(:integer_literal, 10))
         @test length(bitvector) == Quasar.QasmExpression(:integer_literal, 10)
-        @test size(bitvector) == (Quasar.QasmExpression(:integer_literal, 10),)
+        @test size(bitvector)   == (Quasar.QasmExpression(:integer_literal, 10),)
     end
     @testset "Adder" begin
         sv_adder_qasm = """
@@ -124,41 +140,43 @@ get_tol(shots::Int) = return (
         visitor(parsed)
         @test visitor.qubit_count == 10
         correct_instructions = [ 
-            Instruction{X}(X(), QubitSet(6))
-            Instruction{X}(X(), QubitSet(3))
-            Instruction{X}(X(), QubitSet(7))
-            Instruction{X}(X(), QubitSet(4))
-            Instruction{X}(X(), QubitSet(8))
-            Instruction{CNot}(CNot(), QubitSet(4, 8))
-            Instruction{CNot}(CNot(), QubitSet(4, 0))
-            Instruction{CCNot}(CCNot(), QubitSet(0, 8, 4))
-            Instruction{CNot}(CNot(), QubitSet(3, 7))
-            Instruction{CNot}(CNot(), QubitSet(3, 4))
-            Instruction{CCNot}(CCNot(), QubitSet(4, 7, 3))
-            Instruction{CNot}(CNot(), QubitSet(2, 6))
-            Instruction{CNot}(CNot(), QubitSet(2, 3))
-            Instruction{CCNot}(CCNot(), QubitSet(3, 6, 2))
-            Instruction{CNot}(CNot(), QubitSet(1, 5))
-            Instruction{CNot}(CNot(), QubitSet(1, 2))
-            Instruction{CCNot}(CCNot(), QubitSet(2, 5, 1))
-            Instruction{CNot}(CNot(), QubitSet(1, 9))
-            Instruction{CCNot}(CCNot(), QubitSet(2, 5, 1))
-            Instruction{CNot}(CNot(), QubitSet(1, 2))
-            Instruction{CNot}(CNot(), QubitSet(2, 5))
-            Instruction{CCNot}(CCNot(), QubitSet(3, 6, 2))
-            Instruction{CNot}(CNot(), QubitSet(2, 3))
-            Instruction{CNot}(CNot(), QubitSet(3, 6))
-            Instruction{CCNot}(CCNot(), QubitSet(4, 7, 3))
-            Instruction{CNot}(CNot(), QubitSet(3, 4))
-            Instruction{CNot}(CNot(), QubitSet(4, 7))
-            Instruction{CCNot}(CCNot(), QubitSet(0, 8, 4))
-            Instruction{CNot}(CNot(), QubitSet(4, 0))
-            Instruction{CNot}(CNot(), QubitSet(0, 8))
+            BraketSimulator.Instruction(BraketSimulator.X(), BraketSimulator.QubitSet(6))
+            BraketSimulator.Instruction(BraketSimulator.X(), BraketSimulator.QubitSet(3))
+            BraketSimulator.Instruction(BraketSimulator.X(), BraketSimulator.QubitSet(7))
+            BraketSimulator.Instruction(BraketSimulator.X(), BraketSimulator.QubitSet(4))
+            BraketSimulator.Instruction(BraketSimulator.X(), BraketSimulator.QubitSet(8))
+            BraketSimulator.Instruction(BraketSimulator.CNot(), BraketSimulator.QubitSet(4, 8))
+            BraketSimulator.Instruction(BraketSimulator.CNot(), BraketSimulator.QubitSet(4, 0))
+            BraketSimulator.Instruction(BraketSimulator.CCNot(), BraketSimulator.QubitSet(0, 8, 4))
+            BraketSimulator.Instruction(BraketSimulator.CNot(), BraketSimulator.QubitSet(3, 7))
+            BraketSimulator.Instruction(BraketSimulator.CNot(), BraketSimulator.QubitSet(3, 4))
+            BraketSimulator.Instruction(BraketSimulator.CCNot(), BraketSimulator.QubitSet(4, 7, 3))
+            BraketSimulator.Instruction(BraketSimulator.CNot(), BraketSimulator.QubitSet(2, 6))
+            BraketSimulator.Instruction(BraketSimulator.CNot(), BraketSimulator.QubitSet(2, 3))
+            BraketSimulator.Instruction(BraketSimulator.CCNot(), BraketSimulator.QubitSet(3, 6, 2))
+            BraketSimulator.Instruction(BraketSimulator.CNot(), BraketSimulator.QubitSet(1, 5))
+            BraketSimulator.Instruction(BraketSimulator.CNot(), BraketSimulator.QubitSet(1, 2))
+            BraketSimulator.Instruction(BraketSimulator.CCNot(), BraketSimulator.QubitSet(2, 5, 1))
+            BraketSimulator.Instruction(BraketSimulator.CNot(), BraketSimulator.QubitSet(1, 9))
+            BraketSimulator.Instruction(BraketSimulator.CCNot(), BraketSimulator.QubitSet(2, 5, 1))
+            BraketSimulator.Instruction(BraketSimulator.CNot(), BraketSimulator.QubitSet(1, 2))
+            BraketSimulator.Instruction(BraketSimulator.CNot(), BraketSimulator.QubitSet(2, 5))
+            BraketSimulator.Instruction(BraketSimulator.CCNot(), BraketSimulator.QubitSet(3, 6, 2))
+            BraketSimulator.Instruction(BraketSimulator.CNot(), BraketSimulator.QubitSet(2, 3))
+            BraketSimulator.Instruction(BraketSimulator.CNot(), BraketSimulator.QubitSet(3, 6))
+            BraketSimulator.Instruction(BraketSimulator.CCNot(), BraketSimulator.QubitSet(4, 7, 3))
+            BraketSimulator.Instruction(BraketSimulator.CNot(), BraketSimulator.QubitSet(3, 4))
+            BraketSimulator.Instruction(BraketSimulator.CNot(), BraketSimulator.QubitSet(4, 7))
+            BraketSimulator.Instruction(BraketSimulator.CCNot(), BraketSimulator.QubitSet(0, 8, 4))
+            BraketSimulator.Instruction(BraketSimulator.CNot(), BraketSimulator.QubitSet(4, 0))
+            BraketSimulator.Instruction(BraketSimulator.CNot(), BraketSimulator.QubitSet(0, 8))
         ]
         for (ix, c_ix) in zip(visitor.instructions, correct_instructions)
             @test ix == c_ix
         end
-        @test visitor.results == Result[Probability(QubitSet(9, 5, 6, 7, 8)), Probability(QubitSet(9)), Probability(QubitSet(5, 6, 7, 8))]
+        @test visitor.results == BraketSimulator.Result[BraketSimulator.Probability(BraketSimulator.QubitSet(9, 5, 6, 7, 8)),
+                                                        BraketSimulator.Probability(BraketSimulator.QubitSet(9)),
+                                                        BraketSimulator.Probability(BraketSimulator.QubitSet(5, 6, 7, 8))]
     end
     @testset "Randomized Benchmarking" begin
         qasm = """
@@ -174,8 +192,26 @@ get_tol(shots::Int) = return (
         h q[0];
         measure q -> c;
         """
-        circuit    = Circuit(qasm)
-        @test circuit.instructions == [Instruction(H(), 0), Instruction(CZ(), [0, 1]), Instruction(S(), 0), Instruction(CZ(), [0, 1]), Instruction(S(), 0), Instruction(Z(), 0), Instruction(H(), 0), Instruction(Measure(), 0), Instruction(Measure(), 1)]
+        circuit    = BraketSimulator.Circuit(qasm)
+        @test circuit.instructions == [BraketSimulator.Instruction(BraketSimulator.H(), 0),
+                                       BraketSimulator.Instruction(BraketSimulator.CZ(), [0, 1]),
+                                       BraketSimulator.Instruction(BraketSimulator.S(), 0),
+                                       BraketSimulator.Instruction(BraketSimulator.CZ(), [0, 1]),
+                                       BraketSimulator.Instruction(BraketSimulator.S(), 0),
+                                       BraketSimulator.Instruction(BraketSimulator.Z(), 0),
+                                       BraketSimulator.Instruction(BraketSimulator.H(), 0),
+                                       BraketSimulator.Instruction(BraketSimulator.Measure(), 0),
+                                       BraketSimulator.Instruction(BraketSimulator.Measure(), 1)]
+    end
+    @testset "Bare measure" begin
+        qasm = """
+        qubit[2] q;
+        measure q;
+        """
+        circuit    = BraketSimulator.Circuit(qasm)
+        @test circuit.instructions == [BraketSimulator.Instruction(BraketSimulator.Measure(), 0),
+                                       BraketSimulator.Instruction(BraketSimulator.Measure(), 1)]
+        @test [qubit_count(ix.operator) for ix in circuit.instructions] == [1, 1]
     end
     @testset "GPhase" begin
         qasm = """
@@ -201,40 +237,62 @@ get_tol(shots::Int) = return (
         negctrl @ ctrl @ gphase(2 * π) qs[0], qs[1];
         #pragma braket result amplitude '00', '01', '10', '11'
         """
-        circuit    = Circuit(qasm) 
+        circuit    = BraketSimulator.Circuit(qasm) 
         simulation = BraketSimulator.StateVectorSimulator(2, 0)
         BraketSimulator.evolve!(simulation, circuit.instructions)
         sv = 1/√2 * [-1; 0; 0; 1]
         @test simulation.state_vector ≈ sv 
-        @test circuit.result_types == [Amplitude(["00", "01", "10", "11"])]
+        @test circuit.result_types == [BraketSimulator.Amplitude(["00", "01", "10", "11"])]
     end
-    @testset "Numbers" begin
+    @testset "Numbers $qasm_str" for (qasm_str, var_name, output_val) in (("float[32] a = 1.24e-3;", "a", 1.24e-3),
+                                                                          ("complex[float] b = 1-0.23im;", "b", 1-0.23im),
+                                                                          ("const bit c = \"0\";", "c", falses(1)),
+                                                                          ("bool d = false;", "d", false),
+                                                                          ("complex[float] e = -0.23+2im;", "e", -0.23+2im),
+                                                                          ("uint f = 0x123456789abcdef;", "f", 0x123456789abcdef),
+                                                                          ("int g = 0o010;", "g", 0o010),
+                                                                          ("float[64] h = 2*π;", "h", 2π),
+                                                                          ("float[64] i = τ/2;", "i", Float64(π)),
+                                                                         )
+
+
         qasm = """
-        float[32] a = 1.24e-3;
-        complex[float] b = 1-0.23im;
-        const bit c = "0";
-        bool d = false;
-        complex[float] e = -0.23+2im;
-        uint f = 0x123456789abcdef;
-        int g = 0o010;
+        $qasm_str
         """
         parsed  = parse_qasm(qasm)
         visitor = QasmProgramVisitor()
         visitor(parsed)
-        @test visitor.classical_defs["a"].val == 1.24e-3
-        @test visitor.classical_defs["b"].val == 1-0.23im
-        @test visitor.classical_defs["c"].val == falses(1)
-        @test visitor.classical_defs["d"].val == false
-        @test visitor.classical_defs["e"].val == -0.23 + 2im
-        @test visitor.classical_defs["f"].val == 0x123456789abcdef
-        @test visitor.classical_defs["g"].val == 0o010
+        @test visitor.classical_defs[var_name].val == output_val
+    end
+    @testset "Integers next to irrationals" begin
+        qasm = """
+        float[64] h = 2π;
+        """
+        @test_throws Quasar.QasmParseError parse_qasm(qasm)
+        try
+            parse_qasm(qasm)
+        catch e
+            msg = sprint(showerror, e)
+            @test startswith(msg, "QasmParseError: expressions of form 2π are not supported -- you must separate the terms with a * operator.")
+        end
+    end
+    @testset "Bad classical type" begin
+        qasm = """
+        angle[64] h = 2π;
+        """
+        @test_throws Quasar.QasmParseError parse_qasm(qasm)
     end
     @testset "Physical qubits" begin
         qasm = """
         h \$0;
         cnot \$0, \$1;
         """
-        @test Circuit(qasm) == Circuit([(H, 0), (CNot, 0, 1)])
+        parsed  = parse_qasm(qasm)
+        visitor = QasmProgramVisitor()
+        visitor(parsed)
+        circ = BraketSimulator.Circuit(visitor)
+        @test BraketSimulator.qubit_count(circ) == 2
+        @test circ.instructions == [BraketSimulator.Instruction(BraketSimulator.H(), 0), BraketSimulator.Instruction(BraketSimulator.CNot(), [0, 1])]
     end
     @testset "For loop and subroutines" begin
         qasm_str = """
@@ -258,14 +316,25 @@ get_tol(shots::Int) = return (
         __bit_0__[2] = measure __qubits__[2];
         __bit_0__[3] = measure __qubits__[3];
         """
-        braket_circ = Circuit([(H, 0), (CNot, 0, 1), (H, 2), (CNot, 2, 3),  (H, 2), (CNot, 2, 3),  (H, 2), (CNot, 2, 3),  (H, 2), (CNot, 2, 3),  (H, 2), (CNot, 2, 3)])
         inputs = Dict("theta"=>0.2)
-        parsed_circ = Circuit(qasm_str, inputs)
+        parsed_circ = BraketSimulator.Circuit(qasm_str, inputs)
         deleteat!(parsed_circ.instructions, length(parsed_circ.instructions)-3:length(parsed_circ.instructions))
-        @test ir(parsed_circ, Val(:JAQCD)) == Braket.Program(braket_circ)
+        @test parsed_circ.instructions == [BraketSimulator.Instruction(BraketSimulator.H(), 0),
+                                           BraketSimulator.Instruction(BraketSimulator.CNot(), [0, 1]),
+                                           BraketSimulator.Instruction(BraketSimulator.H(), 2),
+                                           BraketSimulator.Instruction(BraketSimulator.CNot(), [2, 3]),
+                                           BraketSimulator.Instruction(BraketSimulator.H(), 2),
+                                           BraketSimulator.Instruction(BraketSimulator.CNot(), [2, 3]),
+                                           BraketSimulator.Instruction(BraketSimulator.H(), 2), 
+                                           BraketSimulator.Instruction(BraketSimulator.CNot(), [2, 3]),
+                                           BraketSimulator.Instruction(BraketSimulator.H(), 2),
+                                           BraketSimulator.Instruction(BraketSimulator.CNot(), [2, 3]),
+                                           BraketSimulator.Instruction(BraketSimulator.H(), 2),
+                                           BraketSimulator.Instruction(BraketSimulator.CNot(), [2, 3])
+                                          ]
     end
     @testset "For Loop" begin
-        qasm = """
+        qasm_with_scope = """
         int[8] x = 0;
         int[8] y = -100;
         int[8] ten = 10;
@@ -278,13 +347,7 @@ get_tol(shots::Int) = return (
             y += i;
         }
         """
-        parsed  = parse_qasm(qasm)
-        visitor = QasmProgramVisitor()
-        visitor(parsed)
-        @test visitor.classical_defs["x"].val == sum((0, 2, 4, 6))
-        @test visitor.classical_defs["y"].val == sum((-100, 2, 4, 6))
-        # without scoping { } 
-        qasm = """
+        qasm_no_scope = """
         int[8] x = 0;
         int[8] y = -100;
         int[8] ten = 10;
@@ -292,14 +355,16 @@ get_tol(shots::Int) = return (
         for uint[8] i in [0:2:ten - 3] x += i;
         for int[8] i in {2, 4, 6} y += i;
         """
-        parsed  = parse_qasm(qasm)
-        visitor = QasmProgramVisitor()
-        visitor(parsed)
-        @test visitor.classical_defs["x"].val == sum((0, 2, 4, 6))
-        @test visitor.classical_defs["y"].val == sum((-100, 2, 4, 6))
+        @testset "$label" for (label, qasm) in (("With scoping {}", qasm_with_scope), ("Without scoping {}", qasm_no_scope))
+            parsed  = parse_qasm(qasm)
+            visitor = QasmProgramVisitor()
+            visitor(parsed)
+            @test visitor.classical_defs["x"].val == sum((0, 2, 4, 6))
+            @test visitor.classical_defs["y"].val == sum((-100, 2, 4, 6))
+        end
     end
     @testset "While Loop" begin
-        qasm = """
+        qasm_with_scope = """
         int[8] x = 0;
         int[8] i = 0;
 
@@ -308,20 +373,17 @@ get_tol(shots::Int) = return (
             i += 1;
         }
         """
-        parsed  = parse_qasm(qasm)
-        visitor = QasmProgramVisitor()
-        visitor(parsed)
-        @test visitor.classical_defs["x"].val == sum(0:6)
-        # without scoping { }
-        qasm = """
-        int[8] i = 0;
+        qasm_no_scope = """
+        int[8] x = 0;
 
-        while (i < 7) i += 1;
+        while (x < 7) x += 1;
         """
-        parsed  = parse_qasm(qasm)
-        visitor = QasmProgramVisitor()
-        visitor(parsed)
-        @test visitor.classical_defs["i"].val == 7
+        @testset "$label" for (label, qasm, val) in (("With scoping {}", qasm_with_scope, sum(0:6)), ("Without scoping {}", qasm_no_scope, 7))
+            parsed  = parse_qasm(qasm)
+            visitor = QasmProgramVisitor()
+            visitor(parsed)
+            @test visitor.classical_defs["x"].val == val
+        end
     end
     @testset "Break and continue" begin
         @testset for str in ("continue;", "{ continue; }")
@@ -389,55 +451,41 @@ get_tol(shots::Int) = return (
             @test_throws Quasar.QasmVisitorError("$str statement encountered outside a loop.") visitor(parsed)
         end
     end
-    @testset "Builtin functions" begin
+    @testset "Builtin functions $fn" for (fn, type, arg, result) in (("arccos", "float[64]", 1, acos(1)),
+                                                                     ("arcsin", "float[64]", 1, asin(1)),
+                                                                     ("arctan", "float[64]", 1, atan(1)),
+                                                                     ("ceiling", "int[64]", "π", 4),
+                                                                     ("floor", "int[64]", "π", 3),
+                                                                     ("mod", "int[64]", "4, 3", 1),
+                                                                     ("mod", "float[64]", "5.2, 2.5", mod(5.2, 2.5)),
+                                                                     ("cos", "float[64]", 1, cos(1)),
+                                                                     ("sin", "float[64]", 1, sin(1)),
+                                                                     ("tan", "float[64]", 1, tan(1)),
+                                                                     ("sqrt", "float[64]", 2, sqrt(2)),
+                                                                     ("exp", "float[64]", 2, exp(2)),
+                                                                     ("log", "float[64]", "ℇ", log(ℯ)),
+                                                                     ("popcount", "int[64]", "true", 1),
+                                                                     ("popcount", "int[64]", "\"1001110\"", 4),
+                                                                     ("popcount", "int[64]", "78", 4),
+                                                                     ("popcount", "int[64]", "0x78", 4),
+                                                                    )
         qasm = """
-            const float[64] arccos_result = arccos(1);
-            const float[64] arcsin_result = arcsin(1);
-            const float[64] arctan_result = arctan(1);
-            const int[64] ceiling_result = ceiling(π);
-            const float[64] cos_result = cos(1);
-            const float[64] exp_result = exp(2);
-            const int[64] floor_result = floor(π);
-            const float[64] log_result = log(ℇ);
-            const int[64] mod_int_result = mod(4, 3);
-            const float[64] mod_float_result = mod(5.2, 2.5);
-            const int[64] popcount_bool_result = popcount(true);
-            const int[64] popcount_bit_result = popcount("1001110");
-            const int[64] popcount_int_result = popcount(78);
-            const int[64] popcount_uint_result = popcount(0x78);
-            bit[2] bitvec;
-            bitvec = "11";
-            const int[64] popcount_bitvec_result = popcount(bitvec);
-            // parser gets confused by pow
-            // const int[64] pow_int_result = pow(3, 3);
-            // const float[64] pow_float_result = pow(2.5, 2.5);
-            // add rotl, rotr
-            const float[64] sin_result = sin(1);
-            const float[64] sqrt_result = sqrt(2);
-            const float[64] tan_result = tan(1);
+            const $type $(fn)_result = $fn($arg);
             """
         parsed  = parse_qasm(qasm)
         visitor = QasmProgramVisitor()
         visitor(parsed)
-        @test visitor.classical_defs["arccos_result"].val == acos(1)
-        @test visitor.classical_defs["arcsin_result"].val == asin(1)
-        @test visitor.classical_defs["arctan_result"].val == atan(1)
-        @test visitor.classical_defs["ceiling_result"].val == 4
-        @test visitor.classical_defs["cos_result"].val == cos(1)
-        @test visitor.classical_defs["exp_result"].val == exp(2)
-        @test visitor.classical_defs["floor_result"].val == 3
-        @test visitor.classical_defs["log_result"].val == 1.0
-        @test visitor.classical_defs["mod_int_result"].val == 1
-        @test visitor.classical_defs["mod_float_result"].val == mod(5.2, 2.5)
-        @test visitor.classical_defs["popcount_bool_result"].val == 1
-        @test visitor.classical_defs["popcount_bit_result"].val == 4
-        @test visitor.classical_defs["popcount_int_result"].val == 4
-        @test visitor.classical_defs["popcount_uint_result"].val == 4
+        @test visitor.classical_defs["$(fn)_result"].val == result
+    end
+    @testset "Builtin functions" begin
+        qasm = """
+            bit[2] bitvec = "11";
+            const int[64] popcount_bitvec_result = popcount(bitvec);
+            """
+        parsed  = parse_qasm(qasm)
+        visitor = QasmProgramVisitor()
+        visitor(parsed)
         @test visitor.classical_defs["popcount_bitvec_result"].val == 2
-        @test visitor.classical_defs["sin_result"].val == sin(1)
-        @test visitor.classical_defs["sqrt_result"].val == sqrt(2)
-        @test visitor.classical_defs["tan_result"].val == tan(1)
-
         @testset "Symbolic" begin
             qasm = """
                 input float x;
@@ -459,25 +507,30 @@ get_tol(shots::Int) = return (
             x = 1.0
             y = 2.0
             inputs      = Dict("x"=>x, "y"=>y)
-            parsed_circ = Circuit(qasm, inputs) 
-            ixs = [Braket.Instruction(Rx(x), 0),  
-                   Braket.Instruction(Rx(acos(x)), 0),  
-                   Braket.Instruction(Rx(asin(x)), 0),  
-                   Braket.Instruction(Rx(atan(x)), 0),  
-                   Braket.Instruction(Rx(ceil(x)), 0),  
-                   Braket.Instruction(Rx(cos(x)), 0),  
-                   Braket.Instruction(Rx(exp(x)), 0),  
-                   Braket.Instruction(Rx(floor(x)), 0),  
-                   Braket.Instruction(Rx(log(x)), 0),  
-                   Braket.Instruction(Rx(mod(x, y)), 0),  
-                   Braket.Instruction(Rx(sin(x)), 0),  
-                   Braket.Instruction(Rx(sqrt(x)), 0),  
-                   Braket.Instruction(Rx(tan(x)), 0)]
-            c = Circuit()
+            parsed_circ = BraketSimulator.Circuit(qasm, inputs) 
+            ixs = [BraketSimulator.Instruction(BraketSimulator.Rx(x), 0),  
+                   BraketSimulator.Instruction(BraketSimulator.Rx(acos(x)), 0),  
+                   BraketSimulator.Instruction(BraketSimulator.Rx(asin(x)), 0),  
+                   BraketSimulator.Instruction(BraketSimulator.Rx(atan(x)), 0),  
+                   BraketSimulator.Instruction(BraketSimulator.Rx(ceil(x)), 0),  
+                   BraketSimulator.Instruction(BraketSimulator.Rx(cos(x)), 0),  
+                   BraketSimulator.Instruction(BraketSimulator.Rx(exp(x)), 0),  
+                   BraketSimulator.Instruction(BraketSimulator.Rx(floor(x)), 0),  
+                   BraketSimulator.Instruction(BraketSimulator.Rx(log(x)), 0),  
+                   BraketSimulator.Instruction(BraketSimulator.Rx(mod(x, y)), 0),  
+                   BraketSimulator.Instruction(BraketSimulator.Rx(sin(x)), 0),  
+                   BraketSimulator.Instruction(BraketSimulator.Rx(sqrt(x)), 0),  
+                   BraketSimulator.Instruction(BraketSimulator.Rx(tan(x)), 0)]
+            c = BraketSimulator.Circuit()
             for ix in ixs
-                Braket.add_instruction!(c, ix)
+                BraketSimulator.add_instruction!(c, ix)
             end
-            @test parsed_circ == c
+            @test parsed_circ.instructions == c.instructions
+        end
+        @testset "popcount!" begin
+            @test Quasar.popcount() == 0
+            @test Quasar.popcount(vcat(trues(3), falses(2))) == 3
+            @test Quasar.popcount("01010101") == 4 
         end
     end
     @testset "Bad pragma" begin
@@ -487,13 +540,33 @@ get_tol(shots::Int) = return (
         """
         @test_throws Quasar.QasmParseError parse_qasm(qasm)
     end
+    @testset "Barrier" begin
+        qasm = """
+        qubit[4] q;
+        x q[0];
+        barrier q[0];
+        """
+        @test_warn "barrier expression encountered -- currently `barrier` is a no-op" parse_qasm(qasm)
+    end
+    @testset "Stretch" begin
+        qasm = """
+        stretch a;
+        """
+        @test_warn "stretch expression encountered -- currently `stretch` is a no-op" parse_qasm(qasm)
+    end
+    @testset "Duration" begin
+        qasm = """
+        duration a = 10μs;
+        """
+        @test_warn "duration expression encountered -- currently `duration` is a no-op" parse_qasm(qasm)
+    end
     @testset "Reset" begin
         qasm = """
         qubit[4] q;
         x q[0];
         reset q[0];
         """
-        @test_throws Quasar.QasmParseError parse_qasm(qasm)
+        @test_warn "reset expression encountered -- currently `reset` is a no-op" parse_qasm(qasm)
     end
     @testset "Gate call missing/extra args" begin
         qasm = """
@@ -511,95 +584,104 @@ get_tol(shots::Int) = return (
         visitor = QasmProgramVisitor()
         @test_throws Quasar.QasmVisitorError("gate x does not accept arguments but arguments were provided.") visitor(parsed)
     end
-    #=@testset "Adjoint Gradient pragma" begin
+    @testset "Adjoint Gradient pragma" begin
         qasm = """
         input float theta;
         qubit[4] q;
         rx(theta) q[0];
         #pragma braket result adjoint_gradient expectation(-6 * y(q[0]) @ i(q[1]) + 0.75 * y(q[2]) @ z(q[3])) theta
         """
-        circuit = Circuit(qasm, Dict("theta"=>0.1))
+        parsed  = parse_qasm(qasm)
+        visitor = QasmProgramVisitor(Dict("theta"=>0.1))
+        @test_throws Quasar.QasmVisitorError("Result type adjoint_gradient is not supported.", "TypeError") visitor(parsed)
+        #= circuit = BraketSimulator.Circuit(qasm, Dict("theta"=>0.1))
         θ       = FreeParameter("theta")
-        obs     = -2 * Braket.Observables.Y() * (3 * Braket.Observables.I()) + 0.75 * Braket.Observables.Y() * Braket.Observables.Z()
+        obs     = -2 * BraketSimulator.Observables.Y() * (3 * BraketSimulator.Observables.I()) + 0.75 * BraketSimulator.Observables.Y() * BraketSimulator.Observables.Z()
         @test circuit.result_types[1].observable == obs
         @test circuit.result_types[1].targets == [QubitSet([0, 1]), QubitSet([2, 3])]
-        @test circuit.result_types[1].parameters == ["theta"]
-    end=#
-    @testset "Assignment operators" begin
-        qasm = """
-        int[16] x;
-        bit[4] xs;
-
-        x = 0;
-        xs = "0000";
-
-        x += 1; // 1
-        x *= 2; // 2
-        x /= 2; // 1
-        x -= 5; // -4
-
-        xs[2:] |= "11";
-        """
-        parsed  = parse_qasm(qasm)
-        visitor = QasmProgramVisitor()
-        visitor(parsed)
-        @test visitor.classical_defs["x"].val  == -4
-        @test visitor.classical_defs["xs"].val == BitVector([0,0,1,1])
+        @test circuit.result_types[1].parameters == ["theta"]=#
     end
-    @testset "Bit operators" begin
-        qasm = """
-        bit[4] and;
-        bit[4] or;
-        bit[4] xor;
-        bit[4] lshift;
-        bit[4] rshift;
-        bit[4] flip;
-        bit gt;
-        bit lt;
-        bit ge;
-        bit le;
-        bit eq;
-        bit neq;
-        bit not;
-        bit not_zero;
+    @testset "Assignment operators" begin
+        @testset "Op: $op" for (op, initial, arg, final) in (("+", 0, 1, 1), ("*", 1, 2, 2), ("/", 2, 2, 1), ("-", 1, 5, -4))
+            qasm = """
+            int[16] x;
+            x = $initial;
+            x $op= $arg;
+            """
+            parsed  = parse_qasm(qasm)
+            visitor = QasmProgramVisitor()
+            visitor(parsed)
+            @test visitor.classical_defs["x"].val == final 
+        end
+        @testset "Op: $op" for (op, initial, arg, final) in (("|", "0000", "11", BitVector([0,0,1,1])),
+                                                             ("&", "0010", "11", BitVector([0,0,1,0])),
+                                                             ("^", "0001", "10", BitVector([0,0,1,1])),
+                                                            )
+            qasm = """
+            bit[4] xs = \"$initial\";
+            xs[2:] $op= \"$arg\";
+            """
+            parsed  = parse_qasm(qasm)
+            visitor = QasmProgramVisitor()
+            visitor(parsed)
+            @test visitor.classical_defs["xs"].val == final
+        end
+    end
+    @testset "Binary bit operators $op" for (op, result) in (("&", BitVector([0,1,0,0])),
+                                                             ("|", BitVector([1,1,0,1])),
+                                                             ("^", BitVector([1,0,0,1])),
+                                                             (">", false),
+                                                             ("<", true),
+                                                             (">=", false),
+                                                             ("<=", true),
+                                                             ("==", false),
+                                                             ("!=", true),
+                                                            )
 
+        qasm = """
         bit[4] x = "0101";
         bit[4] y = "1100";
 
-        and = x & y;
-        or  = x | y;
-        xor = x ^ y;
-        lshift = x << 2;
-        rshift = y >> 2;
-        flip = ~x;
-        gt = x > y;
-        lt = x < y;
-        ge = x >= y;
-        le = x <= y;
-        eq = x == y;
-        neq = x != y;
-        not = !x;
-        not_zero = !(x << 4);
+        bit[4] result = x $op y;
         """
         parsed  = parse_qasm(qasm)
         visitor = QasmProgramVisitor()
         visitor(parsed)
         @test visitor.classical_defs["x"].val == BitVector([0,1,0,1])
         @test visitor.classical_defs["y"].val == BitVector([1,1,0,0])
-        @test visitor.classical_defs["and"].val == BitVector([0,1,0,0])
-        @test visitor.classical_defs["or"].val == BitVector([1,1,0,1])
-        @test visitor.classical_defs["xor"].val == BitVector([1,0,0,1])
-        @test visitor.classical_defs["lshift"].val == BitVector([0,1,0,0])
-        @test visitor.classical_defs["rshift"].val == BitVector([0,0,1,1])
-        @test visitor.classical_defs["flip"].val == BitVector([1,0,1,0])
-        @test visitor.classical_defs["gt"].val == false
-        @test visitor.classical_defs["lt"].val == true
-        @test visitor.classical_defs["ge"].val == false
-        @test visitor.classical_defs["le"].val == true
-        @test visitor.classical_defs["eq"].val == false
-        @test visitor.classical_defs["neq"].val == true
-        @test visitor.classical_defs["not"].val == false
-        @test visitor.classical_defs["not_zero"].val == true
+        @test visitor.classical_defs["result"].val == result 
+    end
+    @testset "Binary bit operators $op" for (op, arg1, arg2, result) in (("<<", "x", 2, BitVector([0,1,0,0])),
+                                                                         (">>", "y", 2, BitVector([0,0,1,1])),
+                                                                        )
+        qasm = """
+        bit[4] x = "0101";
+        bit[4] y = "1100";
+
+        bit[4] result = $arg1 $op $arg2;
+        """
+        parsed  = parse_qasm(qasm)
+        visitor = QasmProgramVisitor()
+        visitor(parsed)
+        @test visitor.classical_defs["result"].val == result
+    end
+    @testset "Unary bit operators $op" for (op, typ, arg, result) in (("~", "bit[4]", "x", BitVector([1,0,1,0])),
+                                                                      ("!", "bit", "x", false),
+                                                                      ("!", "bit", "x << 4", true)
+                                                                     )
+
+        qasm = """
+        bit not;
+        bit not_zero;
+
+        bit[4] x = "0101";
+        $typ result = $(op)$(arg);
+        """
+        parsed  = parse_qasm(qasm)
+        visitor = QasmProgramVisitor()
+        visitor(parsed)
+        @test visitor.classical_defs["x"].val == BitVector([0,1,0,1])
+        @test visitor.classical_defs["result"].val == result
     end
     @testset "End statement" begin
         qasm = """
@@ -611,8 +693,11 @@ get_tol(shots::Int) = return (
         y \$2;
         h \$3;
         """
-        circ = Circuit(qasm)
-        @test circ.instructions == [Instruction(Z(), 0), Instruction(X(), 1), Instruction(H(), 2), Instruction(Y(), 3)]
+        circ = BraketSimulator.Circuit(qasm)
+        @test circ.instructions == [BraketSimulator.Instruction(BraketSimulator.Z(), 0),
+                                    BraketSimulator.Instruction(BraketSimulator.X(), 1),
+                                    BraketSimulator.Instruction(BraketSimulator.H(), 2),
+                                    BraketSimulator.Instruction(BraketSimulator.Y(), 3)]
     end
     @testset "Switch/case" begin
         qasm = """
@@ -622,35 +707,35 @@ get_tol(shots::Int) = return (
             default { z \$0; }
         }
         """
-        circ = Circuit(qasm, Dict("x"=> -1))
+        circ = BraketSimulator.Circuit(qasm, Dict("x"=> -1))
         @test isempty(circ.instructions)
-        circ = Circuit(qasm, Dict("x"=> 0))
-        @test circ.instructions == [Instruction(Z(), 0)]
+        circ = BraketSimulator.Circuit(qasm, Dict("x"=> 0))
+        @test circ.instructions == [BraketSimulator.Instruction(BraketSimulator.Z(), 0)]
         qasm = """
         input int[8] x;
         switch (x) { case 0 {} case 1, 2 { z \$0; }  }
         """
-        circ = Circuit(qasm, Dict("x"=> 0))
+        circ = BraketSimulator.Circuit(qasm, Dict("x"=> 0))
         @test isempty(circ.instructions)
-        circ = Circuit(qasm, Dict("x"=> 1))
-        @test circ.instructions == [Instruction(Z(), 0)]
-        circ = Circuit(qasm, Dict("x"=> 2))
-        @test circ.instructions == [Instruction(Z(), 0)]
+        circ = BraketSimulator.Circuit(qasm, Dict("x"=> 1))
+        @test circ.instructions == [BraketSimulator.Instruction(BraketSimulator.Z(), 0)]
+        circ = BraketSimulator.Circuit(qasm, Dict("x"=> 2))
+        @test circ.instructions == [BraketSimulator.Instruction(BraketSimulator.Z(), 0)]
         qasm = """
         input int[8] x;
         switch (x) { case 0 {} default { z \$0; } default { x \$0; } }
         """
-        @test_throws Quasar.QasmParseError Circuit(qasm, Dict("x"=>0))
+        @test_throws Quasar.QasmParseError BraketSimulator.Circuit(qasm, Dict("x"=>0))
         qasm = """
         input int[8] x;
         switch (x) { default { z \$0; } case 0 {} }
         """
-        @test_throws Quasar.QasmParseError Circuit(qasm, Dict("x"=>0))
+        @test_throws Quasar.QasmParseError BraketSimulator.Circuit(qasm, Dict("x"=>0))
         qasm = """
         input int[8] x;
         switch (x) { case 0 { z \$0; } true {} }
         """
-        @test_throws Quasar.QasmParseError Circuit(qasm, Dict("x"=>0))
+        @test_throws Quasar.QasmParseError BraketSimulator.Circuit(qasm, Dict("x"=>0))
     end
     @testset "If/Else" begin
         qasm = """
@@ -701,9 +786,9 @@ get_tol(shots::Int) = return (
             y q;
         }
         """
-        for (flag, which_gate) in ((true, X()), (false, Y()))
-            circuit = Circuit(qasm, Dict("which_gate"=>flag))
-            @test circuit.instructions == [Instruction(which_gate, 0)]
+        for (flag, which_gate) in ((true, BraketSimulator.X()), (false, BraketSimulator.Y()))
+            circuit = BraketSimulator.Circuit(qasm, Dict("which_gate"=>flag))
+            @test circuit.instructions == [BraketSimulator.Instruction(which_gate, 0)]
         end
     end
     @testset "Global gate control" begin
@@ -715,19 +800,21 @@ get_tol(shots::Int) = return (
         h q2;
         ctrl @ s q1, q2;
         """
-        circuit    = Circuit(qasm) 
+        circuit    = BraketSimulator.Circuit(qasm) 
         simulation = BraketSimulator.StateVectorSimulator(2, 0)
         BraketSimulator.evolve!(simulation, circuit.instructions)
         @test simulation.state_vector ≈ [0.5, 0.5, 0.5, 0.5im]
     end
-    @testset "Simple Pow" begin
+    @testset "Simple Pow" for (orig_gate, sqrt_gate, sqrt_ix) in (("z", "s", BraketSimulator.S()),
+                                                                  ("x", "v", BraketSimulator.V()),
+                                                                 )
         custom_qasm = """
         qubit q1;
         qubit q2;
         h q1;
         h q2;
         
-        pow(1/2) @ z q1; // s
+        pow(1/2) @ $orig_gate q1;
         """
         standard_qasm = """
         qubit q1;
@@ -735,13 +822,15 @@ get_tol(shots::Int) = return (
         h q1;
         h q2;
         
-        s q1; // s
+        $sqrt_gate q1;
         """
-        canonical_ixs = [Instruction(H(), 0), Instruction(H(), 1), Instruction(S(), 0)]
+        canonical_ixs = [BraketSimulator.Instruction(BraketSimulator.H(), 0),
+                         BraketSimulator.Instruction(BraketSimulator.H(), 1),
+                         BraketSimulator.Instruction(sqrt_ix, 0)]
         canonical_simulation = BraketSimulator.StateVectorSimulator(2, 0)
         BraketSimulator.evolve!(canonical_simulation, canonical_ixs)
         @testset "$title" for (title, qasm) in (("standard", standard_qasm), ("custom", custom_qasm))
-            circuit    = Circuit(qasm)
+            circuit    = BraketSimulator.Circuit(qasm)
             simulation = BraketSimulator.StateVectorSimulator(2, 0)
             BraketSimulator.evolve!(simulation, circuit.instructions)
             @test simulation.state_vector ≈ canonical_simulation.state_vector
@@ -817,7 +906,7 @@ get_tol(shots::Int) = return (
         @testset "$title" for (title, qasm) in (("standard", standard_qasm),
                                                 ("custom", custom_qasm)
                                                )
-            circuit    = Circuit(qasm) 
+            circuit    = BraketSimulator.Circuit(qasm) 
             simulation = BraketSimulator.StateVectorSimulator(5, 0)
             BraketSimulator.evolve!(simulation, circuit.instructions)
             sv = zeros(32)
@@ -863,14 +952,24 @@ get_tol(shots::Int) = return (
         ccx_2 q1, q2, q4;
         ccx_2 q1, q2, q5;
         """
-        circuit    = Circuit(qasm) 
+        circuit    = BraketSimulator.Circuit(qasm) 
         simulation = BraketSimulator.StateVectorSimulator(5, 0)
         sv = zeros(ComplexF64, 32)
         sv[end] = 1.0
-        canonical_circuit     = Circuit([(CNot, 0, 1), (X, 0), (CNot, 0, 1), (CCNot, 0, 3, 2), (CCNot, 0, 2, 3), (CCNot, 0, 2, 4), (CCNot, 0, 1, 2), (CCNot, 0, 1, 3), (CCNot, 0, 1, 4)])
-        canonical_simulation  = BraketSimulator.StateVectorSimulator(5, 0)
+        canonical_ixs        = [
+                                BraketSimulator.Instruction(BraketSimulator.CNot(), [0, 1]),
+                                BraketSimulator.Instruction(BraketSimulator.X(), 0),
+                                BraketSimulator.Instruction(BraketSimulator.CNot(), [0, 1]),
+                                BraketSimulator.Instruction(BraketSimulator.CCNot(), [0, 3, 2]),
+                                BraketSimulator.Instruction(BraketSimulator.CCNot(), [0, 2, 3]),
+                                BraketSimulator.Instruction(BraketSimulator.CCNot(), [0, 2, 4]),
+                                BraketSimulator.Instruction(BraketSimulator.CCNot(), [0, 1, 2]),
+                                BraketSimulator.Instruction(BraketSimulator.CCNot(), [0, 1, 3]),
+                                BraketSimulator.Instruction(BraketSimulator.CCNot(), [0, 1, 4])
+                               ]
+        canonical_simulation = BraketSimulator.StateVectorSimulator(5, 0)
         ii = 1
-        @testset for (ix, c_ix) in zip(circuit.instructions, canonical_circuit.instructions)
+        @testset for (ix, c_ix) in zip(circuit.instructions, canonical_ixs)
             BraketSimulator.evolve!(simulation, [ix])
             BraketSimulator.evolve!(canonical_simulation, [c_ix])
             for jj in 1:32
@@ -903,14 +1002,14 @@ get_tol(shots::Int) = return (
         cccx q1, q2, q5, q3;
         ncccx q4, q2, q5, q3;
         """
-        circuit    = Circuit(qasm)
-        @test circuit.instructions == [Instruction(H(), 0),
-                                       Instruction(H(), 1),
-                                       Instruction(H(), 2),
-                                       Instruction(H(), 3),
-                                       Instruction(H(), 4),
-                                       Instruction(Control(X(), (1, 1, 1)), [0, 1, 4, 2]),
-                                       Instruction(Control(X(), (0, 0, 0)), [3, 1, 4, 2]),
+        circuit    = BraketSimulator.Circuit(qasm)
+        @test circuit.instructions == [BraketSimulator.Instruction(BraketSimulator.H(), 0),
+                                       BraketSimulator.Instruction(BraketSimulator.H(), 1),
+                                       BraketSimulator.Instruction(BraketSimulator.H(), 2),
+                                       BraketSimulator.Instruction(BraketSimulator.H(), 3),
+                                       BraketSimulator.Instruction(BraketSimulator.H(), 4),
+                                       BraketSimulator.Instruction(BraketSimulator.Control(BraketSimulator.X(), (1, 1, 1)), [0, 1, 4, 2]),
+                                       BraketSimulator.Instruction(BraketSimulator.Control(BraketSimulator.X(), (0, 0, 0)), [3, 1, 4, 2]),
                                       ]
     end
     @testset "Gate inverses" begin
@@ -963,44 +1062,46 @@ get_tol(shots::Int) = return (
         t q;
         inv @ t q;
         """
-        circuit   = Circuit(qasm) 
+        circuit   = BraketSimulator.Circuit(qasm) 
         collapsed = prod(BraketSimulator.matrix_rep(ix.operator) for ix in circuit.instructions)
-        @test collapsed ≈ diagm(ones(ComplexF64, 2^qubit_count(circuit)))
+        @test collapsed ≈ diagm(ones(ComplexF64, 2^BraketSimulator.qubit_count(circuit)))
     end
-    @testset "Noise" begin
+    @testset "Noise pragmas $noise, $qubits" for (noise, arg, qubits, ix) in (("bit_flip", ".5", "qs[1]", BraketSimulator.Instruction(BraketSimulator.BitFlip(0.5), 1)),
+                                                                     ("phase_flip", ".5", "qs[0]", BraketSimulator.Instruction(BraketSimulator.PhaseFlip(0.5), 0)),
+                                                                     ("pauli_channel", ".1, .2, .3", "qs[0]", BraketSimulator.Instruction(BraketSimulator.PauliChannel(0.1, 0.2, 0.3), 0)),
+                                                                     ("depolarizing", ".5", "qs[0]", BraketSimulator.Instruction(BraketSimulator.Depolarizing(0.5), 0)),
+                                                                     ("two_qubit_depolarizing", ".9", "qs", BraketSimulator.Instruction(BraketSimulator.TwoQubitDepolarizing(0.9), [0, 1])),
+                                                                     ("two_qubit_depolarizing", ".7", "qs[1], qs[0]", BraketSimulator.Instruction(BraketSimulator.TwoQubitDepolarizing(0.7), [1, 0])),
+                                                                     ("two_qubit_dephasing", ".6", "qs", BraketSimulator.Instruction(BraketSimulator.TwoQubitDephasing(0.6), [0, 1])),
+                                                                     ("amplitude_damping", ".2", "qs[0]", BraketSimulator.Instruction(BraketSimulator.AmplitudeDamping(0.2), 0)),
+                                                                     ("generalized_amplitude_damping", ".2, .3", "qs[1]", BraketSimulator.Instruction(BraketSimulator.GeneralizedAmplitudeDamping(0.2, 0.3), 1)),
+                                                                     ("phase_damping", ".4", "qs[0]", BraketSimulator.Instruction(BraketSimulator.PhaseDamping(0.4), 0)),
+                                                                     ("kraus", "[[0.9486833im, 0], [0, 0.9486833im]], [[0, 0.31622777], [0.31622777, 0]]", "qs[0]", BraketSimulator.Instruction(BraketSimulator.Kraus([[0.9486833im 0; 0 0.9486833im], [0 0.31622777; 0.31622777 0]]), 0)),
+                                                                     ("kraus", "[[0.9486832980505138, 0, 0, 0], [0, 0.9486832980505138, 0, 0], [0, 0, 0.9486832980505138, 0], [0, 0, 0, 0.9486832980505138]], [[0, 0.31622776601683794, 0, 0], [0.31622776601683794, 0, 0, 0], [0, 0, 0, 0.31622776601683794], [0, 0, 0.31622776601683794, 0]]", "qs[{1, 0}]", BraketSimulator.Instruction(BraketSimulator.Kraus([[0.9486832980505138 0 0 0; 0 0.9486832980505138 0 0; 0 0 0.9486832980505138 0; 0 0 0 0.9486832980505138], [0 0.31622776601683794 0 0; 0.31622776601683794 0 0 0; 0 0 0 0.31622776601683794; 0 0 0.31622776601683794 0]]), [1, 0])),
+                                                                    )
+
+        
         qasm = """
         qubit[2] qs;
 
-        #pragma braket noise bit_flip(.5) qs[1]
-        #pragma braket noise phase_flip(.5) qs[0]
-        #pragma braket noise pauli_channel(.1, .2, .3) qs[0]
-        #pragma braket noise depolarizing(.5) qs[0]
-        #pragma braket noise two_qubit_depolarizing(.9) qs
-        #pragma braket noise two_qubit_depolarizing(.7) qs[1], qs[0]
-        #pragma braket noise two_qubit_dephasing(.6) qs
-        #pragma braket noise amplitude_damping(.2) qs[0]
-        #pragma braket noise generalized_amplitude_damping(.2, .3)  qs[1]
-        #pragma braket noise phase_damping(.4) qs[0]
-        #pragma braket noise kraus([[0.9486833im, 0], [0, 0.9486833im]], [[0, 0.31622777], [0.31622777, 0]]) qs[0]
-        #pragma braket noise kraus([[0.9486832980505138, 0, 0, 0], [0, 0.9486832980505138, 0, 0], [0, 0, 0.9486832980505138, 0], [0, 0, 0, 0.9486832980505138]], [[0, 0.31622776601683794, 0, 0], [0.31622776601683794, 0, 0, 0], [0, 0, 0, 0.31622776601683794], [0, 0, 0.31622776601683794, 0]]) qs[{1, 0}]
+        #pragma braket noise $noise($arg) $qubits
         """
-        circuit   = Circuit(qasm) 
-        inst_list = [Instruction(BitFlip(0.5), [1]),
-                     Instruction(PhaseFlip(0.5), [0]),
-                     Instruction(PauliChannel(0.1, 0.2, 0.3), [0]),
-                     Instruction(Depolarizing(0.5), [0]),
-                     Instruction(TwoQubitDepolarizing(0.9), [0, 1]),
-                     Instruction(TwoQubitDepolarizing(0.7), [1, 0]),
-                     Instruction(TwoQubitDephasing(0.6), [0, 1]),
-                     Instruction(AmplitudeDamping(0.2), [0]),
-                     Instruction(GeneralizedAmplitudeDamping(0.2, 0.3), [1]),
-                     Instruction(PhaseDamping(0.4), [0]),
-                     Instruction(Kraus([[0.9486833im 0; 0 0.9486833im], [0 0.31622777; 0.31622777 0]]), [0]),
-                     Instruction(Kraus([diagm(fill(√0.9, 4)), √0.1*kron([1.0 0.0; 0.0 1.0], [0.0 1.0; 1.0 0.0])]), [1, 0]),
-                    ] 
-        @testset "Operator $(typeof(ix.operator)), target $(ix.target)" for (cix, ix) in zip(circuit.instructions, inst_list)
-            @test cix.operator == ix.operator
-            @test cix.target == ix.target
+        circuit   = BraketSimulator.Circuit(qasm) 
+        @test only(circuit.instructions) == ix
+    end
+    @testset "StandardObservable/target mismatch" begin
+        @testset "Observable $obs, result type $rt, qubits $qubits" for obs in ("h", "x", "y", "z"),
+                                                                        rt in ("expectation", "variance", "sample"),
+                                                                        qubits in ("q[1:2]", "q[0:1]", "q[{0, 2}]")
+            qasm = """
+            qubit[3] q;
+            i q;
+            
+            #pragma braket result $rt $obs($qubits)
+            """
+            parsed  = parse_qasm(qasm)
+            visitor = Quasar.QasmProgramVisitor()
+            @test_throws Quasar.QasmVisitorError("Standard observable target must be exactly 1 qubit.", "ValueError") visitor(parsed)
         end
     end
     @testset "Basis rotations" begin
@@ -1013,10 +1114,10 @@ get_tol(shots::Int) = return (
             #pragma braket result variance x(q[0]) @ y(q[1])
             #pragma braket result sample x(q[0])
             """
-            circuit = Circuit(qasm)
-            Braket.basis_rotation_instructions!(circuit)
-            c_bris  = [circuit.basis_rotation_instructions[1], Instruction(Unitary(Matrix(mapreduce(ix->BraketSimulator.matrix_rep(ix.operator), *, circuit.basis_rotation_instructions[2:end]))), [1])]
-            bris   = vcat(Instruction(H(), [0]), BraketSimulator.diagonalizing_gates(Braket.Observables.Y(), [1]))
+            circuit = BraketSimulator.Circuit(qasm)
+            BraketSimulator.basis_rotation_instructions!(circuit)
+            c_bris  = [circuit.basis_rotation_instructions[1], BraketSimulator.Instruction(BraketSimulator.Unitary(Matrix(mapreduce(ix->BraketSimulator.matrix_rep(ix.operator), *, circuit.basis_rotation_instructions[2:end]))), [1])]
+            bris   = vcat(BraketSimulator.Instruction(BraketSimulator.H(), [0]), BraketSimulator.diagonalizing_gates(BraketSimulator.Observables.Y(), [1]))
             for (ix, bix) in zip(c_bris, bris)
                 @test BraketSimulator.matrix_rep(ix.operator) ≈ transpose(BraketSimulator.matrix_rep(bix.operator))
                 @test ix.target == bix.target
@@ -1031,10 +1132,10 @@ get_tol(shots::Int) = return (
             #pragma braket result variance x(q[0]) @ y(q[1])
             #pragma braket result sample i(q[0])
             """
-            circuit = Circuit(qasm) 
-            Braket.basis_rotation_instructions!(circuit)
-            c_bris  = [circuit.basis_rotation_instructions[1], Instruction(Unitary(Matrix(mapreduce(ix->BraketSimulator.matrix_rep(ix.operator), *, circuit.basis_rotation_instructions[2:end]))), [1])]
-            bris   = vcat(Instruction(H(), [0]), BraketSimulator.diagonalizing_gates(Braket.Observables.Y(), [1]))
+            circuit = BraketSimulator.Circuit(qasm) 
+            BraketSimulator.basis_rotation_instructions!(circuit)
+            c_bris  = [circuit.basis_rotation_instructions[1], BraketSimulator.Instruction(BraketSimulator.Unitary(Matrix(mapreduce(ix->BraketSimulator.matrix_rep(ix.operator), *, circuit.basis_rotation_instructions[2:end]))), [1])]
+            bris   = vcat(BraketSimulator.Instruction(BraketSimulator.H(), [0]), BraketSimulator.diagonalizing_gates(BraketSimulator.Observables.Y(), [1]))
             for (ix, bix) in zip(c_bris, bris)
                 @test BraketSimulator.matrix_rep(ix.operator) ≈ transpose(BraketSimulator.matrix_rep(bix.operator))
                 @test ix.target == bix.target
@@ -1050,22 +1151,36 @@ get_tol(shots::Int) = return (
             // # noqa: E501
             #pragma braket result expectation x(q[2]) @ hermitian([[-6+0im, 2+1im, -3+0im, -5+2im], [2-1im, 0im, 2-1im, -5+4im], [-3+0im, 2+1im, 0im, -4+3im], [-5-2im, -5-4im, -4-3im, -6+0im]]) q[0:1]
             """
-            circuit = Circuit(qasm) 
-            Braket.basis_rotation_instructions!(circuit)
+            circuit = BraketSimulator.Circuit(qasm) 
+            BraketSimulator.basis_rotation_instructions!(circuit)
             arr = [-6 2+1im -3 -5+2im;
                     2-1im 0 2-1im -5+4im;
                    -3 2+1im 0 -4+3im;
                    -5-2im -5-4im -4-3im -6]
-            h = Braket.Observables.HermitianObservable(arr)
-            bris = vcat(BraketSimulator.diagonalizing_gates(h, [0, 1]), Instruction(H(), [2]))
+            h = BraketSimulator.Observables.HermitianObservable(arr)
+            bris = vcat(BraketSimulator.diagonalizing_gates(h, [0, 1]), BraketSimulator.Instruction(BraketSimulator.H(), [2]))
             for (ix, bix) in zip(circuit.basis_rotation_instructions, bris)
-                @test BraketSimulator.matrix_rep(ix.operator) ≈ adjoint(BraketSimulator.matrix_rep(bix.operator))
+                @test Matrix(BraketSimulator.matrix_rep(ix.operator)) ≈ adjoint(BraketSimulator.fix_endianness(Matrix(BraketSimulator.matrix_rep(bix.operator))))
                 @test ix.target == bix.target
             end
         end
     end
     @testset "Unitary pragma" begin
-        qasm = """
+        standard_qasm = """
+        qubit[3] q;
+
+        x q[0];
+        h q[1];
+
+        t q[0];
+        ti q[0];
+
+        h q[1];
+        h q[1];
+
+        ccnot q;
+        """
+        unitary_qasm = """
         qubit[3] q;
 
         x q[0];
@@ -1083,10 +1198,13 @@ get_tol(shots::Int) = return (
         // unitary pragma for ccnot gate
         #pragma braket unitary([[1.0, 0, 0, 0, 0, 0, 0, 0], [0, 1.0, 0, 0, 0, 0, 0, 0], [0, 0, 1.0, 0, 0, 0, 0, 0], [0, 0, 0, 1.0, 0, 0, 0, 0], [0, 0, 0, 0, 1.0, 0, 0, 0], [0, 0, 0, 0, 0, 1.0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 1.0], [0, 0, 0, 0, 0, 0, 1.0, 0]]) q
         """
-        circuit    = Circuit(qasm)
-        simulation = BraketSimulator.StateVectorSimulator(3, 0)
+        circuit     = BraketSimulator.Circuit(unitary_qasm)
+        ref_circuit = BraketSimulator.Circuit(standard_qasm)
+        simulation  = BraketSimulator.StateVectorSimulator(3, 0)
+        ref_sim     = BraketSimulator.StateVectorSimulator(3, 0)
         BraketSimulator.evolve!(simulation, circuit.instructions)
-        @test simulation.state_vector ≈ [0, 0, 0, 0, 0.70710678, 0, 0, 0.70710678]
+        BraketSimulator.evolve!(ref_sim, ref_circuit.instructions)
+        @test simulation.state_vector ≈ ref_sim.state_vector
     end
     @testset "Output" begin
         qasm = """
@@ -1123,8 +1241,29 @@ get_tol(shots::Int) = return (
         h q;
         cphaseshift(1) qs, q;
         phaseshift(-2) q;
+        ccnot qs;
         """
-        circuit    = Circuit(qasm)
+        circuit    = BraketSimulator.Circuit(qasm)
+        @test circuit.instructions[1] == BraketSimulator.Instruction(BraketSimulator.X(), 0)
+        @test circuit.instructions[2] == BraketSimulator.Instruction(BraketSimulator.X(), 2)
+        @test circuit.instructions[3] == BraketSimulator.Instruction(BraketSimulator.H(), 3)
+        @test circuit.instructions[4] == BraketSimulator.Instruction(BraketSimulator.CPhaseShift(1), [0, 3])
+        @test circuit.instructions[5] == BraketSimulator.Instruction(BraketSimulator.CPhaseShift(1), [1, 3])
+        @test circuit.instructions[6] == BraketSimulator.Instruction(BraketSimulator.CPhaseShift(1), [2, 3])
+        @test circuit.instructions[7] == BraketSimulator.Instruction(BraketSimulator.PhaseShift(-2), 3)
+        @test circuit.instructions[8] == BraketSimulator.Instruction(BraketSimulator.CCNot(), [0, 1, 2])
+    end
+    @testset "Gate on qubit registers" begin 
+        qasm = """
+        qubit[3] qs;
+        qubit q;
+
+        x qs[{0, 2}];
+        h q;
+        cphaseshift(1) qs, q;
+        phaseshift(-2) q;
+        """
+        circuit    = BraketSimulator.Circuit(qasm)
         simulation = BraketSimulator.StateVectorSimulator(4, 0)
         BraketSimulator.evolve!(simulation, circuit.instructions)
         @test simulation.state_vector ≈ (1/√2)*[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0]
@@ -1143,7 +1282,7 @@ get_tol(shots::Int) = return (
         b[0] = measure q[0];
         b[1] = measure q[1];
         """
-        circuit        = Circuit(with_verbatim)
+        circuit        = BraketSimulator.Circuit(with_verbatim)
         sim_w_verbatim = BraketSimulator.StateVectorSimulator(2, 0)
         pop!(circuit.instructions) 
         pop!(circuit.instructions) 
@@ -1161,7 +1300,7 @@ get_tol(shots::Int) = return (
         b[0] = measure q[0];
         b[1] = measure q[1];
         """
-        circuit         = Circuit(without_verbatim)
+        circuit         = BraketSimulator.Circuit(without_verbatim)
         sim_wo_verbatim = BraketSimulator.StateVectorSimulator(2, 0)
         pop!(circuit.instructions) 
         pop!(circuit.instructions) 
@@ -1196,7 +1335,7 @@ get_tol(shots::Int) = return (
                qubit[2] qs;
                flip(qs[0]);
                """
-        circuit    = Circuit(qasm)
+        circuit    = BraketSimulator.Circuit(qasm)
         simulation = BraketSimulator.StateVectorSimulator(2, 0)
         BraketSimulator.evolve!(simulation, circuit.instructions)
         @test simulation.state_vector ≈ [0, 0, 1, 0]
@@ -1307,7 +1446,7 @@ get_tol(shots::Int) = return (
             $operation
             #pragma braket result state_vector
             """
-            circuit    = Circuit(qasm) 
+            circuit    = BraketSimulator.Circuit(qasm) 
             simulation = BraketSimulator.StateVectorSimulator(1, 0)
             BraketSimulator.evolve!(simulation, circuit.instructions)
             @test simulation.state_vector ≈ state_vector
@@ -1320,149 +1459,10 @@ get_tol(shots::Int) = return (
         h q[0];
         ctrl @ x q[0], q[1];
         """
-        circuit    = Circuit(qasm)
-        program    = Braket.Program(circuit)
+        circuit    = BraketSimulator.Circuit(qasm)
+        program    = BraketSimulator.Program(circuit)
         simulation = BraketSimulator.StateVectorSimulator(2, 0)
-        @test_throws BraketSimulator.ValidationError simulate(simulation, program, 2, 0)
-    end
-    @testset "Parsing Hermitian observables" begin
-        three_qubit_circuit(
-            θ::Float64,
-            ϕ::Float64,
-            φ::Float64,
-            obs::Braket.Observables.Observable,
-            obs_targets::Vector{Int},
-        ) = Circuit([
-            (Rx, 0, θ),
-            (Rx, 1, ϕ),
-            (Rx, 2, φ),
-            (CNot, 0, 1),
-            (CNot, 1, 2),
-            (Variance, obs, obs_targets),
-            (Expectation, obs, obs_targets),
-            (Sample, obs, obs_targets),
-        ])
-        θ = 0.432
-        ϕ = 0.123
-        φ = -0.543
-        obs_targets = [0, 1, 2]
-        ho_mat = [
-            -6 2+im -3 -5+2im
-            2-im 0 2-im -5+4im
-            -3 2+im 0 -4+3im
-            -5-2im -5-4im -4-3im -6
-        ]
-        ho_mat2 = [1 2; 2 4]
-        ho_mat3 = [-6 2+im; 2-im 0]
-        ho_mat4 = kron([1 0; 0 1], [-6 2+im; 2-im 0])
-        ho  = Braket.Observables.HermitianObservable(ComplexF64.(ho_mat))
-        ho2 = Braket.Observables.HermitianObservable(ComplexF64.(ho_mat2))
-        ho3 = Braket.Observables.HermitianObservable(ComplexF64.(ho_mat3))
-        ho4 = Braket.Observables.HermitianObservable(ComplexF64.(ho_mat4))
-        meani = -5.7267957792059345
-        meany = 1.4499810303182408
-        meanz =
-            0.5 * (
-                -6 * cos(θ) * (cos(φ) + 1) -
-                2 * sin(φ) * (cos(θ) + sin(ϕ) - 2 * cos(ϕ)) +
-                3 * cos(φ) * sin(ϕ) +
-                sin(ϕ)
-            )
-        meanh = -4.30215023196904
-        meanii = -5.78059066879935
-
-        vari = 43.33800156673375
-        vary = 74.03174647518193
-        varz =
-            (
-                1057 - cos(2ϕ) + 12 * (27 + cos(2ϕ)) * cos(φ) -
-                2 * cos(2φ) * sin(ϕ) * (16 * cos(ϕ) + 21 * sin(ϕ)) + 16 * sin(2ϕ) -
-                8 * (-17 + cos(2ϕ) + 2 * sin(2ϕ)) * sin(φ) -
-                8 * cos(2θ) * (3 + 3 * cos(φ) + sin(φ))^2 -
-                24 * cos(ϕ) * (cos(ϕ) + 2 * sin(ϕ)) * sin(2φ) -
-                8 *
-                cos(θ) *
-                (
-                    4 *
-                    cos(ϕ) *
-                    (4 + 8 * cos(φ) + cos(2φ) - (1 + 6 * cos(φ)) * sin(φ)) +
-                    sin(ϕ) *
-                    (15 + 8 * cos(φ) - 11 * cos(2φ) + 42 * sin(φ) + 3 * sin(2φ))
-                )
-            ) / 16
-        varh = 370.71292282796804
-        varii = 6.268315532585994
-
-        i_array = [1 0; 0 1]
-        y_array = [0 -im; im 0]
-        z_array = diagm([1, -1])
-        eigsi   = eigvals(kron(i_array, ho_mat))
-        eigsy   = eigvals(kron(y_array, ho_mat))
-        eigsz   = eigvals(kron(z_array, ho_mat))
-        eigsh   = [-70.90875406, -31.04969387, 0, 3.26468993, 38.693758]
-        eigsii  = eigvals(kron(i_array, kron(i_array, ho_mat3)))
-        d       = LocalSimulator("braket_sv_v2")
-        @testset "Obs $obs" for (obs, expected_mean, expected_var, expected_eigs) in
-                                [
-            (Observables.I() * ho, meani, vari, eigsi),
-            (Observables.Y() * ho, meany, vary, eigsy),
-            (Observables.Z() * ho, meanz, varz, eigsz),
-            (ho2 * ho, meanh, varh, eigsh),
-            (
-                Observables.HermitianObservable(kron(ho_mat2, ho_mat)),
-                meanh,
-                varh,
-                eigsh,
-            ),
-            (Observables.I() * Observables.I() * ho3, meanii, varii, eigsii),
-            (Observables.I() * ho4, meanii, varii, eigsii),
-        ]
-            circuit    = three_qubit_circuit(θ, ϕ, φ, obs, obs_targets)
-            Braket.basis_rotation_instructions!(circuit)
-            raw_oq3_circ = ir(circuit, Val(:OpenQASM))
-            oq3_circ   = Braket.OpenQasmProgram(raw_oq3_circ.braketSchemaHeader, raw_oq3_circ.source * "\n", raw_oq3_circ.inputs) 
-            jaqcd_circ = ir(circuit, Val(:JAQCD))
-            @testset "Simulator $sim" for sim in (StateVectorSimulator,) 
-                shots = 8000
-                tol   = get_tol(shots)
-                j_simulation = sim(qubit_count(circuit), shots)
-                p_simulation = sim(qubit_count(circuit), shots)
-                parsed_circ  = Braket.Program(Circuit(oq3_circ.source))
-                @test length(parsed_circ.instructions) == length(jaqcd_circ.instructions) 
-                for (p_ix, j_ix) in zip(parsed_circ.instructions, jaqcd_circ.instructions)
-                    @test p_ix == j_ix
-                end
-                @test length(parsed_circ.basis_rotation_instructions) == length(jaqcd_circ.basis_rotation_instructions) 
-                for (p_ix, j_ix) in zip(parsed_circ.basis_rotation_instructions, jaqcd_circ.basis_rotation_instructions)
-                    @test p_ix == j_ix
-                end
-                @test length(parsed_circ.results) == length(jaqcd_circ.results) 
-                for (p_rt, j_rt) in zip(parsed_circ.results, jaqcd_circ.results)
-                    @test p_rt == j_rt
-                end
-                for (p_ix, j_ix) in zip(parsed_circ.instructions, jaqcd_circ.instructions)
-                    j_simulation = evolve!(j_simulation, [j_ix])
-                    p_simulation = evolve!(p_simulation, [p_ix])
-                    @test j_simulation.state_vector ≈ p_simulation.state_vector
-                end
-                formatted_measurements = [rand(0:1, 3) for s in 1:shots]
-                measured_qubits        = [0, 1, 2]
-                j_bundled       = BraketSimulator._bundle_results(Braket.ResultTypeValue[], jaqcd_circ, j_simulation)
-                p_rtv           = [Braket.ResultTypeValue(rt, 0.0) for rt in jaqcd_circ.results]
-                p_bundled       = BraketSimulator._bundle_results(p_rtv, oq3_circ, p_simulation)
-                @test j_bundled.measuredQubits == measured_qubits
-                @test p_bundled.measuredQubits == measured_qubits
-                # test with pre-computed measurements
-                new_j_bundled = Braket.GateModelTaskResult(j_bundled.braketSchemaHeader, formatted_measurements, nothing, j_bundled.resultTypes, j_bundled.measuredQubits, j_bundled.taskMetadata, j_bundled.additionalMetadata)
-                new_p_bundled = Braket.GateModelTaskResult(p_bundled.braketSchemaHeader, formatted_measurements, nothing, p_bundled.resultTypes, p_bundled.measuredQubits, p_bundled.taskMetadata, p_bundled.additionalMetadata)
-
-                j_formatted = Braket.computational_basis_sampling(Braket.GateModelQuantumTaskResult, new_j_bundled)
-                p_formatted = Braket.computational_basis_sampling(Braket.GateModelQuantumTaskResult, new_p_bundled)
-                for (j_v, p_v) in zip(j_formatted.values, p_formatted.values)
-                    @test j_v == p_v
-                end
-            end
-        end
+        @test_throws BraketSimulator.ValidationError BraketSimulator.simulate(simulation, program, 0)
     end
     @testset "Referencing invalid qubit(s)" begin
         source = """
@@ -1539,11 +1539,11 @@ get_tol(shots::Int) = return (
             i q;
         }
         """
-        circ = Circuit(qasm_string, Dict("x"=>"1011"))
+        circ = BraketSimulator.Circuit(qasm_string, Dict("x"=>"1011"))
     end
     @testset "GRCS 16" begin
         simulator = BraketSimulator.StateVectorSimulator(16, 0)
-        circuit   = Circuit(joinpath(@__DIR__, "grcs_16.qasm")) 
+        circuit   = BraketSimulator.Circuit(joinpath(@__DIR__, "grcs_16.qasm")) 
         BraketSimulator.evolve!(simulator, circuit.instructions)
         probs     = BraketSimulator.probabilities(simulator)        
         @test first(probs) ≈ 0.0000062 atol=1e-7

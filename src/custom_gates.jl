@@ -31,16 +31,14 @@ julia> eq2 ==  [0, 0, 0, -sin(ϕ/2), 0, 0, 0, 0, 0, 0, 0, 0, cos(ϕ/2), 0, 0, 0]
 ```
 
 """
-struct DoubleExcitation <: AngledGate{1}
-    angle::NTuple{1,Union{Float64,FreeParameter}}
-    DoubleExcitation(angle::T) where {T<:NTuple{1,Union{Float64,FreeParameter}}} =
-        new(angle)
+mutable struct DoubleExcitation <: AngledGate{1}
+    angle::NTuple{1,Union{Real,FreeParameter}}
+    pow_exponent::Float64
+    DoubleExcitation(angle::T, pow_exponent=1.0) where {T<:NTuple{1,Union{Real,FreeParameter}}} =
+        new(angle, Float64(pow_exponent))
 end
-Braket.chars(::Type{DoubleExcitation}) = "G2(ang)"
-Braket.qubit_count(::Type{DoubleExcitation}) = 4
-Base.inv(g::DoubleExcitation) = DoubleExcitation(-g.angle[1])
-Base.:^(g::DoubleExcitation, power::Integer) = power == -1 ? inv(g) : (iszero(power) ? Braket.I() : (power < 0 ? inv(g^(-power)) : DoubleExcitation((g.angle[1] * power,))))
-function matrix_rep(g::DoubleExcitation)
+qubit_count(::Type{DoubleExcitation}) = 4
+function matrix_rep_raw(g::DoubleExcitation)
     cosϕ = cos(g.angle[1] / 2.0)
     sinϕ = sin(g.angle[1] / 2.0)
 
@@ -201,16 +199,14 @@ julia> eq2 == [0, sin(ϕ/2), cos(ϕ/2), 0] == true;
 ```
 
 """
-struct SingleExcitation <: AngledGate{1}
-    angle::NTuple{1,Union{Float64,FreeParameter}}
-    SingleExcitation(angle::T) where {T<:NTuple{1,Union{Float64,FreeParameter}}} =
-        new(angle)
+mutable struct SingleExcitation <: AngledGate{1}
+    angle::NTuple{1,Union{Real,FreeParameter}}
+    pow_exponent::Float64
+    SingleExcitation(angle::T, pow_exponent=1.0) where {T<:NTuple{1,Union{Real,FreeParameter}}} =
+        new(angle, Float64(pow_exponent))
 end
-Braket.chars(::Type{SingleExcitation}) = "G(ang)"
-Braket.qubit_count(::Type{SingleExcitation}) = 2
-Base.inv(g::SingleExcitation) = SingleExcitation(-g.angle[1])
-Base.:^(g::SingleExcitation, power::Integer) = power == -1 ? inv(g) : (iszero(power) ? Braket.I() : (power < 0 ? inv(g^(-power)) : SingleExcitation((g.angle[1] * power,))))
-function matrix_rep(g::SingleExcitation)
+qubit_count(::Type{SingleExcitation}) = 2
+function matrix_rep_raw(g::SingleExcitation)
     cosϕ = cos(g.angle[1] / 2.0)
     sinϕ = sin(g.angle[1] / 2.0)
     return SMatrix{4,4,ComplexF64}([1.0 0 0 0; 0 cosϕ sinϕ 0; 0 -sinϕ cosϕ 0; 0 0 0 1.0])
@@ -373,32 +369,11 @@ Multi-qubit Z-rotation gate. The 2-qubit version is equivalent to the `ZZ` gate,
 and the single-qubit version is equivalent to the `Rz` gate.
 """
 struct MultiRZ <: AngledGate{1}
-    angle::NTuple{1,Union{Float64,FreeParameter}}
-    MultiRZ(angle::T) where {T<:NTuple{1,Union{Float64,FreeParameter}}} = new(angle)
+    angle::NTuple{1,Union{Real,FreeParameter}}
+    pow_exponent::Float64
+    MultiRZ(angle::T, pow_exponent::Float64=1.0) where {T<:NTuple{1,Union{Real,FreeParameter}}} = new(angle, pow_exponent)
 end
-Braket.chars(::Type{MultiRZ}) = "MultiRZ(ang)"
-Braket.qubit_count(g::MultiRZ) = 1
-Base.inv(g::MultiRZ) = MultiRZ(-g.angle[1])
-
-"""
-    U(θ, ϕ, λ)
-
-3-angle single qubit unitary gate. Equivalent to
-the OpenQASM3 built-in [`U` gate](https://openqasm.com/language/gates.html#U).
-"""
-struct U <: AngledGate{3}
-    angle::NTuple{3,Union{Float64,FreeParameter}}
-    U(angle::T) where {T<:NTuple{3,Union{Float64,FreeParameter}}} =
-        new(angle)
-end
-U(θ::T, ϕ::T, λ::T) where {T<:Union{Float64,FreeParameter}} = U((θ, ϕ, λ))
-function matrix_rep(g::U)
-    θ, ϕ, λ = g.angle
-    return SMatrix{2, 2, ComplexF64}([cos(θ/2) -exp(im*λ)*sin(θ/2); exp(im*ϕ)*sin(θ/2) exp(im*(λ+ϕ))*cos(θ/2)])
-end
-Braket.chars(::Type{U}) = "U(ang)"
-Braket.qubit_count(g::U) = 1
-Base.inv(g::U) = U(-g.angle[1], -g.angle[3], -g.angle[2])
+qubit_count(g::MultiRZ) = 1
 
 """
     MultiQubitPhaseShift{N}(angle)
@@ -409,19 +384,18 @@ Controls/negative controls applied to this gate control
 which states are rotated, so that `Control(g::MultiQubitPhaseShift{2})` will apply the rotation
 to the `|11>` state.
 """
-struct MultiQubitPhaseShift{N} <: AngledGate{1}
+mutable struct MultiQubitPhaseShift{N} <: AngledGate{1}
     angle::NTuple{1,Union{Float64,FreeParameter}}
-    MultiQubitPhaseShift{N}(angle::NTuple{1,<:Union{Float64,FreeParameter}}) where {N} = new(angle)
+    pow_exponent::Float64
+    MultiQubitPhaseShift{N}(angle::T, pow_exponent::Float64=1.0) where {N, T<:NTuple{1,Union{Real,FreeParameter}}} = new(angle, pow_exponent)
 end
-matrix_rep(g::MultiQubitPhaseShift{N}) where {N} = Diagonal(SVector{2^N, ComplexF64}(exp(im*g.angle[1]) for _ in 1:2^N))
-Braket.chars(::Type{MultiQubitPhaseShift}) = "GPhase(ang)"
-Braket.qubit_count(g::MultiQubitPhaseShift{N}) where {N} = N
-Base.inv(g::MultiQubitPhaseShift{N}) where {N} = MultiQubitPhaseShift{N}((-g.angle[1],))
+matrix_rep_raw(g::MultiQubitPhaseShift{N}) where {N} = Diagonal(SVector{2^N, ComplexF64}(exp(im*g.angle[1]) for _ in 1:2^N))
+qubit_count(g::MultiQubitPhaseShift{N}) where {N} = N
 
 function apply_gate!(
     factor::ComplexF64,
-    diagonal::Braket.PauliEigenvalues{N},
-    state_vec::StateVector{T},
+    diagonal::PauliEigenvalues{N},
+    state_vec::AbstractStateVector{T},
     ts::Vararg{Int,N},
 ) where {T<:Complex,N}
     g_mat  = Diagonal(SVector{2^N,ComplexF64}(exp(factor * diagonal[i]) for i = 1:2^N))
@@ -429,7 +403,7 @@ function apply_gate!(
 end
 function apply_gate!(
     factor::ComplexF64,
-    state_vec::StateVector{T},
+    state_vec::AbstractStateVector{T},
     ts::Vararg{Int,N},
 ) where {T<:Complex,N}
     g_mat = Diagonal(SVector{2^N,ComplexF64}(factor for i = 1:2^N))
@@ -437,32 +411,16 @@ function apply_gate!(
 end
 for (V, f) in ((true, :conj), (false, :identity))
     @eval begin
-        apply_gate!(
-            ::Val{$V},
-            g::MultiRZ,
-            state_vec::StateVector{T},
-            t::Int,
-        ) where {T<:Complex} = apply_gate!(Val($V), Rz(g.angle), state_vec, t)
-        apply_gate!(
-            ::Val{$V},
-            g::MultiRZ,
-            state_vec::StateVector{T},
-            t1::Int,
-            t2::Int,
-        ) where {T<:Complex} = apply_gate!(Val($V), ZZ(g.angle), state_vec, t1, t2)
-        apply_gate!(
-            ::Val{$V},
-            g::MultiRZ,
-            state_vec::StateVector{T},
-            ts::Vararg{Int,N},
-        ) where {T<:Complex,N} = apply_gate!($f(-im * g.angle[1] / 2.0), Braket.PauliEigenvalues(Val(N)), state_vec, ts...)
-        apply_gate!(::Val{$V}, g::MultiQubitPhaseShift{N}, state_vec::StateVector{T}, ts::Vararg{Int,N}) where {T<:Complex, N} = apply_gate!($f(exp(im*g.angle[1])), state_vec, ts...)
+        apply_gate!(::Val{$V}, g::MultiRZ, state_vec::AbstractStateVector{T}, t::Int) where {T<:Complex} = apply_gate!(Val($V), Rz(g.angle, g.pow_exponent), state_vec, t)
+        apply_gate!(::Val{$V}, g::MultiRZ, state_vec::AbstractStateVector{T}, t1::Int,t2::Int,) where {T<:Complex} = apply_gate!(Val($V), ZZ(g.angle, g.pow_exponent), state_vec, t1, t2)
+        apply_gate!(::Val{$V}, g::MultiRZ, state_vec::AbstractStateVector{T}, ts::Vararg{Int,N}) where {T<:Complex,N} = apply_gate!($f(-im * g.angle[1] / 2.0), PauliEigenvalues(Val(N)), state_vec, ts...)
+        apply_gate!(::Val{$V}, g::MultiQubitPhaseShift{N}, state_vec::AbstractStateVector{T}, ts::Vararg{Int,N}) where {T<:Complex, N} = apply_gate!($f(exp(im*g.angle[1]*g.pow_exponent)), state_vec, ts...)
     end
 end
 
 function apply_gate!(
     g::DoubleExcitation,
-    state_vec::StateVector{T},
+    state_vec::AbstractStateVector{T},
     t1::Int,
     t2::Int,
     t3::Int,
@@ -486,21 +444,23 @@ function apply_gate!(
     end
     return
 end
-apply_gate!(::Val{true}, g::DoubleExcitation, state_vec::StateVector{T}, t1::Int, t2::Int, t3::Int, t4::Int) where {T<:Complex} = apply_gate!(g, state_vec, t1, t2, t3, t4)
-apply_gate!(::Val{false}, g::DoubleExcitation, state_vec::StateVector{T}, t1::Int, t2::Int, t3::Int, t4::Int) where {T<:Complex} = apply_gate!(g, state_vec, t1, t2, t3, t4)
+apply_gate!(::Val{true}, g::DoubleExcitation, state_vec::AbstractStateVector{T}, t1::Int, t2::Int, t3::Int, t4::Int) where {T<:Complex} = apply_gate!(g, state_vec, t1, t2, t3, t4)
+apply_gate!(::Val{false}, g::DoubleExcitation, state_vec::AbstractStateVector{T}, t1::Int, t2::Int, t3::Int, t4::Int) where {T<:Complex} = apply_gate!(g, state_vec, t1, t2, t3, t4)
 
-struct Control{G<:Gate, B} <: Gate
+mutable struct Control{G<:Gate, B} <: Gate
     g::G
     bitvals::NTuple{B, Int}
-    Control{G, B}(g::G, bitvals::NTuple{B, Int}) where {B, G} = new(g, bitvals)
+    pow_exponent::Float64
+    Control{G, B}(g::G, bitvals::NTuple{B, Int}, pow_exponent::Float64=1.0) where {B, G} = new(g, bitvals, pow_exponent)
 end
-Control(g::G, bitvals::NTuple{B, Int}) where {G<:Gate, B} = Control{G, B}(g, bitvals)
-Control(g::Control{G, BC}, bitvals::NTuple{B, Int}) where {G<:Gate, BC, B} = Control(g.g, (g.bitvals..., bitvals...))
-Control(g::G, bitvals::NTuple{0, Int}) where {G<:Gate} = g
-Base.copy(c::Control{G, B}) where {G<:Gate, B} = Control(copy(c.g), c.bitvals)
-Braket.qubit_count(c::Control{G, B}) where {G<:Gate, B} = qubit_count(c.g) + B
-Braket.qubit_count(c::Control{MultiQubitPhaseShift{N}, B}) where {N, B} = N
-function matrix_rep(c::Control{G, B}) where {G<:Gate, B}
+Control(g::G, bitvals::NTuple{B, Int}, pow_exponent::Float64=1.0) where {G<:Gate, B} = Control{G, B}(g, bitvals, pow_exponent)
+Control(g::Control{G, BC}, bitvals::NTuple{B, Int}, pow_exponent::Float64=1.0) where {G<:Gate, BC, B} = Control(g.g, (g.bitvals..., bitvals...), g.pow_exponent * pow_exponent)
+Control(g::Control{G, BC}, bitvals::NTuple{0, Int}, pow_exponent::Float64=1.0) where {G<:Gate, BC} = g
+Control(g::G, bitvals::NTuple{0, Int}, pow_exponent::Float64=1.0) where {G<:Gate} = g
+Base.copy(c::Control{G, B}) where {G<:Gate, B} = Control(copy(c.g), c.bitvals, c.pow_exponent)
+qubit_count(c::Control{G, B}) where {G<:Gate, B} = qubit_count(c.g) + B
+qubit_count(c::Control{MultiQubitPhaseShift{N}, B}) where {N, B} = N
+function matrix_rep_raw(c::Control{G, B}) where {G<:Gate, B}
     inner_mat = matrix_rep(c.g)
     inner_qc  = qubit_count(c.g)
     total_qc  = qubit_count(c.g) + B
@@ -514,7 +474,7 @@ function matrix_rep(c::Control{G, B}) where {G<:Gate, B}
     end
     return full_mat
 end
-function matrix_rep(c::Control{MultiQubitPhaseShift{N}, B}) where {N, B}
+function matrix_rep_raw(c::Control{MultiQubitPhaseShift{N}, B}) where {N, B}
     g_mat    = matrix_rep(c.g)
     qc       = N 
     ctrl_ix  = 0
@@ -527,6 +487,3 @@ function matrix_rep(c::Control{MultiQubitPhaseShift{N}, B}) where {N, B}
     end
     return Diagonal(SVector{2^N, ComplexF64}(full_mat))
 end
-
-const custom_gates = (doubleexcitation=DoubleExcitation, singleexcitation=SingleExcitation, multirz=MultiRZ, u=U,) 
-

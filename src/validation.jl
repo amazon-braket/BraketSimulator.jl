@@ -54,6 +54,7 @@ function _validate_shots_and_ir_results(shots::Int, results, qubit_count::Int)
             ))
         end
     end
+    return
 end
 function _validate_input_provided(circuit)
     for instruction in circuit.instructions
@@ -77,16 +78,12 @@ function _validate_ir_instructions_compatibility(
     circuit::Union{Program,Circuit},
     supported_operations,
 )
-    circuit_instruction_names = map(ix->replace(lowercase(string(typeof(ix.operator))), "_"=>"", "braket."=>""), circuit.instructions)
+    circuit_instruction_names = map(ix->replace(lowercase(string(typeof(ix.operator))), "_"=>"", "braketsimulator."=>""), circuit.instructions)
     supported_instructions    = Set(map(op->replace(lowercase(op), "_"=>""), supported_operations))
     no_noise = true
-    for name in circuit_instruction_names
-        if name in _NOISE_INSTRUCTIONS
-            no_noise = false
-            if name ∉ supported_instructions
-                throw(ValidationError("Noise instructions are not supported by the state vector simulator (by default). You need to use the density matrix simulator: LocalSimulator(\"braket_dm_v2\").", "TypeError"))
-            end
-        end
+    for name in filter(ix_name->ix_name ∈ _NOISE_INSTRUCTIONS, circuit_instruction_names)
+        no_noise = false
+        name ∉ supported_instructions && throw(ValidationError("Noise instructions are not supported by the state vector simulator (by default). You need to use the density matrix simulator: LocalSimulator(\"braket_dm_v2\").", "TypeError"))
     end
     if no_noise && !isempty(intersect(_NOISE_INSTRUCTIONS, supported_instructions))
         @warn "You are running a noise-free circuit on the density matrix simulator. Consider running this circuit on the state vector simulator: LocalSimulator(\"braket_sv_v2\") for a better user experience."
@@ -95,8 +92,11 @@ function _validate_ir_instructions_compatibility(
 end
 _validate_ir_instructions_compatibility(simulator::D, circuit::Union{Program,Circuit}, v::Val{V}) where {D<:AbstractSimulator, V} = _validate_ir_instructions_compatibility(circuit, supported_operations(simulator, v))
 
-_validate_result_type_qubits_exist(rt::Braket.StateVector, qubit_count::Int) = return
-_validate_result_type_qubits_exist(rt::Braket.Amplitude, qubit_count::Int) = return
+_validate_result_type_qubits_exist(rt::StateVector, qubit_count::Int) = return
+_validate_result_type_qubits_exist(rt::Amplitude, qubit_count::Int)   = return
+# exclude adjoint gradient validation from coverage for now
+# as we don't yet implement this, so don't have a test for it
+# COV_EXCL_START
 function _validate_result_type_qubits_exist(rt::AdjointGradient, qubit_count::Int)
     isempty(rt.targets) && return
     targets = reduce(vcat, targets)
@@ -106,7 +106,8 @@ function _validate_result_type_qubits_exist(rt::AdjointGradient, qubit_count::In
             )
     return
 end
-# don't need to check for `isnothing` here as the `Braket.QubitSet` being empty covers this
+# COV_EXCL_STOP
+# don't need to check for `isnothing` here as the `QubitSet` being empty covers this
 function _validate_result_type_qubits_exist(rt::RT, qubit_count::Int) where {RT<:Result}
     isempty(rt.targets) && return
     maximum(rt.targets) > qubit_count &&
@@ -119,7 +120,7 @@ _validate_result_types_qubits_exist(rts::Vector{RT}, qubit_count::Int) where {RT
 
 function _validate_operation_qubits(operations::Vector{<:Instruction})
     unique_qs = Set{Int}()
-    max_qc = 0
+    max_qc    = 0
     for operation in operations
         targets = operation.target
         max_qc = max(max_qc, targets...)
@@ -129,5 +130,40 @@ function _validate_operation_qubits(operations::Vector{<:Instruction})
         "Non-contiguous qubit indices supplied; qubit indices in a circuit must be contiguous. Qubits referenced: $unique_qs",
         "ValueError"
     ))
+    return
+end
+
+function _check_observable(observable_map, observable, qubits)
+    for qubit in qubits, (target, previously_measured) in observable_map
+        qubit ∉ target && continue
+        # must ensure that target is the same
+        issetequal(target, qubits) || throw(ValidationError("Qubit part of incompatible results targets", "ValueError"))
+        # must ensure observable is the same
+        typeof(previously_measured) != typeof(observable) && throw(ValidationError("Conflicting result types applied to a single qubit", "ValueError"))
+        # including matrix value for Hermitians
+        observable isa Observables.HermitianObservable && !isapprox(previously_measured.matrix, observable.matrix) && throw(ValidationError("Conflicting result types applied to a single qubit", "ValueError"))
+    end
+    observable_map[qubits] = observable
+    return observable_map
+end
+
+function _combine_obs_and_targets(observable::Observables.HermitianObservable, result_targets::Vector{Int})
+    obs_qc = qubit_count(observable)
+    length(result_targets) == obs_qc && return [(observable, result_targets)]
+    obs_qc == 1 && return [(copy(observable), rt) for rt in result_targets]
+    throw(ValidationError("only single-qubit Hermitian observables can be applied to all qubits.", "ValueError"))
+end
+_combine_obs_and_targets(observable::Observables.TensorProduct, result_targets::Vector{Int}) = zip(observable.factors, [splice!(result_targets, 1:qubit_count(f)) for f in observable.factors])
+_combine_obs_and_targets(observable, result_targets::Vector{Int}) = length(result_targets) == 1 ? [(observable, result_targets)] : [(copy(observable), t) for t in result_targets]
+
+function _verify_openqasm_shots_observables(circuit::Circuit, n_qubits::Int)
+    observable_map = Dict()
+    for result in filter(rt->rt isa ObservableResult, circuit.result_types)
+        result.observable isa Observables.I && continue
+        result_targets = isempty(result.targets) ? collect(0:n_qubits-1) : collect(result.targets)
+        for obs_and_target in _combine_obs_and_targets(result.observable, result_targets)
+            observable_map = _check_observable(observable_map, obs_and_target...)
+        end
+    end
     return
 end

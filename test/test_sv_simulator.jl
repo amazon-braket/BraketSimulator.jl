@@ -1,8 +1,6 @@
-using Test, Braket, BraketSimulator, DataStructures
+using Test, BraketSimulator, DataStructures
 
-import Braket: I, Instruction
-
-LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
+LARGE_TESTS = get(ENV, "BRAKET_SIM_LARGE_TESTS", "false") == "true"
 
 @testset "State vector simulator" begin
     @testset "Simple circuits nq: $qubit_count $instructions" for (
@@ -11,138 +9,138 @@ LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
         state_vector,
         probability_amplitudes,
     ) in [
-        ([Instruction(H(), [0])], 1, [0.70710678, 0.70710678], [0.5, 0.5]),
-        ([Instruction(X(), [0])], 1, [0, 1], [0, 1]),
-        ([Instruction(X(), [0])], 2, [0, 0, 1, 0], [0, 0, 1, 0]),
-        ([Instruction(Y(), [0])], 1, [0, im], [0, 1]),
-        ([Instruction(X(), [0]), Instruction(X(), [1])], 2, [0, 0, 0, 1], [0, 0, 0, 1]),
-        ([Instruction(X(), [0]), Instruction(Z(), [0])], 1, [0, -1], [0, 1]),
+        ([BraketSimulator.Instruction(BraketSimulator.H(), [0])], 1, [0.70710678, 0.70710678], [0.5, 0.5]),
+        ([BraketSimulator.Instruction(BraketSimulator.X(), [0])], 1, [0, 1], [0, 1]),
+        ([BraketSimulator.Instruction(BraketSimulator.X(), [0])], 2, [0, 0, 1, 0], [0, 0, 1, 0]),
+        ([BraketSimulator.Instruction(BraketSimulator.Y(), [0])], 1, [0, im], [0, 1]),
+        ([BraketSimulator.Instruction(BraketSimulator.X(), [0]), BraketSimulator.Instruction(BraketSimulator.X(), [1])], 2, [0, 0, 0, 1], [0, 0, 0, 1]),
+        ([BraketSimulator.Instruction(BraketSimulator.X(), [0]), BraketSimulator.Instruction(BraketSimulator.Z(), [0])], 1, [0, -1], [0, 1]),
         (
-            [Instruction(X(), [0]), Instruction(CNot(), [0, 1])],
+            [BraketSimulator.Instruction(BraketSimulator.X(), [0]), BraketSimulator.Instruction(BraketSimulator.CNot(), [0, 1])],
             2,
             [0, 0, 0, 1],
             [0, 0, 0, 1],
         ),
         (
-            [Instruction(X(), [0]), Instruction(CY(), [0, 1])],
+            [BraketSimulator.Instruction(BraketSimulator.X(), [0]), BraketSimulator.Instruction(BraketSimulator.CY(), [0, 1])],
             2,
             [0, 0, 0, im],
             [0, 0, 0, 1],
         ),
         (
-            [Instruction(X(), [0]), Instruction(CZ(), [0, 1])],
+            [BraketSimulator.Instruction(BraketSimulator.X(), [0]), BraketSimulator.Instruction(BraketSimulator.CZ(), [0, 1])],
             2,
             [0, 0, 1, 0],
             [0, 0, 1, 0],
         ),
         (
-            [Instruction(X(), [0]), Instruction(Swap(), [0, 1])],
+            [BraketSimulator.Instruction(BraketSimulator.X(), [0]), BraketSimulator.Instruction(BraketSimulator.Swap(), [0, 1])],
             2,
             [0, 1, 0, 0],
             [0, 1, 0, 0],
         ),
         (
-            [Instruction(X(), [0]), Instruction(ISwap(), [0, 1])],
+            [BraketSimulator.Instruction(BraketSimulator.X(), [0]), BraketSimulator.Instruction(BraketSimulator.ISwap(), [0, 1])],
             2,
             [0, im, 0, 0],
             [0, 1, 0, 0],
         ),
         (
-            [Instruction(X(), [0]), Instruction(Swap(), [0, 2])],
+            [BraketSimulator.Instruction(BraketSimulator.X(), [0]), BraketSimulator.Instruction(BraketSimulator.Swap(), [0, 2])],
             3,
             [0, 1, 0, 0, 0, 0, 0, 0],
             [0, 1, 0, 0, 0, 0, 0, 0],
         ),
-        ([Instruction(X(), [0]), Instruction(S(), [0])], 1, [0, im], [0, 1]),
-        ([Instruction(X(), [0]), Instruction(Si(), [0])], 1, [0, -im], [0, 1]),
+        ([BraketSimulator.Instruction(BraketSimulator.X(), [0]), BraketSimulator.Instruction(BraketSimulator.S(), [0])], 1, [0, im], [0, 1]),
+        ([BraketSimulator.Instruction(BraketSimulator.X(), [0]), BraketSimulator.Instruction(BraketSimulator.Si(), [0])], 1, [0, -im], [0, 1]),
         (
-            [Instruction(X(), [0]), Instruction(T(), [0])],
+            [BraketSimulator.Instruction(BraketSimulator.X(), [0]), BraketSimulator.Instruction(BraketSimulator.T(), [0])],
             1,
             [0, 0.70710678 + 0.70710678 * im],
             [0, 1],
         ),
         (
-            [Instruction(X(), [0]), Instruction(Ti(), [0])],
+            [BraketSimulator.Instruction(BraketSimulator.X(), [0]), BraketSimulator.Instruction(BraketSimulator.Ti(), [0])],
             1,
             [0, 0.70710678 - 0.70710678 * im],
             [0, 1],
         ),
-        ([Instruction(V(), [0])], 1, [0.5 + 0.5 * im, 0.5 - 0.5 * im], [0.5, 0.5]),
-        ([Instruction(Vi(), [0])], 1, [0.5 - 0.5 * im, 0.5 + 0.5 * im], [0.5, 0.5]),
-        ([Instruction(I(), [0])], 1, [1, 0], [1, 0]),
-        ([Instruction(Unitary([0 1; 1 0]), [0])], 1, [0, 1], [0, 1]),
+        ([BraketSimulator.Instruction(BraketSimulator.V(), [0])], 1, [0.5 + 0.5 * im, 0.5 - 0.5 * im], [0.5, 0.5]),
+        ([BraketSimulator.Instruction(BraketSimulator.Vi(), [0])], 1, [0.5 - 0.5 * im, 0.5 + 0.5 * im], [0.5, 0.5]),
+        ([BraketSimulator.Instruction(BraketSimulator.I(), [0])], 1, [1, 0], [1, 0]),
+        ([BraketSimulator.Instruction(BraketSimulator.Unitary([0 1; 1 0]), [0])], 1, [0, 1], [0, 1]),
         (
-            [Instruction(X(), [0]), Instruction(PhaseShift(0.15), [0])],
+            [BraketSimulator.Instruction(BraketSimulator.X(), [0]), BraketSimulator.Instruction(BraketSimulator.PhaseShift(0.15), [0])],
             1,
             [0, 0.98877108 + 0.14943813 * im],
             [0, 1],
         ),
         (
             [
-                Instruction(X(), [0]),
-                Instruction(X(), [1]),
-                Instruction(CPhaseShift(0.15), [0, 1]),
+                BraketSimulator.Instruction(BraketSimulator.X(), [0]),
+                BraketSimulator.Instruction(BraketSimulator.X(), [1]),
+                BraketSimulator.Instruction(BraketSimulator.CPhaseShift(0.15), [0, 1]),
             ],
             2,
             [0, 0, 0, 0.98877108 + 0.14943813 * im],
             [0, 0, 0, 1],
         ),
         (
-            [Instruction(CPhaseShift00(0.15), [0, 1])],
+            [BraketSimulator.Instruction(BraketSimulator.CPhaseShift00(0.15), [0, 1])],
             2,
             [0.98877108 + 0.14943813 * im, 0, 0, 0],
             [1, 0, 0, 0],
         ),
         (
-            [Instruction(X(), [1]), Instruction(CPhaseShift01(0.15), [0, 1])],
+            [BraketSimulator.Instruction(BraketSimulator.X(), [1]), BraketSimulator.Instruction(BraketSimulator.CPhaseShift01(0.15), [0, 1])],
             2,
             [0, 0.98877108 + 0.14943813 * im, 0, 0],
             [0, 1, 0, 0],
         ),
         (
-            [Instruction(X(), [0]), Instruction(CPhaseShift10(0.15), [0, 1])],
+            [BraketSimulator.Instruction(BraketSimulator.X(), [0]), BraketSimulator.Instruction(BraketSimulator.CPhaseShift10(0.15), [0, 1])],
             2,
             [0, 0, 0.98877108 + 0.14943813 * im, 0],
             [0, 0, 1, 0],
         ),
         (
-            [Instruction(Rx(0.15), [0])],
+            [BraketSimulator.Instruction(BraketSimulator.Rx(0.15), [0])],
             1,
             [0.99718882, -0.07492971 * im],
             [0.99438554, 0.00561446],
         ),
         (
-            [Instruction(X(), [0]), Instruction(Ry(0.15), [0])],
+            [BraketSimulator.Instruction(BraketSimulator.X(), [0]), BraketSimulator.Instruction(BraketSimulator.Ry(0.15), [0])],
             1,
             [-0.07492971, 0.99718882],
             [0.00561446, 0.99438554],
         ),
         (
-            [Instruction(H(), [0]), Instruction(Rz(0.15), [0])],
+            [BraketSimulator.Instruction(BraketSimulator.H(), [0]), BraketSimulator.Instruction(BraketSimulator.Rz(0.15), [0])],
             1,
             [0.70511898 - 0.0529833 * im, 0.70511898 + 0.0529833 * im],
             [0.5, 0.5],
         ),
         (
-            [Instruction(H(), [0]), Instruction(GPi(0.15), [0])],
+            [BraketSimulator.Instruction(BraketSimulator.H(), [0]), BraketSimulator.Instruction(BraketSimulator.GPi(0.15), [0])],
             1,
             [0.69916673 - 0.10566872im, 0.69916673 + 0.10566872im],
             [0.5, 0.5],
         ),
         (
-            [Instruction(H(), [0]), Instruction(GPi2(0.15), [0])],
+            [BraketSimulator.Instruction(BraketSimulator.H(), [0]), BraketSimulator.Instruction(BraketSimulator.GPi2(0.15), [0])],
             1,
             [0.42528093 - 0.49438554im, 0.57471907 - 0.49438554im],
             [0.42528093, 0.57471907],
         ),
         (
-            [Instruction(MS(π/2, -π/4, 0.3), [0, 1])],
+            [BraketSimulator.Instruction(BraketSimulator.MS(π/2, -π/4, 0.3), [0, 1])],
             2,
             [0.98877108, 0, 0, 0.10566872 - 0.10566872im],
             [0.97766824, 0, 0, 0.02233176],
         ),
         (
-            [Instruction(H(), [0]), Instruction(H(), [1]), Instruction(ECR(), [0, 1])],
+            [BraketSimulator.Instruction(BraketSimulator.H(), [0]), BraketSimulator.Instruction(BraketSimulator.H(), [1]), BraketSimulator.Instruction(BraketSimulator.ECR(), [0, 1])],
             2,
             [
                 0.35355339 + 0.35355339im,
@@ -153,58 +151,58 @@ LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
             [0.25, 0.25, 0.25, 0.25],
         ),
         (
-            [Instruction(H(), [0]), Instruction(U(0.15, 0.4, 0.7), [0])],
+            [BraketSimulator.Instruction(BraketSimulator.H(), [0]), BraketSimulator.Instruction(BraketSimulator.U(0.15, 0.4, 0.7), [0])],
             1,
             [0.66459511 - 0.03413278im, 0.36864009 + 0.64903989im],
             [0.44285171, 0.55714829],
         ),
         (
-            [Instruction(H(), [0]), Instruction(MultiQubitPhaseShift{1}(0.15), [0])],
+            [BraketSimulator.Instruction(BraketSimulator.H(), [0]), BraketSimulator.Instruction(BraketSimulator.MultiQubitPhaseShift{1}(0.15), [0])],
             1,
             [0.69916673 + 0.10566872im, 0.69916673 + 0.10566872im],
             [0.5, 0.5],
         ),
         (
-            [Instruction(H(), [0]), Instruction(PRx(0.15, 0.4), [0])],
+            [BraketSimulator.Instruction(BraketSimulator.H(), [0]), BraketSimulator.Instruction(BraketSimulator.PRx(0.15, 0.4), [0])],
             1,
             [0.6844863 - 0.04880085im, 0.72575165 - 0.04880085im],
             [0.47090303, 0.52909697],
         ),
         (
-            [Instruction(X(), [0]), Instruction(PSwap(0.15), [0, 1])],
+            [BraketSimulator.Instruction(BraketSimulator.X(), [0]), BraketSimulator.Instruction(BraketSimulator.PSwap(0.15), [0, 1])],
             2,
             [0, 0.98877108 + 0.14943813 * im, 0, 0],
             [0, 1, 0, 0],
         ),
         (
-            [Instruction(X(), [0]), Instruction(XY(0.15), [0, 1])],
+            [BraketSimulator.Instruction(BraketSimulator.X(), [0]), BraketSimulator.Instruction(BraketSimulator.XY(0.15), [0, 1])],
             2,
             [0, 0.07492971 * im, 0.99718882, 0],
             [0, 0.00561446, 0.99438554, 0],
         ),
         (
-            [Instruction(XX(0.3), [0, 1])],
+            [BraketSimulator.Instruction(BraketSimulator.XX(0.3), [0, 1])],
             2,
             [0.98877108, 0, 0, -0.14943813 * im],
             [0.97766824, 0, 0, 0.02233176],
         ),
         (
-            [Instruction(YY(0.3), [0, 1])],
+            [BraketSimulator.Instruction(BraketSimulator.YY(0.3), [0, 1])],
             2,
             [0.98877108, 0, 0, 0.14943813 * im],
             [0.97766824, 0, 0, 0.02233176],
         ),
         (
-            [Instruction(ZZ(0.15), [0, 1])],
+            [BraketSimulator.Instruction(BraketSimulator.ZZ(0.15), [0, 1])],
             2,
             [0.99718882 - 0.07492971 * im, 0, 0, 0],
             [1, 0, 0, 0],
         ),
         (
             [
-                Instruction(X(), [0]),
-                Instruction(X(), [1]),
-                Instruction(CCNot(), [0, 1, 2]),
+                BraketSimulator.Instruction(BraketSimulator.X(), [0]),
+                BraketSimulator.Instruction(BraketSimulator.X(), [1]),
+                BraketSimulator.Instruction(BraketSimulator.CCNot(), [0, 1, 2]),
             ],
             3,
             [0, 0, 0, 0, 0, 0, 0, 1],
@@ -212,9 +210,9 @@ LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
         ),
         (
             [
-                Instruction(X(), [0]),
-                Instruction(X(), [1]),
-                Instruction(CSwap(), [0, 1, 2]),
+                BraketSimulator.Instruction(BraketSimulator.X(), [0]),
+                BraketSimulator.Instruction(BraketSimulator.X(), [1]),
+                BraketSimulator.Instruction(BraketSimulator.CSwap(), [0, 1, 2]),
             ],
             3,
             [0, 0, 0, 0, 0, 1, 0, 0],
@@ -232,58 +230,58 @@ LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
         end
     end
     @testset "Apply observables $obs" for (obs, equivalent_gates, qubit_count) in [
-        ([(Braket.Observables.X(), [0])], [Instruction(H(), [0])], 1),
-        ([(Braket.Observables.Z(), [0])], Instruction[], 1),
-        ([(Braket.Observables.I(), [0])], Instruction[], 1),
+        ([(BraketSimulator.Observables.X(), [0])], [BraketSimulator.Instruction(BraketSimulator.H(), [0])], 1),
+        ([(BraketSimulator.Observables.Z(), [0])], BraketSimulator.Instruction[], 1),
+        ([(BraketSimulator.Observables.I(), [0])], BraketSimulator.Instruction[], 1),
         (
             [
-                (Braket.Observables.X(), [0]),
-                (Braket.Observables.Z(), [3]),
-                (Braket.Observables.H(), [2]),
+                (BraketSimulator.Observables.X(), [0]),
+                (BraketSimulator.Observables.Z(), [3]),
+                (BraketSimulator.Observables.H(), [2]),
             ],
-            [Instruction(H(), [0]), Instruction(Ry(-π / 4), [2])],
+            [BraketSimulator.Instruction(BraketSimulator.H(), [0]), BraketSimulator.Instruction(BraketSimulator.Ry(-π / 4), [2])],
             5,
         ),
         (
             [(
-                Braket.Observables.TensorProduct([
-                    Braket.Observables.X(),
-                    Braket.Observables.Z(),
-                    Braket.Observables.H(),
-                    Braket.Observables.I(),
+                BraketSimulator.Observables.TensorProduct([
+                    BraketSimulator.Observables.X(),
+                    BraketSimulator.Observables.Z(),
+                    BraketSimulator.Observables.H(),
+                    BraketSimulator.Observables.I(),
                 ]),
                 (0, 3, 2, 1),
             )],
-            [Instruction(H(), [0]), Instruction(Ry(-π / 4), [2])],
+            [BraketSimulator.Instruction(BraketSimulator.H(), [0]), BraketSimulator.Instruction(BraketSimulator.Ry(-π / 4), [2])],
             5,
         ),
         (
-            [(Braket.Observables.X(), [0, 1])],
-            [Instruction(H(), [0]), Instruction(H(), [1])],
+            [(BraketSimulator.Observables.X(), [0, 1])],
+            [BraketSimulator.Instruction(BraketSimulator.H(), [0]), BraketSimulator.Instruction(BraketSimulator.H(), [1])],
             2,
         ),
-        ([(Braket.Observables.Z(), [0, 1])], Instruction[], 2),
-        ([(Braket.Observables.I(), [0, 1])], Instruction[], 2),
+        ([(BraketSimulator.Observables.Z(), [0, 1])], BraketSimulator.Instruction[], 2),
+        ([(BraketSimulator.Observables.I(), [0, 1])], BraketSimulator.Instruction[], 2),
         (
             [(
-                Braket.Observables.TensorProduct([
-                    Braket.Observables.I(),
-                    Braket.Observables.Z(),
+                BraketSimulator.Observables.TensorProduct([
+                    BraketSimulator.Observables.I(),
+                    BraketSimulator.Observables.Z(),
                 ]),
                 (2, 0),
             )],
-            Instruction[],
+            BraketSimulator.Instruction[],
             3,
         ),
         (
             [(
-                Braket.Observables.TensorProduct([
-                    Braket.Observables.X(),
-                    Braket.Observables.Z(),
+                BraketSimulator.Observables.TensorProduct([
+                    BraketSimulator.Observables.X(),
+                    BraketSimulator.Observables.Z(),
                 ]),
                 (2, 0),
             )],
-            [Instruction(H(), [2])],
+            [BraketSimulator.Instruction(BraketSimulator.H(), [2])],
             3,
         ),
     ]
@@ -298,11 +296,11 @@ LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
         simulation = StateVectorSimulator(4, 0)
         simulation = BraketSimulator.apply_observables!(
             simulation,
-            [(Braket.Observables.X(), [0])],
+            [(BraketSimulator.Observables.X(), [0])],
         )
         @test_throws ErrorException BraketSimulator.apply_observables!(
             simulation,
-            [(Braket.Observables.X(), [0])],
+            [(BraketSimulator.Observables.X(), [0])],
         )
     end
     @testset "state_with_observables fails before any observables are applied" begin
@@ -311,21 +309,21 @@ LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
     end
     @testset "QFT simulation" begin
         function qft_circuit_operations(qubit_count::Int)
-            qft_ops = Instruction[]
+            qft_ops = BraketSimulator.Instruction[]
             for target_qubit = 0:qubit_count-1
                 angle = π / 2
-                push!(qft_ops, Instruction(H(), [target_qubit]))
+                push!(qft_ops, BraketSimulator.Instruction(BraketSimulator.H(), [target_qubit]))
                 for control_qubit = target_qubit+1:qubit_count-1
                     push!(
                         qft_ops,
-                        Instruction(CPhaseShift(angle), [control_qubit, target_qubit]),
+                        BraketSimulator.Instruction(BraketSimulator.CPhaseShift(angle), [control_qubit, target_qubit]),
                     )
                     angle /= 2
                 end
             end
             return qft_ops
         end
-        max_qc = LARGE_TESTS ? 32 : 20
+        max_qc = 20
         @testset "Qubit count $qubit_count" for qubit_count in 4:max_qc
             simulation = StateVectorSimulator(qubit_count, 0)
             operations = qft_circuit_operations(qubit_count)
@@ -338,11 +336,11 @@ LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
         simulation = StateVectorSimulator(2, 10000)
         simulation = BraketSimulator.evolve!(
             simulation,
-            [Instruction(H(), [0]), Instruction(CNot(), [0, 1])],
+            [BraketSimulator.Instruction(BraketSimulator.H(), [0]), BraketSimulator.Instruction(BraketSimulator.CNot(), [0, 1])],
         )
         samples = counter(BraketSimulator.samples(simulation))
 
-        @test qubit_count(simulation) == 2
+        @test BraketSimulator.qubit_count(simulation) == 2
         @test collect(keys(samples)) == [0, 3]
         @test 0.4 < samples[0] / (samples[0] + samples[3]) < 0.6
         @test 0.4 < samples[3] / (samples[0] + samples[3]) < 0.6
@@ -350,19 +348,18 @@ LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
     end
     @testset "batch" begin
         function make_ghz(num_qubits)
-            ghz = Circuit()
-            ghz(H, 0)
-            for ii in 0:num_qubits-2
-                ghz(CNot, ii, ii+1)
+            ghz = BraketSimulator.Program(BraketSimulator.braketSchemaHeader("braket.ir.jaqcd.program", "1"), BraketSimulator.Instruction[BraketSimulator.Instruction(BraketSimulator.H(), 0)], BraketSimulator.AbstractProgramResult[], BraketSimulator.Instruction[])
+            for ii in 1:num_qubits-1
+                push!(ghz.instructions, BraketSimulator.Instruction(BraketSimulator.CNot(), [0, ii]))
             end
-            return ir(ghz)
+            return ghz
         end
         num_qubits = 5
         @testset for n_circuits in (1, 100)
             shots   = 1000
             jl_ghz  = [make_ghz(num_qubits) for ix in 1:n_circuits]
             jl_sim  = StateVectorSimulator(num_qubits, 0);
-            results = simulate(jl_sim, jl_ghz, shots)
+            results = BraketSimulator.simulate(jl_sim, jl_ghz, shots)
             for (r_ix, r) in enumerate(results)
                 @test length(r.measurements) == shots
                 @test 400 < count(m->m == fill(0, num_qubits), r.measurements) < 600
@@ -394,7 +391,8 @@ LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
         b[3] = measure q[3];
         """
         simulator = StateVectorSimulator(0, 0)
-        res = simulate(simulator, ir(Circuit(qasm), Val(:OpenQASM)), 1000)
+        oq3_program = BraketSimulator.OpenQasmProgram(BraketSimulator.braketSchemaHeader("braket.ir.openqasm.program", "1"), qasm, nothing)
+        res = BraketSimulator.simulate(simulator, oq3_program, 1000)
         @test all(m -> m == zeros(Int, 4), res.measurements)
         @test length(res.measurements) == 1000
         @test res.measuredQubits == collect(0:3)
@@ -408,7 +406,8 @@ LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
         b = measure q;
         """ 
         simulator = StateVectorSimulator(0, 0)
-        res = simulate(simulator, ir(Circuit(qasm), Val(:OpenQASM)), 1000)
+        oq3_program = BraketSimulator.OpenQasmProgram(BraketSimulator.braketSchemaHeader("braket.ir.openqasm.program", "1"), qasm, nothing)
+        res = BraketSimulator.simulate(simulator, oq3_program, 1000)
         @test res.measuredQubits == collect(0:3)
         @test 400 < sum(m[1] for m in res.measurements) < 600
         @test 400 < sum(m[2] for m in res.measurements) < 600
@@ -461,6 +460,203 @@ LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
                 "z",
                 "zz",
             ]
+        new_sv_qubit_count = 18
+        new_sv_max_shots = 1_000_000
+        new_sv_observables = ["x", "y", "z", "h", "i", "hermitian"]
+        new_sv_props_dict = Dict(
+            :braketSchemaHeader => Dict(
+                :name => "braket.device_schema.simulators.gate_model_simulator_device_capabilities",
+                :version => "1",
+            ),
+            :service => Dict(
+                :executionWindows => [
+                    Dict(
+                        :executionDay => "Everyday",
+                        :windowStartHour => "00:00",
+                        :windowEndHour => "23:59:59",
+                    ),
+                ],
+                :shotsRange => [0, new_sv_max_shots],
+            ),
+            :action => Dict(
+                "braket.ir.jaqcd.program" => Dict(
+                    :actionType => "braket.ir.jaqcd.program",
+                    :version => ["1"],
+                    :supportedOperations => [
+                        "ccnot",
+                        "cnot",
+                        "cphaseshift",
+                        "cphaseshift00",
+                        "cphaseshift01",
+                        "cphaseshift10",
+                        "cswap",
+                        "cv",
+                        "cy",
+                        "cz",
+                        "ecr",
+                        "h",
+                        "i",
+                        "iswap",
+                        "pswap",
+                        "phaseshift",
+                        "prx",
+                        "rx",
+                        "ry",
+                        "rz",
+                        "s",
+                        "si",
+                        "swap",
+                        "t",
+                        "ti",
+                        "unitary",
+                        "v",
+                        "vi",
+                        "x",
+                        "xx",
+                        "xy",
+                        "y",
+                        "yy",
+                        "z",
+                        "zz",
+                    ],
+                    :supportedResultTypes => [
+                        Dict(
+                            :name => "Sample",
+                            :observables => new_sv_observables,
+                            :minShots => 1,
+                            :maxShots => new_sv_max_shots,
+                        ),
+                        Dict(
+                            :name => "Expectation",
+                            :observables => new_sv_observables,
+                            :minShots => 0,
+                            :maxShots => new_sv_max_shots,
+                        ),
+                        Dict(
+                            :name => "Variance",
+                            :observables => new_sv_observables,
+                            :minShots => 0,
+                            :maxShots => new_sv_max_shots,
+                        ),
+                        Dict(:name => "Probability", :minShots => 0, :maxShots => new_sv_max_shots),
+                        Dict(:name => "StateVector", :minShots => 0, :maxShots => 0),
+                        Dict(:name => "DensityMatrix", :minShots => 0, :maxShots => 0),
+                        Dict(:name => "Amplitude", :minShots => 0, :maxShots => 0),
+                    ],
+                ),
+                "braket.ir.openqasm.program" => Dict(
+                    :actionType => "braket.ir.openqasm.program",
+                    :version => ["1"],
+                    :supportedOperations => [
+                        "U",
+                        "GPhase",
+                        "ccnot",
+                        "cnot",
+                        "cphaseshift",
+                        "cphaseshift00",
+                        "cphaseshift01",
+                        "cphaseshift10",
+                        "cswap",
+                        "cv",
+                        "cy",
+                        "cz",
+                        "ecr",
+                        "gpi",
+                        "gpi2",
+                        "h",
+                        "i",
+                        "iswap",
+                        "ms",
+                        "pswap",
+                        "phaseshift",
+                        "prx",
+                        "rx",
+                        "ry",
+                        "rz",
+                        "s",
+                        "si",
+                        "swap",
+                        "t",
+                        "ti",
+                        "unitary",
+                        "v",
+                        "vi",
+                        "x",
+                        "xx",
+                        "xy",
+                        "y",
+                        "yy",
+                        "z",
+                        "zz",
+                    ],
+                    :supportedModifiers => [
+                        Dict(:name => "ctrl"),
+                        Dict(:name => "negctrl"),
+                        Dict(:name => "pow", :exponent_types => ["int", "float"]),
+                        Dict(:name => "inv"),
+                    ],
+                    :supportedPragmas => [
+                        "braket_unitary_matrix",
+                        "braket_result_type_state_vector",
+                        "braket_result_type_density_matrix",
+                        "braket_result_type_sample",
+                        "braket_result_type_expectation",
+                        "braket_result_type_variance",
+                        "braket_result_type_probability",
+                        "braket_result_type_amplitude",
+                    ],
+                    :forbiddenPragmas => [
+                        "braket_noise_amplitude_damping",
+                        "braket_noise_bit_flip",
+                        "braket_noise_depolarizing",
+                        "braket_noise_kraus",
+                        "braket_noise_pauli_channel",
+                        "braket_noise_generalized_amplitude_damping",
+                        "braket_noise_phase_flip",
+                        "braket_noise_phase_damping",
+                        "braket_noise_two_qubit_dephasing",
+                        "braket_noise_two_qubit_depolarizing",
+                    ],
+                    :supportedResultTypes => [
+                        Dict(
+                            :name => "Sample",
+                            :observables => new_sv_observables,
+                            :minShots => 1,
+                            :maxShots => new_sv_max_shots,
+                        ),
+                        Dict(
+                            :name => "Expectation",
+                            :observables => new_sv_observables,
+                            :minShots => 0,
+                            :maxShots => new_sv_max_shots,
+                        ),
+                        Dict(
+                            :name => "Variance",
+                            :observables => new_sv_observables,
+                            :minShots => 0,
+                            :maxShots => new_sv_max_shots,
+                        ),
+                        Dict(:name => "Probability", :minShots => 0, :maxShots => new_sv_max_shots),
+                        Dict(:name => "StateVector", :minShots => 0, :maxShots => 0),
+                        Dict(:name => "DensityMatrix", :minShots => 0, :maxShots => 0),
+                        Dict(:name => "Amplitude", :minShots => 0, :maxShots => 0),
+                    ],
+                    :supportPhysicalQubits => false,
+                    :supportsPartialVerbatimBox => false,
+                    :requiresContiguousQubitIndices => true,
+                    :requiresAllQubitsMeasurement => true,
+                    :supportsUnassignedMeasurements => true,
+                    :disabledQubitRewiringSupported => false,
+                ),
+            ),
+            :paradigm => Dict(:qubitCount => new_sv_qubit_count),
+            :deviceParameters =>
+                Dict(:paradigmParameters => Dict(:qubitCount => new_sv_qubit_count)),
+        )
+
+        new_sv_props = BraketSimulator.StructTypes.constructfrom(BraketSimulator.GateModelSimulatorDeviceCapabilities, new_sv_props_dict)
+        @test new_sv_props.paradigm.qubitCount == new_sv_qubit_count
+        @test BraketSimulator.supported_result_types(sim) == BraketSimulator.supported_result_types(sim, Val(:OpenQASM))
     end
     @testset "inputs handling" begin
         sv_adder_qasm = """
@@ -505,8 +701,8 @@ LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
             #pragma braket result probability b
             """
         simulator = StateVectorSimulator(6, 0)
-        oq3_program = Braket.OpenQasmProgram(Braket.header_dict[Braket.OpenQasmProgram], sv_adder_qasm, Dict("a_in"=>3, "b_in"=>7))
+        oq3_program = BraketSimulator.OpenQasmProgram(BraketSimulator.braketSchemaHeader("braket.ir.openqasm.program", "1"), sv_adder_qasm, Dict("a_in"=>3, "b_in"=>7))
         # should NOT throw a missing input error
-        simulate(simulator, oq3_program, 0; inputs=Dict{String, Float64}())
+        BraketSimulator.simulate(simulator, oq3_program, 0; inputs=Dict{String, Float64}())
     end
 end

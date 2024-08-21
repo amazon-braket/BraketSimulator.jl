@@ -1,27 +1,28 @@
-using Test, Braket, BraketSimulator, LinearAlgebra
-import Braket: Instruction
+using Test, BraketSimulator, LinearAlgebra
 
 const NUM_SAMPLES = 1000
 
+LARGE_TESTS = get(ENV, "BRAKET_SIM_LARGE_TESTS", "false") == "true"
+
 observables_testdata = [
     (
-        Braket.Observables.TensorProduct([Braket.Observables.X(), Braket.Observables.H()]),
+        BraketSimulator.Observables.TensorProduct([BraketSimulator.Observables.X(), BraketSimulator.Observables.H()]),
         (1, 2),
     ),
     (
-        Braket.Observables.TensorProduct([Braket.Observables.I(), Braket.Observables.Y()]),
+        BraketSimulator.Observables.TensorProduct([BraketSimulator.Observables.I(), BraketSimulator.Observables.Y()]),
         (0, 2),
     ),
-    (Braket.Observables.Y(), (2,)),
+    (BraketSimulator.Observables.Y(), (2,)),
 ]
 
 all_qubit_observables_testdata = [
-    Braket.Observables.X(),
-    Braket.Observables.Y(),
-    Braket.Observables.Z(),
-    Braket.Observables.H(),
-    Braket.Observables.I(),
-    Braket.Observables.HermitianObservable([0.0 1.0; 1.0 0.0]),
+    BraketSimulator.Observables.X(),
+    BraketSimulator.Observables.Y(),
+    BraketSimulator.Observables.Z(),
+    BraketSimulator.Observables.H(),
+    BraketSimulator.Observables.I(),
+    BraketSimulator.Observables.HermitianObservable([0.0 1.0; 1.0 0.0]),
 ]
 
 @testset "Result types" begin
@@ -37,7 +38,7 @@ all_qubit_observables_testdata = [
     end
     density_matrix(sv) = kron(adjoint(sv), sv)
     observable() = (
-        Braket.Observables.TensorProduct([Braket.Observables.X(), Braket.Observables.H()]),
+        BraketSimulator.Observables.TensorProduct([BraketSimulator.Observables.X(), BraketSimulator.Observables.H()]),
         (1, 2),
     )
     dm_dict = Dict(
@@ -101,7 +102,7 @@ all_qubit_observables_testdata = [
     @testset "Simulation type $sim_type" for sim_type in (Val(:sv), Val(:dm))
         if sim_type isa Val{:sv}
             @testset "Amplitude" begin
-                result_type = Braket.Amplitude(["0010", "0101", "1110"])
+                result_type = BraketSimulator.Amplitude(["0010", "0101", "1110"])
                 amplitudes = BraketSimulator.calculate(
                     result_type,
                     simulation(observable, sim_type),
@@ -114,7 +115,7 @@ all_qubit_observables_testdata = [
         end
         @testset "Probability" begin
             probability_12 = BraketSimulator.calculate(
-                Braket.Probability([1, 2]),
+                BraketSimulator.Probability([1, 2]),
                 simulation(nothing, sim_type),
             )
             @test collect(probability_12) ≈ marginal_12()
@@ -122,16 +123,16 @@ all_qubit_observables_testdata = [
             state_vector_probabilities = collect(abs2.(state_vector()))
             probability_all_qubits = collect(
                 BraketSimulator.calculate(
-                    Braket.Probability([0, 1, 2, 3]),
+                    BraketSimulator.Probability([0, 1, 2, 3]),
                     simulation(nothing, sim_type),
                 ),
             )
             @test probability_all_qubits ≈ state_vector_probabilities
         end
         @testset "Expectation obs $obs" for obs in observables_testdata
-            result_type = Expectation(obs...)
+            result_type = BraketSimulator.Expectation(obs...)
             @test result_type.observable == obs[1]
-            @test result_type.targets == QubitSet(obs[2])
+            @test result_type.targets == BraketSimulator.QubitSet(obs[2])
 
             sim = simulation(() -> obs, sim_type)
             calculated = BraketSimulator.calculate(result_type, sim)
@@ -145,7 +146,7 @@ all_qubit_observables_testdata = [
             @test calculated ≈ from_diagonalization
         end
         @testset "Expectation no targets $obs" for obs in all_qubit_observables_testdata
-            result_types = [Expectation(obs, t) for t in targs]
+            result_types = [BraketSimulator.Expectation(obs, t) for t in targs]
             @test all(result_type.observable == obs for result_type in result_types)
 
             calculated = [
@@ -167,9 +168,9 @@ all_qubit_observables_testdata = [
         end
         @testset "Variance obs $obs" for obs in observables_testdata
             sim = simulation(() -> obs, sim_type)
-            result_type = Variance(obs...)
+            result_type = BraketSimulator.Variance(obs...)
             @test result_type.observable == obs[1]
-            @test result_type.targets == QubitSet(obs[2])
+            @test result_type.targets == BraketSimulator.QubitSet(obs[2])
             calculated = BraketSimulator.calculate(result_type, sim)
             from_diagonalization = _variance_from_diagonalization(
                 BraketSimulator.state_with_observables(
@@ -181,7 +182,7 @@ all_qubit_observables_testdata = [
             @test calculated ≈ from_diagonalization atol = 1e-12
         end
         @testset "Variance no targets $obs" for obs in all_qubit_observables_testdata
-            result_types = [Variance(obs, t) for t in targs]
+            result_types = [BraketSimulator.Variance(obs, t) for t in targs]
             @test all(result_type.observable == obs for result_type in result_types)
 
             calculated = [
@@ -202,7 +203,7 @@ all_qubit_observables_testdata = [
             @test calculated ≈ from_diagonalization atol = 1e-12
         end
         @testset "Density matrix $qubit" for (qubit, mat) in dm_dict
-            dm  = DensityMatrix(qubit)
+            dm  = BraketSimulator.DensityMatrix(qubit)
             sim = simulation(nothing, sim_type)
             calculated = BraketSimulator.calculate(dm, sim)
             @test collect(calculated) ≈ mat rtol = 1e-6
@@ -211,9 +212,18 @@ all_qubit_observables_testdata = [
     @testset "Permutation of probability/density matrix" begin
         sim = BraketSimulator.StateVectorSimulator(4, 0)
         sim.state_vector = state_vector()
-        sv = BraketSimulator.calculate(Braket.Probability(reverse(0:3)), sim)
+        sv = BraketSimulator.calculate(BraketSimulator.Probability(reverse(0:3)), sim)
         @test sv ≈ conj(state_vector()) .* state_vector()
-        dm = BraketSimulator.calculate(Braket.DensityMatrix(reverse(0:3)), sim)
+        dm = BraketSimulator.calculate(BraketSimulator.DensityMatrix(reverse(0:3)), sim)
         @test dm ≈ kron(adjoint(state_vector()), state_vector())
+    end
+    @testset "Direct sampling" begin
+        if LARGE_TESTS
+            sim = BraketSimulator.StateVectorSimulator(30, 10)
+            sim.state_vector[1]   = 1/√2
+            sim.state_vector[end] = 1/√2
+            shot_results = BraketSimulator.samples(sim)
+            @test all(s->s ∈ [0, 2^30-1], shot_results)
+        end
     end
 end

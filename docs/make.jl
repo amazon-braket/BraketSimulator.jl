@@ -1,7 +1,7 @@
-using Braket, BraketSimulator
+using BraketSimulator
 using Documenter
 
-DocMeta.setdocmeta!(BraketSimulator, :DocTestSetup, :(using Braket, BraketSimulator); recursive=true)
+DocMeta.setdocmeta!(BraketSimulator, :DocTestSetup, :(using BraketSimulator, BraketSimulator.Observables; using BraketSimulator: Program, Circuit, qubits, CNot, H, Rx, FreeParameter, QubitSet, AdjointGradient, BitFlip, qubit_count, Qubit, StateVector, Measure, Probability, Ry, Amplitude, Instruction, DensityMatrix, add_instruction!); recursive=true)
 
 makedocs(;
     modules=[BraketSimulator],
@@ -15,6 +15,12 @@ makedocs(;
     pages=[
         "Home" => "index.md",
         "Simulators" => "sims.md",
+        "Gates" => "gates.md",
+        "Custom Gates" => "custom_gates.md",
+        "Noises" => "noises.md",
+        "Observables" => "observables.md",
+        "Results" => "results.md",
+        "Internals" => "internals.md",
     ],
 )
 

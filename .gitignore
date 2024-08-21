@@ -3,6 +3,7 @@
 *.jl.mem
 lcov.info
 *.profraw
+*.json
 /Manifest.toml
 /docs/Manifest.toml
 /docs/build/
