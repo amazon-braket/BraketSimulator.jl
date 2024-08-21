@@ -1,7 +1,7 @@
 module Quasar
 
 using ..BraketSimulator
-using Automa, AbstractTrees, DataStructures
+using Automa, AbstractTrees, DataStructures, Dates
 using DataStructures: Stack
 using BraketSimulator: Control, Instruction, Result, bind_value!, remap, qubit_count, Circuit
 
@@ -112,7 +112,7 @@ const qasm_tokens = [
         :spaces          => re"[\t ]+",
         :durationof_token  => re"durationof", # this MUST be lower than duration_token to preempt duration
         :classical_type    => re"bool|uint|int|float|angle|complex|array|bit",
-        :duration_value    => (float | integer) * re"ns|µs|us|ms|s",
+        :duration_literal  => (float | integer) * re"dt|ns|µs|us|ms|s",
         :forbidden_keyword => re"cal|defcal|extern",
 ]
 
@@ -427,6 +427,19 @@ parse_oct_literal(token, qasm)     = QasmExpression(:integer_literal, tryparse(I
 parse_bin_literal(token, qasm)     = QasmExpression(:integer_literal, tryparse(Int, qasm[token[1]:token[1]+token[2]-1]))
 parse_float_literal(token, qasm)   = QasmExpression(:float_literal, tryparse(Float64, qasm[token[1]:token[1]+token[2]-1]))
 parse_boolean_literal(token, qasm)   = QasmExpression(:boolean_literal, tryparse(Bool, qasm[token[1]:token[1]+token[2]-1]))
+function parse_duration_literal(token, qasm)
+    str = String(codeunits(qasm)[token[1]:token[1]+token[2]-1])
+    duration = if endswith(str, "ns")
+            Nanosecond(tryparse(Int, chop(str, tail=2)))
+        elseif endswith(str, "ms")
+            Millisecond(tryparse(Int, chop(str, tail=2)))
+        elseif endswith(str, "us") || endswith(str, "μs")
+            Microsecond(tryparse(Int, chop(str, tail=2)))
+        elseif endswith(str, "s")
+            Second(tryparse(Int, chop(str, tail=1)))
+        end
+    QasmExpression(:duration_literal, duration)
+end
 function parse_irrational_literal(token, qasm)
     raw_string = String(codeunits(qasm)[token[1]:token[1]+token[2]-1])
     raw_string == "pi" && return QasmExpression(:irrational_literal, π)
@@ -511,6 +524,7 @@ function parse_list_expression(tokens::Vector{Tuple{Int64, Int32, Token}}, stack
 end
 
 function parse_literal(tokens::Vector{Tuple{Int64, Int32, Token}}, stack, start, qasm)
+    tokens[1][end] == duration_literal && return parse_duration_literal(popfirst!(tokens), qasm) 
     tokens[1][end] == string_token && return parse_string_literal(popfirst!(tokens), qasm) 
     tokens[1][end] == hex     && return parse_hex_literal(popfirst!(tokens), qasm) 
     tokens[1][end] == oct     && return parse_oct_literal(popfirst!(tokens), qasm) 
@@ -634,7 +648,7 @@ function parse_expression(tokens::Vector{Tuple{Int64, Int32, Token}}, stack, sta
         token_name = parse_bracketed_expression(pushfirst!(tokens, start_token), stack, start, qasm) 
     elseif start_token[end] == classical_type 
         token_name = parse_classical_type(pushfirst!(tokens, start_token), stack, start, qasm)
-    elseif start_token[end] ∈ (string_token, integer_token, float_token, hex, oct, bin, irrational, dot, boolean)
+    elseif start_token[end] ∈ (string_token, integer_token, float_token, hex, oct, bin, irrational, dot, boolean, duration_literal)
         token_name = parse_literal(pushfirst!(tokens, start_token), stack, start, qasm)
     elseif start_token[end] ∈ (mutable, readonly, const_token)
         token_name = parse_identifier(start_token, qasm)
@@ -644,7 +658,6 @@ function parse_expression(tokens::Vector{Tuple{Int64, Int32, Token}}, stack, sta
         token_name = QasmExpression(:n_dims, QasmExpression(:integer_literal, parse(Int, dim)))
     end
     head(token_name) == :empty && throw(QasmParseError("unable to parse line with start token $(start_token[end])", stack, start, qasm))
-
     next_token = first(tokens)
     if next_token[end] == semicolon || next_token[end] == comma || start_token[end] ∈ (lbracket, lbrace)
         expr = token_name
@@ -657,7 +670,7 @@ function parse_expression(tokens::Vector{Tuple{Int64, Int32, Token}}, stack, sta
         unary_op_symbol ∈ (:~, :!, :-) || throw(QasmParseError("invalid unary operator $unary_op_symbol.", stack, start, qasm))
         next_expr = parse_expression(tokens, stack, start, qasm)
         # apply unary op to next_expr
-        if head(next_expr) ∈ (:identifier, :indexed_identifier, :integer_literal, :float_literal, :string_literal, :irrational_literal, :boolean_literal, :complex_literal, :function_call, :cast)
+        if head(next_expr) ∈ (:identifier, :indexed_identifier, :integer_literal, :float_literal, :string_literal, :irrational_literal, :boolean_literal, :complex_literal, :function_call, :cast, :duration_literal)
             expr = QasmExpression(:unary_op, unary_op_symbol, next_expr)
         elseif head(next_expr) == :binary_op
             # replace first argument
@@ -1013,13 +1026,13 @@ function parse_qasm(clean_tokens::Vector{Tuple{Int64, Int32, Token}}, qasm::Stri
             @warn "reset expression encountered -- currently `reset` is a no-op"
             eol = findfirst(triplet->triplet[end] == semicolon, clean_tokens)
             reset_tokens = splice!(clean_tokens, 1:eol)
-            targets = parse_expression(reset_tokens, stack, start, qasm)
+            targets = parse_list_expression(reset_tokens, stack, start, qasm)
             push!(stack, QasmExpression(:reset, targets))
         elseif token == barrier_token
             @warn "barrier expression encountered -- currently `barrier` is a no-op"
             eol = findfirst(triplet->triplet[end] == semicolon, clean_tokens)
             barrier_tokens = splice!(clean_tokens, 1:eol)
-            targets = parse_expression(barrier_tokens, stack, start, qasm)
+            targets = parse_list_expression(barrier_tokens, stack, start, qasm)
             push!(stack, QasmExpression(:barrier, targets))
         elseif token == delay_token
             @warn "delay expression encountered -- currently `delay` is a no-op"
@@ -1031,7 +1044,7 @@ function parse_qasm(clean_tokens::Vector{Tuple{Int64, Int32, Token}}, qasm::Stri
             push!(delay_expr, QasmExpression(:duration, parse_expression(delay_duration, stack, start, qasm)))
             target_expr = QasmExpression(:targets)
             if first(delay_tokens)[end] != semicolon # targets present
-                targets = parse_expression(delay_tokens, stack, start, qasm)
+                targets = parse_list_expression(delay_tokens, stack, start, qasm)
                 push!(target_expr, targets)
             end
             push!(delay_expr, target_expr)
@@ -1342,7 +1355,7 @@ function evaluate(v::V, expr::QasmExpression) where {V<:AbstractVisitor}
         step::Int  = evaluate(v, raw_step)
         stop::Int  = evaluate(v, raw_stop)
         return StepRange(start, step, stop)
-    elseif head(expr) ∈ (:integer_literal, :float_literal, :string_literal, :complex_literal, :irrational_literal, :boolean_literal)
+    elseif head(expr) ∈ (:integer_literal, :float_literal, :string_literal, :complex_literal, :irrational_literal, :boolean_literal, :duration_literal)
         return expr.args[1]
     elseif head(expr) == :array_literal
         return [evaluate(v, arg) for arg in convert(Vector{QasmExpression}, expr.args)]
@@ -1645,10 +1658,21 @@ function (v::AbstractVisitor)(program_expr::QasmExpression)
     elseif head(program_expr) == :version
         return v
     elseif head(program_expr) == :reset
+        targets = program_expr.args[1]::QasmExpression
+        target_qubits = evaluate(v, targets)
+        push!(v, [BraketSimulator.Instruction(BraketSimulator.Reset(), t) for t in target_qubits])
         return v
     elseif head(program_expr) == :barrier
+        targets = program_expr.args[1]::QasmExpression
+        target_qubits = evaluate(v, targets)
+        push!(v, [BraketSimulator.Instruction(BraketSimulator.Barrier(), t) for t in target_qubits])
         return v
     elseif head(program_expr) == :delay
+        duration_expr = program_expr.args[1].args[1]::QasmExpression
+        targets  = program_expr.args[2].args[1]::QasmExpression
+        target_qubits = evaluate(v, targets)
+        duration = evaluate(v, duration_expr) 
+        push!(v, [BraketSimulator.Instruction(BraketSimulator.Delay(duration), t) for t in target_qubits])
         return v
     elseif head(program_expr) == :stretch
         return v

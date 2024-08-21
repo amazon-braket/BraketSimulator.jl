@@ -66,3 +66,47 @@ Measure() = Measure(-1)
 Parametrizable(m::Measure) = NonParametrized()
 qubit_count(::Type{Measure}) = 1
 qubit_count(m::Measure) = qubit_count(Measure)
+
+"""
+    Reset(index) <: QuantumOperator
+
+Represents an active reset operation on targeted qubit, stored in the classical register at `index`.
+For now, this is a no-op.
+"""
+struct Reset <: QuantumOperator
+    index::Int
+end
+Reset() = Reset(-1)
+Parametrizable(m::Reset) = NonParametrized()
+qubit_count(::Type{Reset}) = 1
+qubit_count(m::Reset) = qubit_count(Reset)
+
+"""
+    Barrier(index) <: QuantumOperator
+
+Represents a barrier operation on targeted qubit, stored in the classical register at `index`.
+For now, this is a no-op.
+"""
+struct Barrier <: QuantumOperator
+    index::Int
+end
+Barrier() = Barrier(-1)
+Parametrizable(m::Barrier) = NonParametrized()
+qubit_count(::Type{Barrier}) = 1
+qubit_count(m::Barrier) = qubit_count(Barrier)
+
+"""
+    Delay(index, duration::Time) <: QuantumOperator
+
+Represents a delay operation for `duration` on targeted qubit,
+stored in the classical register at `index`.
+For now, this is a no-op.
+"""
+struct Delay <: QuantumOperator
+    index::Int
+    duration::Dates.Period
+end
+Delay(duration::Dates.Period) = Delay(-1, duration)
+Parametrizable(m::Delay) = NonParametrized()
+qubit_count(::Type{Delay}) = 1
+qubit_count(m::Delay) = qubit_count(Delay)

@@ -1,4 +1,4 @@
-using BraketSimulator.Quasar, Statistics, LinearAlgebra, BraketSimulator, BraketSimulator.Observables
+using BraketSimulator.Quasar, BraketSimulator.Dates, Statistics, LinearAlgebra, BraketSimulator, BraketSimulator.Observables
 
 get_tol(shots::Int) = return (
     shots > 0 ? Dict("atol" => 0.1, "rtol" => 0.15) : Dict("atol" => 0.01, "rtol" => 0)
@@ -560,9 +560,10 @@ get_tol(shots::Int) = return (
     @testset "Delay" begin
         qasm = """
         qubit[4] q;
-        delay[200dt] q[0], q[1];
+        delay[200us] q[0], q[1];
         """
         @test_warn "delay expression encountered -- currently `delay` is a no-op" parse_qasm(qasm)
+        @test BraketSimulator.Circuit(qasm).instructions == [BraketSimulator.Instruction(BraketSimulator.Delay(Microsecond(200)), 0), BraketSimulator.Instruction(BraketSimulator.Delay(Microsecond(200)), 1)]
     end
     @testset "Barrier" begin
         qasm = """
@@ -571,6 +572,7 @@ get_tol(shots::Int) = return (
         barrier q[0];
         """
         @test_warn "barrier expression encountered -- currently `barrier` is a no-op" parse_qasm(qasm)
+        @test BraketSimulator.Circuit(qasm).instructions == [BraketSimulator.Instruction(BraketSimulator.X(), 0), BraketSimulator.Instruction(BraketSimulator.Barrier(), 0)]
     end
     @testset "Stretch" begin
         qasm = """
@@ -591,6 +593,7 @@ get_tol(shots::Int) = return (
         reset q[0];
         """
         @test_warn "reset expression encountered -- currently `reset` is a no-op" parse_qasm(qasm)
+        @test BraketSimulator.Circuit(qasm).instructions == [BraketSimulator.Instruction(BraketSimulator.X(), 0), BraketSimulator.Instruction(BraketSimulator.Reset(), 0)]
     end
     @testset "Gate call missing/extra args" begin
         qasm = """
