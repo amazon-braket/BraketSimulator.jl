@@ -489,6 +489,7 @@ include("dm_simulator.jl")
         #pragma braket result probability cout
         #pragma braket result probability b
         """
+    
     grcs_16_qasm = """
         OPENQASM 3.0;
 
@@ -601,6 +602,104 @@ include("dm_simulator.jl")
         #pragma braket result expectation x(q[0]) 
         #pragma braket result variance x(q[1]) 
     """
+    
+    vqe_qasm = """
+        OPENQASM 3.0;
+        bit[2] b;
+        qubit[2] q;
+        ry(-4.97894242803364) q[0];
+        ry(-4.435983179322655) q[1];
+        cz q[0], q[1];
+        ry(6.249142469550989) q[0];
+        ry(2.509637558409141) q[1];
+        cz q[0], q[1];
+        ry(-5.476946260844031) q[0];
+        ry(5.937223228770655) q[1];
+        cz q[0], q[1];
+        ry(1.6839702128823246) q[0];
+        ry(-3.211915934619051) q[1];
+        b[0] = measure q[0];
+        b[1] = measure q[1];
+        """
+    all_gates_qasm = """
+        OPENQASM 3.0;
+        bit[3] b;
+        qubit[3] q;
+        rx(0.1) q[0];
+        prx(0.1, 0.2) q[0];
+        x q[0];
+        ry(0.1) q[0];
+        y q[0];
+        rz(0.1) q[0];
+        z q[0];
+        h q[0];
+        i q[0];
+        t q[0];
+        ti q[0];
+        s q[0];
+        si q[0];
+        v q[0];
+        vi q[0];
+        phaseshift(0.1) q[0];
+        gpi(0.1) q[0];
+        gpi2(0.1) q[0];
+
+        cz q[0], q[1];
+        cnot q[0], q[1];
+        cy q[0], q[1];
+        cv q[0], q[1];
+
+        ecr q[0], q[1];
+        swap q[0], q[1];
+        iswap q[0], q[1];
+
+        xx(6.249142469550989) q[0], q[1];
+        yy(6.249142469550989) q[0], q[1];
+        xy(6.249142469550989) q[0], q[1];
+        zz(6.249142469550989) q[0], q[1];
+        pswap(6.249142469550989) q[0], q[1];
+        ms(0.1, 0.2, 0.3) q[0], q[1];
+
+        cphaseshift(6.249142469550989) q[0], q[1];
+        cphaseshift00(6.249142469550989) q[0], q[1];
+        cphaseshift01(6.249142469550989) q[0], q[1];
+        cphaseshift10(6.249142469550989) q[0], q[1];
+
+        ccnot q[0], q[1], q[2];
+        cswap q[0], q[1], q[2];
+        b[0] = measure q[0];
+        b[1] = measure q[1];
+        b[2] = measure q[2];
+        """
+    sv_exact_results_qasm = """
+        OPENQASM 3.0;
+        qubit[2] q;
+        h q;
+        #pragma braket result amplitude '00', '01', '10', '11'
+        #pragma braket result state_vector
+        #pragma braket result density_matrix
+        #pragma braket result probability
+        #pragma braket result expectation x(q[0])
+        #pragma braket result variance x(q[0]) @ y(q[1])
+        """
+    dm_exact_results_qasm = """
+        OPENQASM 3.0;
+        qubit[2] q;
+        h q;
+        #pragma braket result density_matrix
+        #pragma braket result probability
+        #pragma braket result expectation x(q[0])
+        #pragma braket result variance x(q[0]) @ y(q[1])
+        """
+    shots_results_qasm = """
+        OPENQASM 3.0;
+        qubit[2] q;
+        h q;
+        #pragma braket result probability
+        #pragma braket result expectation x(q[0])
+        #pragma braket result variance x(q[0]) @ y(q[1])
+        #pragma braket result sample x(q[0]) @ y(q[1])
+        """
     @compile_workload begin
         using BraketSimulator, BraketSimulator.Quasar
         simulator = StateVectorSimulator(5, 0)
@@ -624,6 +723,26 @@ include("dm_simulator.jl")
         simulator = StateVectorSimulator(16, 0)
         oq3_program = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), grcs_16_qasm, nothing)
         simulate(simulator, oq3_program, 0)
+
+        simulator = StateVectorSimulator(2, 0)
+        oq3_program = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), vqe_qasm, nothing)
+        simulate(simulator, oq3_program, 100)
+
+        sv_simulator = StateVectorSimulator(3, 0)
+        dm_simulator = DensityMatrixSimulator(3, 0)
+        oq3_program  = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), all_gates_qasm, nothing)
+        simulate(sv_simulator, oq3_program, 100)
+        simulate(dm_simulator, oq3_program, 100)
+
+        sv_simulator = StateVectorSimulator(2, 0)
+        dm_simulator = DensityMatrixSimulator(2, 0)
+        sv_oq3_program = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), sv_exact_results_qasm, nothing)
+        dm_oq3_program = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), dm_exact_results_qasm, nothing)
+        simulate(sv_simulator, sv_oq3_program, 0)
+        simulate(dm_simulator, dm_oq3_program, 0)
+        oq3_program = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), shots_results_qasm, nothing)
+        simulate(sv_simulator, oq3_program, 10)
+        simulate(dm_simulator, oq3_program, 10)
     end
 end
 end # module BraketSimulator
