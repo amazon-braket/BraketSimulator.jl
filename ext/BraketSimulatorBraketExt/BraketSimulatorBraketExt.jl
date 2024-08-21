@@ -153,6 +153,7 @@ function Base.convert(::Type{BraketSimulator.Program}, p::Braket.Program)
 end
 Base.convert(::Type{Braket.AbstractProgram}, p::BraketSimulator.Program) = Braket.Program(Braket.braketSchemaHeader("braket.ir.jaqcd.program", "1"), [convert(Braket.Instruction, ix) for ix in p.instructions],[convert(Braket.AbstractProgramResult, rt) for rt in p.results], [convert(Braket.Instruction, ix) for ix in p.basis_rotation_instructions])
 Base.convert(::Type{Braket.AbstractProgram}, p::BraketSimulator.OpenQasmProgram) = Braket.OpenQasmProgram(Braket.braketSchemaHeader("braket.ir.openqasm.program", "1"), p.source, p.inputs)
+Base.convert(::Type{Braket.Circuit}, c::BraketSimulator.Circuit) = convert(Braket.Circuit, convert(Braket.AbstractProgram, BraketSimulator.Program(c)))
 
 function __init__()
     Braket._simulator_devices[]["braket_dm_v2"] =
