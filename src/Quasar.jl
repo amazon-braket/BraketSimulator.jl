@@ -71,9 +71,7 @@ const qasm_tokens = [
         :arrow_token  => re"->",
         :reset_token  => re"reset",
         :delay_token  => re"delay",
-        :stretch_token  => re"stretch",
-        :barrier_token  => re"barrier",
-        :duration_token  => re"duration",
+        :barrier_token => re"barrier",
         :void         => re"void",
         :const_token  => re"const",
         :assignment   => re"=|-=|\+=|\*=|/=|^=|&=|\|=|<<=|>>=",
@@ -110,8 +108,8 @@ const qasm_tokens = [
         :string_token    => '"' * rep(re"[ !#-~]" | re"\\\\\"") * '"' | '\'' * rep(re"[ -&(-~]" | ('\\' * re"[ -~]")) * '\'',
         :newline         => re"\r?\n",
         :spaces          => re"[\t ]+",
-        :durationof_token  => re"durationof", # this MUST be lower than duration_token to preempt duration
-        :classical_type    => re"bool|uint|int|float|angle|complex|array|bit",
+        :classical_type    => re"bool|uint|int|float|angle|complex|array|bit|stretch|duration",
+        :durationof_token  => re"durationof", # this MUST be lower than classical_type to preempt duration
         :duration_literal  => (float | integer) * re"dt|ns|µs|us|ms|s",
         :forbidden_keyword => re"cal|defcal|extern",
 ]
@@ -369,6 +367,15 @@ function parse_classical_type(tokens, stack, start, qasm)
         first(array_tokens)[end] == comma && popfirst!(array_tokens)
         size   = parse_expression(array_tokens, stack, start, qasm)
         return QasmExpression(:classical_type, SizedArray(eltype, size))
+    elseif var_type == "duration"
+        @warn "duration expression encountered -- currently `duration` is a no-op"
+        # TODO: add proper parsing of duration expressions, including
+        # support for units and algebraic durations like 2*a.
+        return QasmExpression(:classical_type, :duration)
+    elseif var_type == "stretch"
+        @warn "stretch expression encountered -- currently `stretch` is a no-op"
+        # TODO: add proper parsing of stretch expressions
+        return QasmExpression(:classical_type, :stretch)
     else
         !any(triplet->triplet[end] == semicolon, tokens) && push!(tokens, (-1, Int32(-1), semicolon))
         size = is_sized ? parse_expression(tokens, stack, start, qasm) : QasmExpression(:integer_literal, -1)
@@ -1049,20 +1056,6 @@ function parse_qasm(clean_tokens::Vector{Tuple{Int64, Int32, Token}}, qasm::Stri
             end
             push!(delay_expr, target_expr)
             push!(stack, delay_expr)
-        elseif token == duration_token
-            @warn "duration expression encountered -- currently `duration` is a no-op"
-            eol = findfirst(triplet->triplet[end] == semicolon, clean_tokens)
-            duration_tokens = splice!(clean_tokens, 1:eol)
-            # TODO: add proper parsing of duration expressions, including
-            # support for units and algebraic durations like 2*a.
-            #dur_expr = parse_expression(duration_tokens, stack, start, qasm)
-            push!(stack, QasmExpression(:duration))
-        elseif token == stretch_token
-            @warn "stretch expression encountered -- currently `stretch` is a no-op"
-            eol = findfirst(triplet->triplet[end] == semicolon, clean_tokens)
-            stretch_tokens = splice!(clean_tokens, 1:eol)
-            stretch_expr = parse_expression(stretch_tokens, stack, start, qasm)
-            push!(stack, QasmExpression(:stretch, stretch_expr))
         elseif token == end_token
             push!(stack, QasmExpression(:end))
         elseif token == identifier || token == builtin_gate
@@ -1669,9 +1662,9 @@ function (v::AbstractVisitor)(program_expr::QasmExpression)
         return v
     elseif head(program_expr) == :delay
         duration_expr = program_expr.args[1].args[1]::QasmExpression
-        targets  = program_expr.args[2].args[1]::QasmExpression
+        targets       = program_expr.args[2].args[1]::QasmExpression
         target_qubits = evaluate(v, targets)
-        duration = evaluate(v, duration_expr) 
+        duration      = evaluate(v, duration_expr) 
         push!(v, [BraketSimulator.Instruction(BraketSimulator.Delay(duration), t) for t in target_qubits])
         return v
     elseif head(program_expr) == :stretch

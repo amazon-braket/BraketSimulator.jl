@@ -557,13 +557,34 @@ get_tol(shots::Int) = return (
         """
         @test_throws Quasar.QasmParseError parse_qasm(qasm)
     end
-    @testset "Delay" begin
+    @testset "Delay $duration" for (duration, ix) in (("200us", Microsecond(200)),
+                                                      ("50ns", Nanosecond(50)),
+                                                      ("10ms", Millisecond(10)),
+                                                      ("1s", Second(1)),
+                                                     )
+        
+
         qasm = """
         qubit[4] q;
-        delay[200us] q[0], q[1];
+        x q[0];
+        delay[$duration] q[0], q[1];
         """
         @test_warn "delay expression encountered -- currently `delay` is a no-op" parse_qasm(qasm)
-        @test BraketSimulator.Circuit(qasm).instructions == [BraketSimulator.Instruction(BraketSimulator.Delay(Microsecond(200)), 0), BraketSimulator.Instruction(BraketSimulator.Delay(Microsecond(200)), 1)]
+        circuit = BraketSimulator.Circuit(qasm)
+        @test circuit.instructions == [BraketSimulator.Instruction(BraketSimulator.X(), 0),
+                                       BraketSimulator.Instruction(BraketSimulator.Delay(ix), 0),
+                                       BraketSimulator.Instruction(BraketSimulator.Delay(ix), 1),
+                                      ]
+        simulation = BraketSimulator.StateVectorSimulator(4, 0)
+        ref_circ   = BraketSimulator.Circuit()
+        push!(ref_circ.instructions, BraketSimulator.Instruction(BraketSimulator.X(), 0))
+        push!(ref_circ.instructions, BraketSimulator.Instruction(BraketSimulator.I(), 1))
+        push!(ref_circ.instructions, BraketSimulator.Instruction(BraketSimulator.I(), 2))
+        push!(ref_circ.instructions, BraketSimulator.Instruction(BraketSimulator.I(), 3))
+        ref_sim    = BraketSimulator.StateVectorSimulator(4, 0)
+        BraketSimulator.evolve!(simulation, circuit.instructions)
+        BraketSimulator.evolve!(ref_sim, ref_circ.instructions)
+        @test simulation.state_vector ≈ ref_sim.state_vector
     end
     @testset "Barrier" begin
         qasm = """
@@ -605,7 +626,18 @@ get_tol(shots::Int) = return (
         reset q[0];
         """
         @test_warn "reset expression encountered -- currently `reset` is a no-op" parse_qasm(qasm)
-        @test BraketSimulator.Circuit(qasm).instructions == [BraketSimulator.Instruction(BraketSimulator.X(), 0), BraketSimulator.Instruction(BraketSimulator.Reset(), 0)]
+        circuit = BraketSimulator.Circuit(qasm)
+        @test circuit.instructions == [BraketSimulator.Instruction(BraketSimulator.X(), 0), BraketSimulator.Instruction(BraketSimulator.Reset(), 0)]
+        simulation = BraketSimulator.StateVectorSimulator(4, 0)
+        ref_circ   = BraketSimulator.Circuit()
+        push!(ref_circ.instructions, BraketSimulator.Instruction(BraketSimulator.X(), 0))
+        push!(ref_circ.instructions, BraketSimulator.Instruction(BraketSimulator.I(), 1))
+        push!(ref_circ.instructions, BraketSimulator.Instruction(BraketSimulator.I(), 2))
+        push!(ref_circ.instructions, BraketSimulator.Instruction(BraketSimulator.I(), 3))
+        ref_sim    = BraketSimulator.StateVectorSimulator(4, 0)
+        BraketSimulator.evolve!(simulation, circuit.instructions)
+        BraketSimulator.evolve!(ref_sim, ref_circ.instructions)
+        @test simulation.state_vector ≈ ref_sim.state_vector
     end
     @testset "Gate call missing/extra args" begin
         qasm = """
