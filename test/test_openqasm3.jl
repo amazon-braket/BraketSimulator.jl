@@ -568,6 +568,7 @@ get_tol(shots::Int) = return (
 
         qasm = """
         qubit[4] q;
+<<<<<<< HEAD
         x q[0];
         delay[$duration] q[0], q[1];
         """

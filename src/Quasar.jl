@@ -1059,7 +1059,7 @@ function parse_qasm(clean_tokens::Vector{Tuple{Int64, Int32, Token}}, qasm::Stri
             push!(delay_expr, QasmExpression(:duration, parse_expression(delay_duration, stack, start, qasm)))
             target_expr = QasmExpression(:targets)
             if first(delay_tokens)[end] != semicolon # targets present
-                targets = parse_expression(delay_tokens, stack, start, qasm)
+                targets = parse_list_expression(delay_tokens, stack, start, qasm)
                 push!(target_expr, targets)
             end
             push!(delay_expr, target_expr)
@@ -1689,8 +1689,6 @@ function (v::AbstractVisitor)(program_expr::QasmExpression)
         target_qubits = evaluate(v, targets)
         duration      = evaluate(v, duration_expr) 
         push!(v, [BraketSimulator.Instruction(BraketSimulator.Delay(duration), t) for t in target_qubits])
-        return v
-    elseif head(program_expr) == :delay
         return v
     elseif head(program_expr) == :stretch
         return v
