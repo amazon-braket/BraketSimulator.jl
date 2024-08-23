@@ -177,15 +177,20 @@ function _compute_exact_results(d::AbstractSimulator, program::Program, qubit_co
     return _generate_results(program.results, result_types, d)
 end
 
+function _compute_exact_results(d::AbstractSimulator, program::Circuit, qubit_count::Int)
+    _validate_result_types_qubits_exist(program.result_types, qubit_count)
+    return _generate_results(map(StructTypes.lower, program.result_types), program.result_types, d)
+end
+
 """
-    _get_measured_qubits(program::Program, qubit_count::Int) -> Vector{Int}
+    _get_measured_qubits(program, qubit_count::Int) -> Vector{Int}
 
 Get the qubits measured by the program. If [`Measure`](@ref)
 instructions are present in the program's instruction list,
 their targets are used to form the list of measured qubits.
 If not, all qubits from 0 to `qubit_count-1` are measured. 
 """
-function _get_measured_qubits(program::Program, qubit_count::Int)
+function _get_measured_qubits(program, qubit_count::Int)
     measure_inds    = findall(ix->ix.operator isa Measure, program.instructions)
     isempty(measure_inds) && return collect(0:qubit_count-1)
     measure_ixs     = program.instructions[measure_inds]
@@ -202,13 +207,13 @@ parsing and the qubit count of the circuit.
 """
 function _prepare_program(circuit_ir::OpenQasmProgram, inputs::Dict{String, <:Any}, shots::Int)
     ir_inputs = isnothing(circuit_ir.inputs) ? Dict{String, Float64}() : circuit_ir.inputs 
-    circuit   = Circuit(circuit_ir.source, merge(ir_inputs, inputs))
+    circuit   = @time "\t\tParse OQ3" Circuit(circuit_ir.source, merge(ir_inputs, inputs))
     n_qubits  = qubit_count(circuit)
     if shots > 0
         _verify_openqasm_shots_observables(circuit, n_qubits)
         basis_rotation_instructions!(circuit)
     end
-    return Program(circuit), n_qubits
+    return circuit, n_qubits
 end
 """
     _prepare_program(circuit_ir::Program, inputs::Dict{String, <:Any}, shots::Int) -> (Program, Int)
@@ -225,12 +230,12 @@ function _prepare_program(circuit_ir::Program, inputs::Dict{String, <:Any}, shot
     return bound_program, qubit_count(circuit_ir)
 end
 """
-    _combine_operations(program::Program, shots::Int) -> Program
+    _combine_operations(program, shots::Int) -> Program
 
 Combine explicit instructions and basis rotation instructions (if necessary).
 Validate that all operations are performed on qubits within `qubit_count`.
 """
-function _combine_operations(program::Program, shots::Int)
+function _combine_operations(program, shots::Int)
     operations = program.instructions
     if shots > 0 && !isempty(program.basis_rotation_instructions)
         operations = vcat(operations, program.basis_rotation_instructions)
@@ -249,13 +254,14 @@ Compute the results once `simulator` has finished applying all the instructions.
   and a placeholder zero value.
 """
 function _compute_results(::Type{OpenQasmProgram}, simulator, program, n_qubits, shots) # nosemgrep
-    analytic_results = shots == 0 && !isnothing(program.results) && !isempty(program.results)
+    results = program.result_types
+    analytic_results = shots == 0 && !isnothing(results) && !isempty(results)
     if analytic_results
         return _compute_exact_results(simulator, program, n_qubits)
-    elseif isnothing(program.results) || isempty(program.results)
+    elseif isnothing(results) || isempty(results)
         return ResultTypeValue[]
     else
-        return ResultTypeValue[ResultTypeValue(result_type, 0.0) for result_type in program.results]
+        return ResultTypeValue[ResultTypeValue(StructTypes.lower(result_type), 0.0) for result_type in results]
     end
 end
 function _compute_results(::Type{Program}, simulator, program, n_qubits, shots) # nosemgrep
@@ -270,6 +276,12 @@ function _validate_circuit_ir(simulator, circuit_ir::Program, qubit_count::Int, 
     _validate_ir_results_compatibility(simulator, circuit_ir.results, Val(:JAQCD))
     _validate_ir_instructions_compatibility(simulator, circuit_ir, Val(:JAQCD))
     _validate_shots_and_ir_results(shots, circuit_ir.results, qubit_count)
+    return
+end
+function _validate_circuit_ir(simulator, circuit_ir::Circuit, qubit_count::Int, shots::Int)
+    _validate_ir_results_compatibility(simulator, circuit_ir.result_types, Val(:JAQCD))
+    _validate_ir_instructions_compatibility(simulator, circuit_ir, Val(:JAQCD))
+    _validate_shots_and_ir_results(shots, circuit_ir.result_types, qubit_count)
     return
 end
 
@@ -290,14 +302,14 @@ function simulate(
     inputs = Dict{String, Float64}(),
     kwargs...,
 ) where {T<:Union{OpenQasmProgram, Program}}
-    program, n_qubits = _prepare_program(circuit_ir, inputs, shots)
-    _validate_circuit_ir(simulator, program, n_qubits, shots)
-    operations        = _combine_operations(program, shots)
+    program, n_qubits = @time "\tPrep program" _prepare_program(circuit_ir, inputs, shots)
+    @time "\tValidate program" _validate_circuit_ir(simulator, program, n_qubits, shots)
+    operations        = @time "\tCombine ops" _combine_operations(program, shots)
     reinit!(simulator, n_qubits, shots)
-    simulator         = evolve!(simulator, operations)
+    simulator         = @time "\tEvolve" evolve!(simulator, operations)
     measured_qubits   = _get_measured_qubits(program, n_qubits)
-    results           = _compute_results(T, simulator, program, n_qubits, shots)
-    return _bundle_results(results, circuit_ir, simulator, measured_qubits)
+    results           = @time "\tCompute results" _compute_results(T, simulator, program, n_qubits, shots)
+    return  @time "\tBundle results" _bundle_results(results, circuit_ir, simulator, measured_qubits)
 end
 
 """
@@ -701,7 +713,7 @@ include("dm_simulator.jl")
         #pragma braket result sample x(q[0]) @ y(q[1])
         """
     @compile_workload begin
-        using BraketSimulator, BraketSimulator.Quasar
+        using BraketSimulator, BraketSimulator.Quasar, BraketSimulator.StructTypes
         simulator = StateVectorSimulator(5, 0)
         oq3_program = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), custom_qasm, nothing)
         simulate(simulator, oq3_program, 100)
@@ -738,11 +750,15 @@ include("dm_simulator.jl")
         dm_simulator = DensityMatrixSimulator(2, 0)
         sv_oq3_program = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), sv_exact_results_qasm, nothing)
         dm_oq3_program = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), dm_exact_results_qasm, nothing)
-        simulate(sv_simulator, sv_oq3_program, 0)
-        simulate(dm_simulator, dm_oq3_program, 0)
+        results = simulate(sv_simulator, sv_oq3_program, 0)
+        map(StructTypes.lower, results.resultTypes) 
+        results = simulate(dm_simulator, dm_oq3_program, 0)
+        map(StructTypes.lower, results.resultTypes) 
         oq3_program = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), shots_results_qasm, nothing)
-        simulate(sv_simulator, oq3_program, 10)
-        simulate(dm_simulator, oq3_program, 10)
+        results = simulate(sv_simulator, oq3_program, 10)
+        map(StructTypes.lower, results.resultTypes) 
+        results = simulate(dm_simulator, oq3_program, 10)
+        map(StructTypes.lower, results.resultTypes) 
     end
 end
 end # module BraketSimulator

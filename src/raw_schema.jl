@@ -107,23 +107,16 @@ struct ResultTypeValue
     value::Union{Vector, Float64, Dict}
 end
 # for custom lowering of ComplexF64
+# just build the tuples directly to
+# avoid allocing so much
 StructTypes.StructType(::Type{ResultTypeValue}) = StructTypes.CustomStruct()
 function StructTypes.lower(rtv::ResultTypeValue)
-    typ = rtv.type
-    function lower_complex(v::ComplexF64)
-        abs(imag(v)) < eps(real(v)) && return real(v)
-        return [real(v), imag(v)]
-    end
-    lower_complex(v) = v
-    if rtv.value isa Float64
-        return (type=typ, value=rtv.value)
-    elseif rtv.value isa Vector 
-        lowered_vec = [lower_complex(val) for val in rtv.value]
-        return (type=typ, value=lowered_vec)
-    elseif rtv.value isa Dict
-        lowered_dict = Dict(k=>lower_complex(v) for (k, v) in rtv.value)
-        return (type=typ, value=lowered_dict)
-    end
+    lower_complex(v::Number)             = (real(v), imag(v))
+    lower_complex(v::Vector{Float64})    = v
+    lower_complex(v::Vector{ComplexF64}) = reinterpret(Tuple{Float64, Float64}, v)
+    lower_complex(v::Vector)             = map(lower_complex, v)
+    lower_complex(v::Dict)               = Dict(k=>lower_complex(v_) for (k,v_) in v)
+    return (type=rtv.type, value=lower_complex(rtv.value))
 end
 
 struct JaqcdDeviceActionProperties <: DeviceActionProperties
