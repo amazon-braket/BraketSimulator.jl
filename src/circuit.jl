@@ -234,8 +234,28 @@ add_to_qubit_observable_set!(c::Circuit, rt::AdjointGradient)  = union!(c.qubit_
 # COV_EXCL_STOP
 add_to_qubit_observable_set!(c::Circuit, rt::Result) = c.qubit_observable_set
 
+function _check_if_measured_qubit_is_reset(c::Circuit, qubit::Int)
+    # Initialize a flag to track if the qubit has been reset after measurement
+    reset_after_measurement = true
+
+    # Iterate through the instructions in the circuit
+    for instruction in c.instructions
+        if instruction isa BraketSimulator.Measure && instruction.target == qubit
+            # If we encounter a measurement instruction, check the next instruction
+            reset_after_measurement = false
+        elseif instruction isa BraketSimulator.Reset && instruction.target == qubit
+            # If we encounter a reset instruction for the same qubit, set the flag
+            reset_after_measurement = true
+        end
+    end
+
+    reset_after_measurement 
+end
+
 function _check_if_qubit_measured(c::Circuit, qubit::Int)
     isempty(c.measure_targets) && return
+    # check if after there is a reset instruction after every measure instruction on the targeted qubit
+    _check_if_measured_qubit_is_reset(c, qubit) && return
     # check if there is a measure instruction on the targeted qubit(s)
     isempty(intersect(c.measure_targets, qubit)) || error("cannot apply instruction to measured qubits.")
 end
