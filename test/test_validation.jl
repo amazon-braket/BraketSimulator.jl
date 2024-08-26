@@ -2,9 +2,14 @@ using Test, BraketSimulator
 
 @testset "IR validation" begin
     sim = DensityMatrixSimulator(2, 0)
-    results = [(type="NotARealResult",)]
-    @test_throws ErrorException BraketSimulator._validate_ir_results_compatibility(sim, results, Val(:OpenQASM))
-    @test_throws ErrorException BraketSimulator._validate_ir_results_compatibility(sim, results, Val(:JAQCD))
+    struct NotARealResult <: BraketSimulator.Result end
+    BraketSimulator.label(::NotARealResult) = "notarealresult"
+    @test_throws ErrorException BraketSimulator._validate_ir_results_compatibility(sim, [NotARealResult()], Val(:OpenQASM))
+    struct NotARealIRResult <: BraketSimulator.AbstractProgramResult
+        type::String
+        NotARealIRResult() = new("notarealresult")
+    end
+    @test_throws ErrorException BraketSimulator._validate_ir_results_compatibility(sim, [NotARealIRResult()], Val(:JAQCD))
     c = BraketSimulator.Circuit()
     BraketSimulator.add_instruction!(c, BraketSimulator.Instruction(BraketSimulator.Rx(BraketSimulator.FreeParameter(:α)), 0))
     @test_throws ErrorException BraketSimulator._validate_input_provided(c)
