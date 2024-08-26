@@ -78,9 +78,9 @@ qubit_count(c::Circuit) = length(qubits(c))
 qubit_count(p::Program) = length(qubits(p))
 
 function Base.convert(::Type{Program}, c::Circuit)
-    lowered_rts = @time "\t\t\tlower rts in program" ir.(c.result_types, Val(:JAQCD))
-    header = @time "\t\t\tbuild header" braketSchemaHeader("braket.ir.jaqcd.program" ,"1")
-    return @time "\t\t\tput program together" Program(header, c.instructions, lowered_rts, c.basis_rotation_instructions)
+    lowered_rts = map(StructTypes.lower, c.result_types)
+    header = braketSchemaHeader("braket.ir.jaqcd.program" ,"1")
+    return Program(header, c.instructions, lowered_rts, c.basis_rotation_instructions)
 end
 Program(c::Circuit) = convert(Program, c)
 
