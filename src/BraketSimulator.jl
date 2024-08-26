@@ -74,7 +74,8 @@ include("noise_kernels.jl")
 include("Quasar.jl")
 using .Quasar
 
-const CHUNK_SIZE = 2^10
+const LOG2_CHUNK_SIZE = 10
+const CHUNK_SIZE      = 2^LOG2_CHUNK_SIZE
 
 function _index_to_endian_bits(ix::Int, qubit_count::Int)
     bits = Vector{Int}(undef, qubit_count)
@@ -139,17 +140,16 @@ function _bundle_results(
 end
 
 function _generate_results(
-    results::Vector{<:AbstractProgramResult},
-    result_types::Vector,
+    result_types,
     simulator::D,
 ) where {D<:AbstractSimulator}
     result_values = map(result_type -> calculate(result_type, simulator), result_types)
-    final_results = Vector{ResultTypeValue}(undef, length(result_values))
-    for r_ix in 1:length(final_results)
-        final_results[r_ix] = ResultTypeValue(results[r_ix],
-                                              complex_matrix_to_ir(result_values[r_ix]))
+    ir_results    = map(StructTypes.lower, result_types)
+    results = map(zip(ir_results, result_values)) do (ir, val)
+        ir_val = complex_matrix_to_ir(val)
+        return ResultTypeValue(ir, ir_val)
     end
-    return final_results
+    return results
 end
 
 _translate_result_type(r::IR.Amplitude, qc::Int)     = Amplitude(r.states)
@@ -158,14 +158,13 @@ _translate_result_type(r::IR.StateVector, qc::Int)   = StateVector()
 # however `Result`s represent this with an empty `QubitSet` for type
 # stability reasons. Here we take a `nothing` value for `targets` and translate it
 # to apply to all qubits.
-_translate_result_type(r::IR.DensityMatrix, qc::Int) = isnothing(r.targets) ? DensityMatrix(collect(0:qc-1)) : DensityMatrix(r.targets)
-_translate_result_type(r::IR.Probability, qc::Int)   = isnothing(r.targets) ? Probability(collect(0:qc-1))   : Probability(r.targets)
+_translate_result_type(r::IR.DensityMatrix, qc::Int) = DensityMatrix(r.targets)
+_translate_result_type(r::IR.Probability, qc::Int)   = Probability(r.targets)
 for (RT, IRT) in ((:Expectation, :(IR.Expectation)), (:Variance, :(IR.Variance)), (:Sample, :(IR.Sample)))
     @eval begin
         function _translate_result_type(r::$IRT, qc::Int)
-            targets = isnothing(r.targets) ? collect(0:qc-1) : r.targets
             obs     = StructTypes.constructfrom(Observables.Observable, r.observable)
-            $RT(obs, QubitSet(targets))
+            $RT(obs, QubitSet(r.targets))
         end
     end
 end
@@ -174,12 +173,12 @@ _translate_result_types(results::Vector{AbstractProgramResult}, qubit_count::Int
 function _compute_exact_results(d::AbstractSimulator, program::Program, qubit_count::Int)
     result_types = _translate_result_types(program.results, qubit_count)
     _validate_result_types_qubits_exist(result_types, qubit_count)
-    return _generate_results(program.results, result_types, d)
+    return _generate_results(result_types, d)
 end
 
 function _compute_exact_results(d::AbstractSimulator, program::Circuit, qubit_count::Int)
     _validate_result_types_qubits_exist(program.result_types, qubit_count)
-    return _generate_results(map(StructTypes.lower, program.result_types), program.result_types, d)
+    return _generate_results(program.result_types, d)
 end
 
 """
@@ -207,7 +206,7 @@ parsing and the qubit count of the circuit.
 """
 function _prepare_program(circuit_ir::OpenQasmProgram, inputs::Dict{String, <:Any}, shots::Int)
     ir_inputs = isnothing(circuit_ir.inputs) ? Dict{String, Float64}() : circuit_ir.inputs 
-    circuit   = @time "\t\tParse OQ3" Circuit(circuit_ir.source, merge(ir_inputs, inputs))
+    circuit   = Circuit(circuit_ir.source, merge(ir_inputs, inputs))
     n_qubits  = qubit_count(circuit)
     if shots > 0
         _verify_openqasm_shots_observables(circuit, n_qubits)
@@ -221,13 +220,13 @@ end
 Apply any `inputs` provided for the simulation. Return the `Program`
 (with bound parameters) and the qubit count of the circuit.
 """
-# nosemgrep
-function _prepare_program(circuit_ir::Program, inputs::Dict{String, <:Any}, shots::Int)
+function _prepare_program(circuit_ir::Program, inputs::Dict{String, <:Any}, shots::Int) #nosemgrep
     operations::Vector{Instruction} = circuit_ir.instructions
     symbol_inputs = Dict(Symbol(k) => v for (k, v) in inputs)
     operations    = [bind_value!(operation, symbol_inputs) for operation in operations]
+    qc            = qubit_count(circuit_ir)
     bound_program = Program(circuit_ir.braketSchemaHeader, operations, circuit_ir.results, circuit_ir.basis_rotation_instructions)
-    return bound_program, qubit_count(circuit_ir)
+    return bound_program, qc
 end
 """
     _combine_operations(program, shots::Int) -> Program
@@ -253,18 +252,19 @@ Compute the results once `simulator` has finished applying all the instructions.
   the results array is populated with the parsed result types (to help the Braket SDK compute them from the sampled measurements)
   and a placeholder zero value.
 """
-function _compute_results(::Type{OpenQasmProgram}, simulator, program, n_qubits, shots) # nosemgrep
-    results = program.result_types
-    analytic_results = shots == 0 && !isnothing(results) && !isempty(results)
+function _compute_results(simulator, program::Circuit, n_qubits, shots)
+    results          = program.result_types
+    has_no_results   = isnothing(results) || isempty(results)
+    analytic_results = shots == 0 && !has_no_results
     if analytic_results
         return _compute_exact_results(simulator, program, n_qubits)
-    elseif isnothing(results) || isempty(results)
+    elseif has_no_results
         return ResultTypeValue[]
     else
         return ResultTypeValue[ResultTypeValue(StructTypes.lower(result_type), 0.0) for result_type in results]
     end
 end
-function _compute_results(::Type{Program}, simulator, program, n_qubits, shots) # nosemgrep
+function _compute_results(simulator, program::Program, n_qubits, shots)
     analytic_results = shots == 0 && !isnothing(program.results) && !isempty(program.results)
     if analytic_results
         return _compute_exact_results(simulator, program, n_qubits)
@@ -302,14 +302,14 @@ function simulate(
     inputs = Dict{String, Float64}(),
     kwargs...,
 ) where {T<:Union{OpenQasmProgram, Program}}
-    program, n_qubits = @time "\tPrep program" _prepare_program(circuit_ir, inputs, shots)
-    @time "\tValidate program" _validate_circuit_ir(simulator, program, n_qubits, shots)
-    operations        = @time "\tCombine ops" _combine_operations(program, shots)
+    program, n_qubits = _prepare_program(circuit_ir, inputs, shots)
+    _validate_circuit_ir(simulator, program, n_qubits, shots)
+    operations        = _combine_operations(program, shots)
     reinit!(simulator, n_qubits, shots)
-    simulator         = @time "\tEvolve" evolve!(simulator, operations)
+    simulator         = evolve!(simulator, operations)
     measured_qubits   = _get_measured_qubits(program, n_qubits)
-    results           = @time "\tCompute results" _compute_results(T, simulator, program, n_qubits, shots)
-    return  @time "\tBundle results" _bundle_results(results, circuit_ir, simulator, measured_qubits)
+    results           = _compute_results(simulator, program, n_qubits, shots)
+    return _bundle_results(results, circuit_ir, simulator, measured_qubits)
 end
 
 """
@@ -635,6 +635,7 @@ include("dm_simulator.jl")
         """
     all_gates_qasm = """
         OPENQASM 3.0;
+        input float theta;
         bit[3] b;
         qubit[3] q;
         rx(0.1) q[0];
@@ -665,11 +666,11 @@ include("dm_simulator.jl")
         swap q[0], q[1];
         iswap q[0], q[1];
 
-        xx(6.249142469550989) q[0], q[1];
-        yy(6.249142469550989) q[0], q[1];
-        xy(6.249142469550989) q[0], q[1];
-        zz(6.249142469550989) q[0], q[1];
-        pswap(6.249142469550989) q[0], q[1];
+        xx(theta) q[0], q[1];
+        yy(theta) q[0], q[1];
+        xy(theta) q[0], q[1];
+        zz(theta) q[0], q[1];
+        pswap(theta) q[0], q[1];
         ms(0.1, 0.2, 0.3) q[0], q[1];
 
         cphaseshift(6.249142469550989) q[0], q[1];
@@ -742,7 +743,7 @@ include("dm_simulator.jl")
 
         sv_simulator = StateVectorSimulator(3, 0)
         dm_simulator = DensityMatrixSimulator(3, 0)
-        oq3_program  = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), all_gates_qasm, nothing)
+        oq3_program  = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), all_gates_qasm, Dict("theta"=>0.665))
         simulate(sv_simulator, oq3_program, 100)
         simulate(dm_simulator, oq3_program, 100)
 
