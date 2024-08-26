@@ -29,17 +29,17 @@ end
     return n_amps, endian_qubits(n_qubits, qubits...)
 end
 
-matrix_rep_raw(::H) = SMatrix{2,2}(complex((1 / √2) * [1.0 1.0; 1.0 -1.0]))
-matrix_rep_raw(::X) = SMatrix{2,2}(complex([0.0 1.0; 1.0 0.0]))
-matrix_rep_raw(::Y) = SMatrix{2,2}(complex([0.0 -im; im 0.0]))
-matrix_rep_raw(::Z) = SMatrix{2,2}(complex([1.0 0.0; 0.0 -1.0]))
 matrix_rep_raw(g::I, qc::Int=1) = SMatrix{2^qc,2^qc}(complex(diagm(ones(2^qc))))
-matrix_rep_raw(::V) = SMatrix{2,2}(0.5 * [1.0+im 1.0-im; 1.0-im 1.0+im])
-matrix_rep_raw(::Vi) = SMatrix{2,2}(0.5 * [1.0-im 1.0+im; 1.0+im 1.0-im])
-matrix_rep_raw(::S)  = SMatrix{2,2}([1.0 0.0; 0.0 im])
-matrix_rep_raw(::Si) = SMatrix{2,2}([1.0 0.0; 0.0 -im])
-matrix_rep_raw(::T)  = SMatrix{2,2}([1.0 0.0; 0.0 exp(im * π / 4.0)])
-matrix_rep_raw(::Ti) = SMatrix{2,2}([1.0 0.0; 0.0 exp(-im * π / 4.0)])
+matrix_rep_raw(::H) = SMatrix{2,2}(complex(1/√2), complex(1/√2), complex(1/√2), -complex(1/√2))
+matrix_rep_raw(::X) = SMatrix{2,2}(complex(0.0), complex(1.0), complex(1.0), complex(0.0))
+matrix_rep_raw(::Y) = SMatrix{2,2}(0.0, im, -im, 0.0)
+matrix_rep_raw(::Z) = SMatrix{2,2}(complex(1.0), complex(0.0), complex(0.0), complex(-1.0))
+matrix_rep_raw(::V) = SMatrix{2,2}(0.5+0.5*im, 0.5-0.5*im, 0.5-0.5*im, 0.5+0.5*im)
+matrix_rep_raw(::Vi) = SMatrix{2,2}(0.5-0.5*im, 0.5+0.5*im, 0.5+0.5*im, 0.5-0.5*im)
+matrix_rep_raw(::S)  = SMatrix{2,2}(1.0, 0.0, 0.0, im)
+matrix_rep_raw(::Si) = SMatrix{2,2}(1.0, 0.0, 0.0, -im)
+matrix_rep_raw(::T)  = SMatrix{2,2}(1.0, 0.0, 0.0, exp(im * π / 4.0))
+matrix_rep_raw(::Ti) = SMatrix{2,2}(1.0, 0.0, 0.0, exp(-im * π / 4.0))
 matrix_rep_raw(g::CNot) = SMatrix{4,4}(complex([1.0 0.0 0.0 0.0; 0.0 1.0 0.0 0.0; 0.0 0.0 0.0 1.0; 0.0 0.0 1.0 0.0]))
 matrix_rep_raw(g::CY) = SMatrix{4,4}([1.0 0.0 0.0 0.0; 0.0 1.0 0.0 0.0; 0.0 0.0 0.0 -im; 0.0 0.0 im 0.0])
 matrix_rep_raw(g::CZ) = SMatrix{4,4}(complex([1.0 0.0 0.0 0.0; 0.0 1.0 0.0 0.0; 0.0 0.0 1.0 0.0; 0.0 0.0 0.0 -1.0]))
@@ -95,13 +95,46 @@ function matrix_rep(g::PRx)
     return SMatrix{2, 2}(matrix_rep_raw(g)^n)
 end
 
-for G in (:Rx, :Ry, :Rz, :PhaseShift, :CPhaseShift, :CPhaseShift00, :CPhaseShift01, :CPhaseShift10, :XX, :YY, :ZZ, :XY, :SingleExcitation, :DoubleExcitation, :MultiRZ)
+for G in (:Rx, :Ry, :Rz, :PhaseShift)
     @eval function matrix_rep(g::$G)
-        n = g.pow_exponent
-        iszero(n) && return matrix_rep_raw(I(), qubit_count(g))
-        isone(n) && return matrix_rep_raw(g)
-        isinteger(n) && return matrix_rep_raw($G(g.angle[1]*n))
-        return SMatrix{2^qubit_count(g),2^qubit_count(g)}(matrix_rep_raw($G(g.angle[1])) ^ n)
+        n = g.pow_exponent::Float64
+        θ = @inbounds g.angle[1]
+        iszero(n)    && return matrix_rep_raw(I())::SMatrix{2,2,ComplexF64}
+        isone(n)     && return matrix_rep_raw(g, θ)::SMatrix{2,2,ComplexF64}
+        isinteger(n) && return matrix_rep_raw(g, θ*n)::SMatrix{2,2,ComplexF64}
+        return SMatrix{2,2,ComplexF64}(matrix_rep_raw(g, θ) ^ n)
+    end
+end
+
+for G in (:CPhaseShift, :CPhaseShift00, :CPhaseShift01, :CPhaseShift10, :ZZ)
+    @eval function matrix_rep(g::$G)
+        n = g.pow_exponent::Float64
+        θ = @inbounds g.angle[1]
+        iszero(n)    && return matrix_rep_raw(I(), 2)
+        isone(n)     && return matrix_rep_raw(g, θ)::Diagonal{ComplexF64, SVector{4,ComplexF64}}
+        return matrix_rep_raw(g, θ*n)::Diagonal{ComplexF64, SVector{4,ComplexF64}}
+    end
+end
+
+for G in (:XX, :YY, :XY, :SingleExcitation)
+    @eval function matrix_rep(g::$G)
+        n = g.pow_exponent::Float64
+        θ = @inbounds g.angle[1]
+        iszero(n)    && return matrix_rep_raw(I(), 2)::SMatrix{4,4,ComplexF64}
+        isone(n)     && return matrix_rep_raw(g, θ)::SMatrix{4,4,ComplexF64}
+        isinteger(n) && return matrix_rep_raw(g, θ*n)::SMatrix{4,4,ComplexF64}
+        return SMatrix{4,4}(matrix_rep_raw(g, θ) ^ n)
+    end
+end
+
+for G in (:DoubleExcitation, :MultiRZ)
+    @eval function matrix_rep(g::$G)
+        n = g.pow_exponent::Float64
+        θ = @inbounds g.angle[1]
+        iszero(n)    && return matrix_rep_raw(I(), qubit_count(g))
+        isone(n)     && return matrix_rep_raw(g, θ)
+        isinteger(n) && return matrix_rep_raw(g, θ*n)
+        return SMatrix{2^qubit_count(g),2^qubit_count(g)}(matrix_rep_raw(g, θ) ^ n)
     end
 end
     
@@ -179,22 +212,9 @@ matrix_rep_raw(g::PRx) = SMatrix{2,2}(
         -im*exp(im*g.angle[2])*sin(g.angle[1]/2.0) cos(g.angle[1] / 2.0)
     ],
 )
-matrix_rep_raw(g::Rz) =
-    SMatrix{2,2}([exp(-im * g.angle[1] / 2.0) 0.0; 0.0 exp(im * g.angle[1] / 2.0)])
-matrix_rep_raw(g::Rx) = SMatrix{2,2}(
-    [
-        cos(g.angle[1] / 2.0) -im*sin(g.angle[1] / 2.0)
-        -im*sin(g.angle[1] / 2.0) cos(g.angle[1] / 2.0)
-    ],
-)
-matrix_rep_raw(g::Ry) = SMatrix{2,2}(
-    complex(
-        [
-            cos(g.angle[1] / 2.0) -sin(g.angle[1] / 2.0)
-            sin(g.angle[1] / 2.0) cos(g.angle[1] / 2.0)
-        ],
-    ),
-)
+matrix_rep_raw(g::Rz, ϕ) = (θ = ϕ/2.0; return SMatrix{2,2}(exp(-im*θ), 0.0, 0.0, exp(im*θ)))
+matrix_rep_raw(g::Rx, ϕ) = ((sθ, cθ) = sincos(ϕ/2.0); return SMatrix{2,2}(cθ, -im*sθ, -im*sθ, cθ))
+matrix_rep_raw(g::Ry, ϕ) = ((sθ, cθ) = sincos(ϕ/2.0); return SMatrix{2,2}(complex(cθ), complex(sθ), -complex(sθ), complex(cθ)))
 matrix_rep_raw(g::GPi) =
     SMatrix{2,2}(complex([0 exp(-im * g.angle[1]); exp(im * g.angle[1]) 0]))
 
@@ -210,19 +230,13 @@ matrix_rep_raw(g::MS) = SMatrix{4,4}(
         ],
     ),
 )
-matrix_rep_raw(g::PhaseShift) = SMatrix{2,2}([1.0 0.0; 0.0 exp(im * g.angle[1])])
+matrix_rep_raw(g::PhaseShift, ϕ) = SMatrix{2,2}(complex(1.0), 0.0, 0.0, exp(im * ϕ))
 
 # controlled unitaries
-for (cph, ind) in
-    ((:CPhaseShift, 4), (:CPhaseShift00, 1), (:CPhaseShift01, 3), (:CPhaseShift10, 2))
-    @eval begin
-        matrix_rep_raw(g::$cph) = Diagonal(
-            SVector{4,ComplexF64}(
-                setindex!(ones(ComplexF64, 4), exp(im * g.angle[1]), $ind),
-            ),
-        )
-    end
-end
+matrix_rep_raw(g::CPhaseShift, ϕ)   = Diagonal(SVector{4}(1.0, 1.0, 1.0, exp(im*ϕ)))
+matrix_rep_raw(g::CPhaseShift00, ϕ) = Diagonal(SVector{4}(exp(im*ϕ), 1.0, 1.0, 1.0))
+matrix_rep_raw(g::CPhaseShift01, ϕ) = Diagonal(SVector{4}(1.0, 1.0, exp(im*ϕ), 1.0))
+matrix_rep_raw(g::CPhaseShift10, ϕ) = Diagonal(SVector{4}(1.0, exp(im*ϕ), 1.0, 1.0))
 
 for (sw, factor) in ((:Swap, 1.0), (:ISwap, im), (:PSwap, :(exp(im * g.angle[1]))))
     @eval begin
@@ -231,38 +245,27 @@ for (sw, factor) in ((:Swap, 1.0), (:ISwap, im), (:PSwap, :(exp(im * g.angle[1])
         )
     end
 end
-matrix_rep_raw(g::XX) = SMatrix{4,4}(
-    [
-        cos(g.angle[1] / 2.0) 0.0 0.0 -im*sin(g.angle[1] / 2)
-        0.0 cos(g.angle[1] / 2.0) -im*sin(g.angle[1] / 2.0) 0.0
-        0.0 -im*sin(g.angle[1] / 2.0) cos(g.angle[1] / 2.0) 0.0
-        -im*sin(g.angle[1] / 2.0) 0.0 0.0 cos(g.angle[1] / 2.0)
-    ],
+matrix_rep_raw(::XX, ϕ) = ((sθ, cθ) = sincos(ϕ/2.0); return SMatrix{4,4,ComplexF64}(
+    cθ, 0.0, 0.0, -im*sθ,
+    0.0, cθ, -im*sθ, 0.0,
+    0.0, -im*sθ, cθ, 0.0,
+    -im*sθ, 0.0, 0.0, cθ,
 )
-matrix_rep_raw(g::XY) = SMatrix{4,4}(
-    [
-        1.0 0.0 0.0 0.0
-        0.0 cos(g.angle[1] / 2.0) im*sin(g.angle[1] / 2.0) 0.0
-        0.0 im*sin(g.angle[1] / 2.0) cos(g.angle[1] / 2.0) 0.0
-        0.0 0.0 0.0 1.0
-    ],
+                        )
+matrix_rep_raw(::XY, ϕ) = (θ = ϕ/2.0; return SMatrix{4,4}(
+        1.0, 0.0, 0.0, 0.0,
+        0.0, cos(θ), im*sin(θ), 0.0,
+        0.0, im*sin(θ), cos(θ), 0.0,
+        0.0, 0.0, 0.0, 1.0
+       ))
+matrix_rep_raw(::YY, ϕ) = (θ = ϕ/2.0; return SMatrix{4,4}(
+        cos(θ), 0.0, 0.0, im*sin(θ),
+        0.0, cos(θ), -im*sin(θ), 0.0,
+        0.0, -im*sin(θ), cos(θ), 0.0,
+        im*sin(θ), 0.0, 0.0, cos(θ),
 )
-matrix_rep_raw(g::YY) = SMatrix{4,4}(
-    [
-        cos(g.angle[1] / 2.0) 0.0 0.0 im*sin(g.angle[1] / 2)
-        0.0 cos(g.angle[1] / 2.0) -im*sin(g.angle[1] / 2.0) 0.0
-        0.0 -im*sin(g.angle[1] / 2.0) cos(g.angle[1] / 2.0) 0.0
-        im*sin(g.angle[1] / 2.0) 0.0 0.0 cos(g.angle[1] / 2.0)
-    ],
-)
-matrix_rep_raw(g::ZZ) = SMatrix{4,4}(
-    diagm([
-        exp(-im * g.angle[1] / 2.0),
-        exp(im * g.angle[1] / 2.0),
-        exp(im * g.angle[1] / 2.0),
-        exp(-im * g.angle[1] / 2.0),
-    ]),
-)
+                           )
+matrix_rep_raw(::ZZ, ϕ) = (θ = ϕ/2.0; return Diagonal(SVector{4}(exp(-im * θ), exp(im * θ), exp(im * θ), exp(-im * θ))))
 # 1/√2 * (IX - XY)
 matrix_rep_raw(g::ECR) = SMatrix{4,4}(1/√2 * [0 1 0 im; 1 0 -im 0; 0 im 0 1; -im 0 1 0])
 matrix_rep_raw(g::Unitary) = g.matrix
@@ -280,6 +283,8 @@ apply_gate!(::Val{false}, g::I, state_vec::AbstractStateVector{T}, qubits::Int..
 apply_gate!(::Val{true}, g::I, state_vec::AbstractStateVector{T}, qubits::Int...) where {T<:Complex} =
     return
 apply_gate!(::Measure, state_vec, args...) = return
+apply_gate!(::Val{false}, ::Measure, state_vec, args...) = return
+apply_gate!(::Val{true}, ::Measure, state_vec, args...) = return
 
 function apply_gate!(
     g_matrix::Union{SMatrix{2,2,T}, Diagonal{T,SVector{2,T}}},
@@ -333,38 +338,40 @@ end
 # generic two-qubit non controlled unitaries
 function apply_gate!(
     g_mat::M,
-    state_vec::AbstractStateVector{T},
+    state_vec::Vector{T},
     t1::Int,
     t2::Int,
 ) where {T<:Complex,M<:Union{SMatrix{4,4,T},Diagonal{T,SVector{4,T}}}}
     n_amps, (endian_t1, endian_t2) = get_amps_and_qubits(state_vec, t1, t2)
     small_t, big_t = minmax(endian_t1, endian_t2)
-    chunk_size     = CHUNK_SIZE
     n_tasks        = n_amps >> 2
-    n_chunks       = max(div(n_tasks, CHUNK_SIZE), 1)
-    chunked_amps   = collect(Iterators.partition(0:n_tasks-1, CHUNK_SIZE))
+    n_chunks       = n_tasks >> LOG2_CHUNK_SIZE
+    n_chunks       = n_chunks == 0 ? 1 : n_chunks
     Threads.@threads for chunk_index = 1:n_chunks
-        for ix in chunked_amps[chunk_index]
-            ix_00   = pad_bit(pad_bit(ix, small_t), big_t)
+        amp_1, amp_2, amp_3, amp_4 = 0, 0, 0, 0
+        new_amp_1, new_amp_2, new_amp_3, new_amp_4 = 0, 0, 0, 0
+        for ix in (chunk_index-1)*CHUNK_SIZE : min(chunk_index*CHUNK_SIZE - 1, n_tasks-1)
+            ix_00   = pad_bits(ix, (small_t, big_t))
             ix_10   = flip_bit(ix_00, endian_t2)
             ix_01   = flip_bit(ix_00, endian_t1)
             ix_11   = flip_bit(ix_10, endian_t1)
-            ind_vec = SVector(ix_00 + 1, ix_01 + 1, ix_10 + 1, ix_11 + 1)
             @inbounds begin
-                amps = SVector{4,T}(
-                    state_vec[ix_00+1],
-                    state_vec[ix_01+1],
-                    state_vec[ix_10+1],
-                    state_vec[ix_11+1],
-                )
-                new_amps = g_mat * amps
-                state_vec[ind_vec[1]] = new_amps[1]
-                state_vec[ind_vec[2]] = new_amps[2]
-                state_vec[ind_vec[3]] = new_amps[3]
-                state_vec[ind_vec[4]] = new_amps[4]
+                amp_1 = state_vec[ix_00+1]
+                amp_2 = state_vec[ix_01+1]
+                amp_3 = state_vec[ix_10+1]
+                amp_4 = state_vec[ix_11+1]
+                new_amp_1 = g_mat[1, 1] * amp_1 + g_mat[1, 2] * amp_2 + g_mat[1, 3] * amp_3 + g_mat[1, 4]*amp_4
+                new_amp_2 = g_mat[2, 1] * amp_1 + g_mat[2, 2] * amp_2 + g_mat[2, 3] * amp_3 + g_mat[2, 4]*amp_4
+                new_amp_3 = g_mat[3, 1] * amp_1 + g_mat[3, 2] * amp_2 + g_mat[3, 3] * amp_3 + g_mat[3, 4]*amp_4
+                new_amp_4 = g_mat[4, 1] * amp_1 + g_mat[4, 2] * amp_2 + g_mat[4, 3] * amp_3 + g_mat[4, 4]*amp_4
+                state_vec[ix_00+1] = new_amp_1
+                state_vec[ix_01+1] = new_amp_2
+                state_vec[ix_10+1] = new_amp_3
+                state_vec[ix_11+1] = new_amp_4
             end
         end
     end
+    return
 end
 
 function apply_controlled_gate!(
@@ -403,9 +410,22 @@ function apply_controlled_gate!(
     target_1::Int,
     target_2::Int,
 ) where {T<:Complex}
-    n_amps, (endian_control, endian_t1, endian_t2) =
-        get_amps_and_qubits(state_vec, control, target_1, target_2)
-    small_t, mid_t, big_t = sort([endian_control, endian_t1, endian_t2])
+    n_amps, (endian_control, endian_t1, endian_t2) = get_amps_and_qubits(state_vec, control, target_1, target_2)
+    small_t = min(endian_control, endian_t1, endian_t2)
+    big_t   = max(endian_control, endian_t1, endian_t2)
+    mid_t   = if     small_t == endian_control && big_t == endian_t1
+                  endian_t2
+              elseif small_t == endian_control && big_t == endian_t2
+                  endian_t1
+              elseif small_t == endian_t1 && big_t == endian_t2
+                  endian_control
+              elseif small_t == endian_t2 && big_t == endian_t1
+                  endian_control
+              elseif small_t == endian_t1 && big_t == endian_control
+                  endian_t2
+              elseif small_t == endian_t2 && big_t == endian_control
+                  endian_t1
+              end
     Threads.@threads for ix = 0:div(n_amps, 8)-1
         ix_00 = pad_bits(ix, (small_t, mid_t, big_t))
         if c_bit
@@ -461,7 +481,7 @@ for (V, f) in ((true, :conj), (false, :identity))
         apply_gate!(::Val{$V}, gate::Control{G, B}, state_vec::AbstractStateVector{T}, qubits::Int...) where {T<:Complex, G<:Gate, B} = apply_controlled_gate!(Val($V), Val(B), gate, gate.g ^ gate.pow_exponent, state_vec, gate.bitvals, qubits...)
         apply_gate!(::Val{$V}, gate::Control{MultiQubitPhaseShift{N}, B}, state_vec::AbstractStateVector{T}, qubits::Int...) where {T<:Complex, N, B} = apply_gate!($f(im), gate, state_vec, qubits...)
         apply_gate!(::Val{$V}, gate::Unitary, state_vec::AbstractStateVector{T}, targets::Vararg{Int,NQ}) where {T<:Complex,NQ} = apply_gate!($f(SMatrix{2^NQ, 2^NQ, ComplexF64}(matrix_rep(gate))), state_vec, targets...)
-        apply_gate!(::Val{$V}, g::G, state_vec::AbstractStateVector{T}, qubits::Int...) where {G<:Gate,T<:Complex} = apply_gate!($f(matrix_rep(g)), state_vec, qubits...)
+        apply_gate!(::Val{$V}, g::G, state_vec::AbstractStateVector{T}, qubits::Int...) where {G<:Gate,T<:Complex} = (mat = $f(matrix_rep(g)); apply_gate!(mat, state_vec, qubits...))
         apply_controlled_gate!(
             ::Val{$V},
             ::Val{1},
