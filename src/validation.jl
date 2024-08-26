@@ -25,7 +25,7 @@ end
 
 function _validate_ir_results_compatibility(
     simulator::D,
-    results::Vector{AbstractProgramResult},
+    results::Vector{<:AbstractProgramResult},
     supported_result_types::Vector,
 ) where {D<:AbstractSimulator}
     (isnothing(results) || isempty(results)) && return
@@ -39,7 +39,7 @@ function _validate_ir_results_compatibility(
 end
 function _validate_ir_results_compatibility(
     simulator::D,
-    results::Vector{Result},
+    results::Vector{<:Result},
     supported_result_types::Vector,
 ) where {D<:AbstractSimulator}
     (isnothing(results) || isempty(results)) && return
