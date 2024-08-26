@@ -152,26 +152,26 @@ function _generate_results(
     return results
 end
 
-_translate_result_type(r::IR.Amplitude, qc::Int)     = Amplitude(r.states)
-_translate_result_type(r::IR.StateVector, qc::Int)   = StateVector()
+_translate_result_type(r::IR.Amplitude)     = Amplitude(r.states)
+_translate_result_type(r::IR.StateVector)   = StateVector()
 # The IR result types support `nothing` as a valid option for the `targets` field,
 # however `Result`s represent this with an empty `QubitSet` for type
 # stability reasons. Here we take a `nothing` value for `targets` and translate it
 # to apply to all qubits.
-_translate_result_type(r::IR.DensityMatrix, qc::Int) = DensityMatrix(r.targets)
-_translate_result_type(r::IR.Probability, qc::Int)   = Probability(r.targets)
+_translate_result_type(r::IR.DensityMatrix) = DensityMatrix(r.targets)
+_translate_result_type(r::IR.Probability)   = Probability(r.targets)
 for (RT, IRT) in ((:Expectation, :(IR.Expectation)), (:Variance, :(IR.Variance)), (:Sample, :(IR.Sample)))
     @eval begin
-        function _translate_result_type(r::$IRT, qc::Int)
-            obs     = StructTypes.constructfrom(Observables.Observable, r.observable)
+        function _translate_result_type(r::$IRT)
+            obs = StructTypes.constructfrom(Observables.Observable, r.observable)
             $RT(obs, QubitSet(r.targets))
         end
     end
 end
-_translate_result_types(results::Vector{AbstractProgramResult}, qubit_count::Int) = map(result->_translate_result_type(result, qubit_count), results)
+_translate_result_types(results::Vector{AbstractProgramResult}) = map(_translate_result_type, results)
 
 function _compute_exact_results(d::AbstractSimulator, program::Program, qubit_count::Int)
-    result_types = _translate_result_types(program.results, qubit_count)
+    result_types = _translate_result_types(program.results)
     _validate_result_types_qubits_exist(result_types, qubit_count)
     return _generate_results(result_types, d)
 end
@@ -220,7 +220,7 @@ end
 Apply any `inputs` provided for the simulation. Return the `Program`
 (with bound parameters) and the qubit count of the circuit.
 """
-function _prepare_program(circuit_ir::Program, inputs::Dict{String, <:Any}, shots::Int) #nosemgrep
+function _prepare_program(circuit_ir::Program, inputs::Dict{String, <:Any}, shots::Int) # nosemgrep
     operations::Vector{Instruction} = circuit_ir.instructions
     symbol_inputs = Dict(Symbol(k) => v for (k, v) in inputs)
     operations    = [bind_value!(operation, symbol_inputs) for operation in operations]

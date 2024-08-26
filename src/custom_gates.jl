@@ -5,7 +5,7 @@ mutable struct DoubleExcitation <: AngledGate{1}
         new(angle, Float64(pow_exponent))
 end
 qubit_count(::Type{DoubleExcitation}) = 4
-function matrix_rep_raw(g::DoubleExcitation, ϕ)
+function matrix_rep_raw(::DoubleExcitation, ϕ) # nosemgrep
     sθ, cθ = sincos(ϕ/2.0)
     mat = diagm(ones(ComplexF64, 16))
     mat[4, 4]   = cθ
@@ -22,7 +22,7 @@ mutable struct SingleExcitation <: AngledGate{1}
         new(angle, Float64(pow_exponent))
 end
 qubit_count(::Type{SingleExcitation}) = 2
-matrix_rep_raw(g::SingleExcitation, ϕ) = ((sθ, cθ) = sincos(ϕ/2.0); return SMatrix{4,4,ComplexF64}(complex(1.0), 0, 0, 0, 0, cθ, -sθ, 0, 0, sθ, cθ, 0, 0, 0, 0, complex(1.0)))
+matrix_rep_raw(::SingleExcitation, ϕ) = ((sθ, cθ) = sincos(ϕ/2.0); return SMatrix{4,4,ComplexF64}(complex(1.0), 0, 0, 0, 0, cθ, -sθ, 0, 0, sθ, cθ, 0, 0, 0, 0, complex(1.0)))
 """
     MultiRz(angle)
 

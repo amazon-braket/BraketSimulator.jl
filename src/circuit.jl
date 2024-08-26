@@ -77,7 +77,7 @@ julia> qubit_count(c)
 qubit_count(c::Circuit) = length(qubits(c))
 qubit_count(p::Program) = length(qubits(p))
 
-function Base.convert(::Type{Program}, c::Circuit)
+function Base.convert(::Type{Program}, c::Circuit) # nosemgrep
     lowered_rts = map(StructTypes.lower, c.result_types)
     header = braketSchemaHeader("braket.ir.jaqcd.program" ,"1")
     return Program(header, c.instructions, lowered_rts, c.basis_rotation_instructions)
