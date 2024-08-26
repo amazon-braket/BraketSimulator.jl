@@ -13,6 +13,18 @@ end
 abstract type DeviceActionProperties <: BraketSchemaBase end
 
 abstract type AbstractProgram <: BraketSchemaBase end
+StructTypes.StructType(::Type{AbstractProgram}) = StructTypes.AbstractType()
+function bsh_f(raw_symbol::Symbol)
+    raw = String(raw_symbol)
+    v   = eval(Meta.parse(raw))
+    if v["name"] == "braket.ir.openqasm.program"
+        return OpenQasmProgram
+    else
+        return Program
+    end
+end
+StructTypes.subtypes(::Type{AbstractProgram}) = StructTypes.SubTypeClosure(bsh_f)
+StructTypes.subtypekey(::Type{AbstractProgram}) = :braketSchemaHeader
 
 module IR
 import ..BraketSimulator: braketSchemaHeader, BraketSchemaBase, AbstractProgram
@@ -25,6 +37,8 @@ abstract type AbstractIR end
 const IRObservable = Union{Vector{Union{String, Vector{Vector{Vector{Float64}}}}}, String}
 
 abstract type AbstractProgramResult <: AbstractIR end
+StructTypes.StructType(::Type{AbstractProgramResult}) = StructTypes.AbstractType()
+StructTypes.subtypes(::Type{AbstractProgramResult}) = (probability=Probability, statevector=StateVector, adjoint_gradient=AdjointGradient, densitymatrix=DensityMatrix, sample=Sample, expectation=Expectation, variance=Variance, amplitude=Amplitude)
 
 struct Program <: AbstractProgram
     braketSchemaHeader::braketSchemaHeader
@@ -105,19 +119,26 @@ end
 struct ResultTypeValue
     type::AbstractProgramResult
     value::Union{Vector, Float64, Dict}
+    ResultTypeValue(type, value::Float64)             = new(type, value)
+    ResultTypeValue(type, value::Dict{String, <:Any}) = new(type, value)
+    ResultTypeValue(type, value::Vector)              = new(type, value)
+    ResultTypeValue(type, value::Union{Float64, Dict, Vector}) = new(type, value)
 end
 # for custom lowering of ComplexF64
 # just build the tuples directly to
 # avoid allocing so much
 StructTypes.StructType(::Type{ResultTypeValue}) = StructTypes.CustomStruct()
 function StructTypes.lower(rtv::ResultTypeValue)
-    lower_complex(v::Number)             = (real(v), imag(v))
+    lower_complex(v::Complex)            = (real(v), imag(v))
+    lower_complex(v::Float64)            = v
     lower_complex(v::Vector{Float64})    = v
     lower_complex(v::Vector{ComplexF64}) = reinterpret(Tuple{Float64, Float64}, v)
     lower_complex(v::Vector)             = map(lower_complex, v)
     lower_complex(v::Dict)               = Dict(k=>lower_complex(v_) for (k,v_) in v)
     return (type=rtv.type, value=lower_complex(rtv.value))
 end
+ResultTypeValue(nt::@NamedTuple{type::AbstractProgramResult, value::Union{Float64, Dict, Vector}}) = ResultTypeValue(nt.type, nt.value)
+StructTypes.lowertype(::Type{ResultTypeValue}) = @NamedTuple{type::AbstractProgramResult, value::Union{Float64, Dict, Vector}} 
 
 struct JaqcdDeviceActionProperties <: DeviceActionProperties
     version::Vector{String}

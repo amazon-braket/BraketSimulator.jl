@@ -3,7 +3,7 @@ module BraketSimulatorPythonExt
 using PrecompileTools
 
 @recompile_invalidations begin
-    using BraketSimulator, PythonCall, JSON3
+    using BraketSimulator, BraketSimulator.Quasar, PythonCall, JSON3
 end
 
 using BraketSimulator: simulate, AbstractProgramResult
@@ -16,9 +16,9 @@ function BraketSimulator.simulate(simulator_id::String, task_spec::String, py_in
     elseif simulator_id == "braket_dm_v2"
         DensityMatrixSimulator(0, shots)
     end
-    jl_results = @time "simulate" simulate(simulator, jl_spec, shots; kwargs...)
-    py_results = @time "JSON write" JSON3.write(jl_results)
+    jl_results = simulate(simulator, jl_spec, shots; kwargs...)
     # this is expensive due to allocations
+    py_results = JSON3.write(jl_results)
     simulator  = nothing
     inputs     = nothing
     jl_spec    = nothing
@@ -28,7 +28,8 @@ end
 function BraketSimulator.simulate(simulator_id::String, task_specs::PyList, py_inputs::String, shots::Int; kwargs...)
     inputs    = JSON3.read(py_inputs, Vector{Dict{String, Any}})
     jl_specs  = map(zip(task_specs, inputs)) do (task_spec, input)
-        BraketSimulator.OpenQasmProgram(BraketSimulator.braketSchemaHeader("braket.ir.openqasm.program", "1"), task_spec, input)
+        jl_spec = task_spec isa Py ? pyconvert(String, task_spec) : task_spec
+        BraketSimulator.OpenQasmProgram(BraketSimulator.braketSchemaHeader("braket.ir.openqasm.program", "1"), jl_spec, input)
     end
     simulator = if simulator_id == "braket_sv_v2"
         StateVectorSimulator(0, shots)
