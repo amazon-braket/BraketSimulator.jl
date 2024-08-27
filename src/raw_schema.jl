@@ -17,11 +17,7 @@ StructTypes.StructType(::Type{AbstractProgram}) = StructTypes.AbstractType()
 function bsh_f(raw_symbol::Symbol)
     raw = String(raw_symbol)
     v   = eval(Meta.parse(raw))
-    if v["name"] == "braket.ir.openqasm.program"
-        return OpenQasmProgram
-    else
-        return Program
-    end
+    return v["name"] == "braket.ir.openqasm.program" ? OpenQasmProgram : Program
 end
 StructTypes.subtypes(::Type{AbstractProgram}) = StructTypes.SubTypeClosure(bsh_f)
 StructTypes.subtypekey(::Type{AbstractProgram}) = :braketSchemaHeader
@@ -122,7 +118,6 @@ struct ResultTypeValue
     ResultTypeValue(type, value::Float64)             = new(type, value)
     ResultTypeValue(type, value::Dict{String, <:Any}) = new(type, value)
     ResultTypeValue(type, value::Vector)              = new(type, value)
-    ResultTypeValue(type, value::Union{Float64, Dict, Vector}) = new(type, value)
 end
 # for custom lowering of ComplexF64
 # just build the tuples directly to

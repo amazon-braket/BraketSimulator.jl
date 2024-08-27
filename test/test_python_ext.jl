@@ -67,42 +67,50 @@ using Test, JSON3, PythonCall, BraketSimulator
                 cnot \$0, \$1;
                 #pragma braket result state_vector
                 """
-                oq3_results  = BraketSimulator.simulate("braket_sv_v2", PyList([simple_bell_qasm]), "[{}]", 0)
-                for oq3_result in oq3_results
-                    result = JSON3.read(oq3_result, BraketSimulator.GateModelTaskResult)
-                    @test result.additionalMetadata.action.source == simple_bell_qasm
-                    @test length(result.resultTypes) == 1
-                    @test result.resultTypes[1].type == BraketSimulator.IR.StateVector("statevector")
-                end
+                oq3_result  = BraketSimulator.simulate("braket_sv_v2", simple_bell_qasm, "{}", 0)
+                result = JSON3.read(oq3_result, BraketSimulator.GateModelTaskResult)
+                @test result.additionalMetadata.action.source == simple_bell_qasm
+                @test length(result.resultTypes) == 1
+                @test result.resultTypes[1].type == BraketSimulator.IR.StateVector("statevector")
+
                 simple_bell_qasm = """
                 h \$0;
                 cy \$0, \$1;
                 #pragma braket result amplitude '00', '01', '10', '11' 
                 """
-                oq3_results  = BraketSimulator.simulate("braket_sv_v2", PyList([simple_bell_qasm]), "[{}]", 0)
-                for oq3_result in oq3_results
-                    result = JSON3.read(oq3_result, BraketSimulator.GateModelTaskResult)
-                    @test result.additionalMetadata.action.source == simple_bell_qasm
-                    @test length(result.resultTypes) == 1
-                    @test result.resultTypes[1].type.type == "amplitude"
-                    @test result.resultTypes[1].type.states == ["00", "01", "10", "11"]
-                    @test result.resultTypes[1].value == Dict("00"=>[1/√2, 0.0], "01"=>[0.0, 0.0], "10"=>[0.0, 0.0], "11"=>[0.0, 1/√2])
-                end
+                oq3_result  = BraketSimulator.simulate("braket_sv_v2", simple_bell_qasm, "{}", 0)
+                result = JSON3.read(oq3_result, BraketSimulator.GateModelTaskResult)
+                @test result.additionalMetadata.action.source == simple_bell_qasm
+                @test length(result.resultTypes) == 1
+                @test result.resultTypes[1].type.type == "amplitude"
+                @test result.resultTypes[1].type.states == ["00", "01", "10", "11"]
+                @test result.resultTypes[1].value == Dict("00"=>[1/√2, 0.0], "01"=>[0.0, 0.0], "10"=>[0.0, 0.0], "11"=>[0.0, 1/√2])
+
                 simple_bell_qasm = """
                 h \$0;
                 cy \$0, \$1;
                 #pragma braket result expectation z(\$0)
                 """
-                oq3_results  = BraketSimulator.simulate("braket_sv_v2", PyList([simple_bell_qasm]), "[{}]", 0)
-                for oq3_result in oq3_results
-                    result = JSON3.read(oq3_result, BraketSimulator.GateModelTaskResult)
-                    @test result.additionalMetadata.action.source == simple_bell_qasm
-                    @test length(result.resultTypes) == 1
-                    @test result.resultTypes[1].type.type    == "expectation"
-                    @test result.resultTypes[1].type.targets == [0] 
-                    @test result.resultTypes[1].type.observable == ["z"]
-                    @test result.resultTypes[1].value == 0.0
-                end
+                oq3_result  = BraketSimulator.simulate("braket_sv_v2", simple_bell_qasm, "{}", 0)
+                result = JSON3.read(oq3_result, BraketSimulator.GateModelTaskResult)
+                @test result.additionalMetadata.action.source == simple_bell_qasm
+                @test length(result.resultTypes) == 1
+                @test result.resultTypes[1].type.type    == "expectation"
+                @test result.resultTypes[1].type.targets == [0] 
+                @test result.resultTypes[1].type.observable == ["z"]
+                @test result.resultTypes[1].value == 0.0
+
+                simple_bell_qasm = """
+                h \$0;
+                cy \$0, \$1;
+                #pragma braket result density_matrix
+                """
+                oq3_result  = BraketSimulator.simulate("braket_dm_v2", simple_bell_qasm, "{}", 0)
+                result = JSON3.read(oq3_result, BraketSimulator.GateModelTaskResult)
+                @test result.additionalMetadata.action.source == simple_bell_qasm
+                @test length(result.resultTypes) == 1
+                @test result.resultTypes[1].type.type    == "densitymatrix"
+                @test result.resultTypes[1].type.targets == nothing
             end
         end
     end

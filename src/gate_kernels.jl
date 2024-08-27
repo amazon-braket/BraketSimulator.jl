@@ -131,10 +131,9 @@ for G in (:DoubleExcitation, :MultiRZ)
     @eval function matrix_rep(g::$G)
         n = g.pow_exponent::Float64
         θ = @inbounds g.angle[1]
-        iszero(n)    && return matrix_rep_raw(I(), qubit_count(g))
-        isone(n)     && return matrix_rep_raw(g, θ)
-        isinteger(n) && return matrix_rep_raw(g, θ*n)
-        return SMatrix{2^qubit_count(g),2^qubit_count(g)}(matrix_rep_raw(g, θ) ^ n)
+        iszero(n) && return matrix_rep_raw(I(), qubit_count(g))
+        isone(n)  && return matrix_rep_raw(g, θ)
+        return matrix_rep_raw(g, θ*n)
     end
 end
     
@@ -283,8 +282,6 @@ apply_gate!(::Val{false}, g::I, state_vec::AbstractStateVector{T}, qubits::Int..
 apply_gate!(::Val{true}, g::I, state_vec::AbstractStateVector{T}, qubits::Int...) where {T<:Complex} =
     return
 apply_gate!(::Measure, state_vec, args...) = return
-apply_gate!(::Val{false}, ::Measure, state_vec, args...) = return
-apply_gate!(::Val{true}, ::Measure, state_vec, args...) = return
 
 function apply_gate!(
     g_matrix::Union{SMatrix{2,2,T}, Diagonal{T,SVector{2,T}}},
@@ -413,6 +410,7 @@ function apply_controlled_gate!(
     n_amps, (endian_control, endian_t1, endian_t2) = get_amps_and_qubits(state_vec, control, target_1, target_2)
     small_t = min(endian_control, endian_t1, endian_t2)
     big_t   = max(endian_control, endian_t1, endian_t2)
+    # this big if/else is to avoid an allocation
     mid_t   = if     small_t == endian_control && big_t == endian_t1
                   endian_t2
               elseif small_t == endian_control && big_t == endian_t2

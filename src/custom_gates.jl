@@ -6,8 +6,8 @@ mutable struct DoubleExcitation <: AngledGate{1}
 end
 qubit_count(::Type{DoubleExcitation}) = 4
 function matrix_rep_raw(::DoubleExcitation, ϕ) # nosemgrep
-    sθ, cθ = sincos(ϕ/2.0)
-    mat = diagm(ones(ComplexF64, 16))
+    sθ, cθ      = sincos(ϕ/2.0)
+    mat         = diagm(ones(ComplexF64, 16))
     mat[4, 4]   = cθ
     mat[13, 13] = cθ
     mat[4, 13]  = -sθ
@@ -89,13 +89,12 @@ function apply_gate!(
 ) where {T<:Complex}
     n_amps, endian_ts = get_amps_and_qubits(state_vec, t1, t2, t3, t4)
     ordered_ts = sort(collect(endian_ts))
-    cosϕ = cos(g.angle[1] / 2.0)
-    sinϕ = sin(g.angle[1] / 2.0)
+    sinϕ, cosϕ = sincos(g.angle[1] * g.pow_exponent / 2.0)
     e_t1, e_t2, e_t3, e_t4 = endian_ts
     Threads.@threads for ix = 0:div(n_amps, 2^4)-1
         padded_ix = pad_bits(ix, ordered_ts)
-        i0011 = flip_bits(padded_ix, (e_t3, e_t4)) + 1
-        i1100 = flip_bits(padded_ix, (e_t1, e_t2)) + 1
+        i0011     = flip_bits(padded_ix, (e_t3, e_t4)) + 1
+        i1100     = flip_bits(padded_ix, (e_t1, e_t2)) + 1
         @inbounds begin
             amp0011 = state_vec[i0011]
             amp1100 = state_vec[i1100]

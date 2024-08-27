@@ -154,10 +154,6 @@ end
 
 _translate_result_type(r::IR.Amplitude)     = Amplitude(r.states)
 _translate_result_type(r::IR.StateVector)   = StateVector()
-# The IR result types support `nothing` as a valid option for the `targets` field,
-# however `Result`s represent this with an empty `QubitSet` for type
-# stability reasons. Here we take a `nothing` value for `targets` and translate it
-# to apply to all qubits.
 _translate_result_type(r::IR.DensityMatrix) = DensityMatrix(r.targets)
 _translate_result_type(r::IR.Probability)   = Probability(r.targets)
 for (RT, IRT) in ((:Expectation, :(IR.Expectation)), (:Variance, :(IR.Variance)), (:Sample, :(IR.Sample)))
