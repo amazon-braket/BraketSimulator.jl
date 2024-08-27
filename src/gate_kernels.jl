@@ -411,19 +411,7 @@ function apply_controlled_gate!(
     small_t = min(endian_control, endian_t1, endian_t2)
     big_t   = max(endian_control, endian_t1, endian_t2)
     # this big if/else is to avoid an allocation
-    mid_t   = if     small_t == endian_control && big_t == endian_t1
-                  endian_t2
-              elseif small_t == endian_control && big_t == endian_t2
-                  endian_t1
-              elseif small_t == endian_t1 && big_t == endian_t2
-                  endian_control
-              elseif small_t == endian_t2 && big_t == endian_t1
-                  endian_control
-              elseif small_t == endian_t1 && big_t == endian_control
-                  endian_t2
-              elseif small_t == endian_t2 && big_t == endian_control
-                  endian_t1
-              end
+    mid_t   = max(min(endian_control, endian_t1), min(endian_control, endian_t2), min(endian_t1, endian_t2))
     Threads.@threads for ix = 0:div(n_amps, 8)-1
         ix_00 = pad_bits(ix, (small_t, mid_t, big_t))
         if c_bit
