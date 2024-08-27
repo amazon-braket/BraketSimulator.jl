@@ -141,7 +141,7 @@ end
 Base.:(==)(c1::MultiQubitPauliChannel{N}, c2::MultiQubitPauliChannel{M}) where {N,M} = N == M && c1.probabilities == c2.probabilities
 
 Parametrizable(g::Noise) = NonParametrized()
-parameters(g::Noise) = parameters(Parametrizable(g), g)
+parameters(g::Noise)     = parameters(Parametrizable(g), g)
 parameters(::Parametrized, g::N) where {N<:Noise} = filter(x->x isa FreeParameter, [getproperty(g, fn) for fn in fieldnames(N)])
 parameters(::NonParametrized, g::Noise) = FreeParameter[]
 

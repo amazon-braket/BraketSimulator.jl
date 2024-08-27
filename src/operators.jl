@@ -54,6 +54,8 @@ function Base.getindex(p::PauliEigenvalues{N}, i::Int)::Float64 where N
 end
 Base.getindex(p::PauliEigenvalues{N}, ix::Vector{Int}) where {N} = [p[i] for i in ix]
 
+parameters(o::QuantumOperator) = FreeParameter[] 
+
 """
     Measure(index) <: QuantumOperator
 
