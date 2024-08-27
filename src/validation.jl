@@ -25,8 +25,8 @@ end
 
 function _validate_ir_results_compatibility(
     simulator::D,
-    results,
-    supported_result_types,
+    results::Vector{<:AbstractProgramResult},
+    supported_result_types::Vector,
 ) where {D<:AbstractSimulator}
     (isnothing(results) || isempty(results)) && return
     circuit_result_types_name    = [rt.type for rt in results]
@@ -37,25 +37,46 @@ function _validate_ir_results_compatibility(
     end
     return
 end
-_validate_ir_results_compatibility(simulator::D, results, ::Val{V}) where {D<:AbstractSimulator, V} = _validate_ir_results_compatibility(simulator, results, supported_result_types(simulator, Val(V)))
-
-function _validate_shots_and_ir_results(shots::Int, results, qubit_count::Int)
-    if shots == 0
-        (isnothing(results) || isempty(results)) && throw(ValidationError("Result types must be specified in the IR when shots=0", "ValueError"))
-        for rt in results
-            rt.type == "sample" && throw(ValidationError("sample can only be specified when shots>0", "ValueError"))
-            rt.type == "amplitude" && _validate_amplitude_states(rt.states, qubit_count)
-        end
-    elseif shots > 0 && !isnothing(results) && !isempty(results)
-        for rt in results
-            rt.type ∈ ["statevector", "amplitude", "densitymatrix"] && throw(ValidationError(
-                "statevector, amplitude and densitymatrix result types are only available when shots==0",
-                "ValueError"
-            ))
-        end
+function _validate_ir_results_compatibility(
+    simulator::D,
+    results::Vector{<:Result},
+    supported_result_types::Vector,
+) where {D<:AbstractSimulator}
+    (isnothing(results) || isempty(results)) && return
+    circuit_result_types_name    = map(label, results)
+    supported_result_types_names = map(supported_rt->lowercase(string(supported_rt.name)), supported_result_types)
+    for name in circuit_result_types_name
+        name ∉ supported_result_types_names &&
+            throw(ErrorException("result type $name not supported by $simulator"))
     end
     return
 end
+_validate_ir_results_compatibility(simulator::D, results::Vector{A}, ::Val{V}) where {D<:AbstractSimulator, A, V} = _validate_ir_results_compatibility(simulator, results, supported_result_types(simulator, Val(V)))
+
+_validate_exact_result(amp::Amplitude, qubit_count)    = _validate_amplitude_states(amp.states, qubit_count)
+_validate_exact_result(amp::IR.Amplitude, qubit_count) = _validate_amplitude_states(amp.states, qubit_count)
+_validate_exact_result(sample::Sample, qubit_count)    = throw(ValidationError("sample can only be specified when shots>0", "ValueError"))
+_validate_exact_result(sample::IR.Sample, qubit_count) = throw(ValidationError("sample can only be specified when shots>0", "ValueError"))
+_validate_exact_result(result, qubit_count)            = return
+
+const nonzero_shots_error = "statevector, amplitude and densitymatrix result types are only available when shots==0"
+_validate_nonzero_shots_result(sv::StateVector)      = throw(ValidationError(nonzero_shots_error, "ValueError"))
+_validate_nonzero_shots_result(sv::IR.StateVector)   = throw(ValidationError(nonzero_shots_error, "ValueError"))
+_validate_nonzero_shots_result(amp::Amplitude)       = throw(ValidationError(nonzero_shots_error, "ValueError"))
+_validate_nonzero_shots_result(amp::IR.Amplitude)    = throw(ValidationError(nonzero_shots_error, "ValueError"))
+_validate_nonzero_shots_result(dm::DensityMatrix)    = throw(ValidationError(nonzero_shots_error, "ValueError"))
+_validate_nonzero_shots_result(dm::IR.DensityMatrix) = throw(ValidationError(nonzero_shots_error, "ValueError"))
+_validate_nonzero_shots_result(result)               = return
+function _validate_shots_and_ir_results(shots::Int, results, qubit_count::Int)
+    if shots == 0
+        (isnothing(results) || isempty(results)) && throw(ValidationError("Result types must be specified in the IR when shots=0", "ValueError"))
+        foreach(r->_validate_exact_result(r, qubit_count), results)
+    elseif shots > 0 && !isnothing(results)
+        foreach(_validate_nonzero_shots_result, results)
+    end
+    return
+end
+
 function _validate_input_provided(circuit)
     for instruction in circuit.instructions
         possible_parameters = (Symbol("_angle"), Symbol("_angle_1"), Symbol("_angle_2"), Symbol("angle"))
@@ -74,10 +95,7 @@ function _validate_input_provided(circuit)
     return
 end
 
-function _validate_ir_instructions_compatibility(
-    circuit::Union{Program,Circuit},
-    supported_operations,
-)
+function _validate_ir_instructions_compatibility(circuit, supported_operations)
     circuit_instruction_names = map(ix->replace(lowercase(string(typeof(ix.operator))), "_"=>"", "braketsimulator."=>""), circuit.instructions)
     supported_instructions    = Set(map(op->replace(lowercase(op), "_"=>""), supported_operations))
     no_noise = true
@@ -90,7 +108,7 @@ function _validate_ir_instructions_compatibility(
     end
     return
 end
-_validate_ir_instructions_compatibility(simulator::D, circuit::Union{Program,Circuit}, v::Val{V}) where {D<:AbstractSimulator, V} = _validate_ir_instructions_compatibility(circuit, supported_operations(simulator, v))
+_validate_ir_instructions_compatibility(simulator::D, circuit, v::Val{V}) where {D<:AbstractSimulator, V} = _validate_ir_instructions_compatibility(circuit, supported_operations(simulator, v))
 
 _validate_result_type_qubits_exist(rt::StateVector, qubit_count::Int) = return
 _validate_result_type_qubits_exist(rt::Amplitude, qubit_count::Int)   = return

@@ -160,7 +160,7 @@ end
 
 function calculate(expectation_result::Expectation, sim::AbstractSimulator)
     obs             = expectation_result.observable
-    targets         = isempty(expectation_result.targets) ? collect(0:qubit_count(sim)-1) : expectation_result.targets
+    targets         = (isempty(expectation_result.targets) || isnothing(expectation_result.targets)) ? collect(0:qubit_count(sim)-1) : expectation_result.targets
     obs_qubit_count = qubit_count(obs)
     length(targets) == obs_qubit_count && return expectation(sim, obs, targets...)
     return [expectation(sim, obs, target) for target in targets]
@@ -222,7 +222,7 @@ apply_observable(observable::O, sv_or_dm, target::Int...) where {O<:Observables.
 
 function calculate(variance::Variance, sim::AbstractSimulator)
     obs     = variance.observable
-    targets = isnothing(variance.targets) ? collect(0:qubit_count(sim)-1) : variance.targets
+    targets = (isnothing(variance.targets) || isempty(variance.targets)) ? collect(0:qubit_count(sim)-1) : variance.targets
     obs_qubit_count = qubit_count(obs)
     if length(targets) == obs_qubit_count
         var2 = expectation_op_squared(sim, obs, targets...)
@@ -240,7 +240,7 @@ end
 function calculate(dm::DensityMatrix, sim::AbstractSimulator)
     ρ = density_matrix(sim)
     full_qubits = collect(0:qubit_count(sim)-1)
-    (collect(dm.targets) == full_qubits || isempty(dm.targets)) && return ρ
+    (collect(dm.targets) == full_qubits || isnothing(dm.targets) || isempty(dm.targets)) && return ρ
     length(dm.targets) == sim.qubit_count && return permute_density_matrix(ρ, sim.qubit_count, collect(dm.targets))
     # otherwise must compute a partial trace
     return partial_trace(ρ, dm.targets)

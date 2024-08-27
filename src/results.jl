@@ -38,6 +38,7 @@ for (typ, ir_typ, label) in ((:Expectation, :(IR.Expectation), "expectation"), (
               - Absent, in which case the observable `o` will be applied to all qubits provided it is a single qubit observable.
             """ $typ(o::Observables.Observable, targets) = new(o, QubitSet(targets))
         end
+        label(::$typ) = $label
         StructTypes.lower(x::$typ) = $ir_typ(StructTypes.lower(x.observable), (isempty(x.targets) ? nothing : Int.(x.targets)), $label)
     end
 end
@@ -69,6 +70,7 @@ for (typ, ir_typ, label) in ((:Probability, :(IR.Probability), "probability"), (
           - Absent, in which case the measurement will be applied to all qubits.
         """ $typ(targets) = $typ(QubitSet(targets))
         $typ(targets::Vararg{IntOrQubit}) = $typ(QubitSet(targets...))
+        label(::$typ) = $label
         StructTypes.lower(x::$typ) = $ir_typ(isempty(x.targets) ? nothing : Int.(x.targets), $label)
     end
 end
@@ -173,6 +175,7 @@ All elements of `states` must be `'0'` or `'1'`.
 """
 Amplitude(s::String) = Amplitude([s])
 Base.:(==)(a1::Amplitude, a2::Amplitude) = (a1.states == a2.states)
+label(::Amplitude) = "amplitude"
 
 """
     StateVector <: Result
@@ -181,10 +184,9 @@ Struct which represents a state vector measurement on a [`Circuit`](@ref).
 """
 struct StateVector <: Result end
 Base.:(==)(sv1::StateVector, sv2::StateVector) = true
+label(::StateVector) = "statevector"
 
 const ObservableResult = Union{Expectation, Variance, Sample}
 const ObservableParameterResult = Union{AdjointGradient,}
 StructTypes.lower(x::Amplitude) = IR.Amplitude(x.states, "amplitude")
 StructTypes.lower(x::StateVector) = IR.StateVector("statevector")
-
-ir(r::Result, ::Val{:JAQCD}; kwargs...) = StructTypes.lower(r)

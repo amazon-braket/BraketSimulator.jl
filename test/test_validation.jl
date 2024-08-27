@@ -2,9 +2,14 @@ using Test, BraketSimulator
 
 @testset "IR validation" begin
     sim = DensityMatrixSimulator(2, 0)
-    results = [(type="NotARealResult",)]
-    @test_throws ErrorException BraketSimulator._validate_ir_results_compatibility(sim, results, Val(:OpenQASM))
-    @test_throws ErrorException BraketSimulator._validate_ir_results_compatibility(sim, results, Val(:JAQCD))
+    struct NotARealResult <: BraketSimulator.Result end
+    BraketSimulator.label(::NotARealResult) = "notarealresult"
+    @test_throws ErrorException BraketSimulator._validate_ir_results_compatibility(sim, [NotARealResult()], Val(:OpenQASM))
+    struct NotARealIRResult <: BraketSimulator.AbstractProgramResult
+        type::String
+        NotARealIRResult() = new("notarealresult")
+    end
+    @test_throws ErrorException BraketSimulator._validate_ir_results_compatibility(sim, [NotARealIRResult()], Val(:JAQCD))
     c = BraketSimulator.Circuit()
     BraketSimulator.add_instruction!(c, BraketSimulator.Instruction(BraketSimulator.Rx(BraketSimulator.FreeParameter(:α)), 0))
     @test_throws ErrorException BraketSimulator._validate_input_provided(c)
@@ -12,7 +17,23 @@ using Test, BraketSimulator
     BraketSimulator.add_instruction!(c, BraketSimulator.Instruction(BraketSimulator.Rx(0.1), 0))
     @test isnothing(BraketSimulator._validate_input_provided(c))
 
-    
+
+    @testset for rt in (BraketSimulator.StateVector(),
+                        BraketSimulator.IR.StateVector("statevector"),
+                        BraketSimulator.Amplitude(["00", "11"]),
+                        BraketSimulator.IR.Amplitude(["00", "11"], "amplitude"),
+                        BraketSimulator.DensityMatrix(),
+                        BraketSimulator.IR.DensityMatrix(nothing, "densitymatrix")
+                       )
+        @test_throws BraketSimulator.ValidationError("statevector, amplitude and densitymatrix result types are only available when shots==0", "ValueError") BraketSimulator._validate_shots_and_ir_results(1, [rt], 1)
+    end
+    @testset for rt in (BraketSimulator.Sample(BraketSimulator.Observables.Z(), 0),
+                        BraketSimulator.IR.Sample("z", [0], "sample"),
+                       )
+        @test_throws BraketSimulator.ValidationError("sample can only be specified when shots>0", "ValueError") BraketSimulator._validate_shots_and_ir_results(0, [rt], 1)
+    end
+
+
     sim = DensityMatrixSimulator(2, 0)
     @test_logs (:warn, "You are running a noise-free circuit on the density matrix simulator. Consider running this circuit on the state vector simulator: LocalSimulator(\"braket_sv_v2\") for a better user experience.") BraketSimulator._validate_ir_instructions_compatibility(sim, c, Val(:OpenQASM))
     @test_logs (:warn, "You are running a noise-free circuit on the density matrix simulator. Consider running this circuit on the state vector simulator: LocalSimulator(\"braket_sv_v2\") for a better user experience.") BraketSimulator._validate_ir_instructions_compatibility(sim, c, Val(:JAQCD))
