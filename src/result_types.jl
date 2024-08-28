@@ -238,10 +238,9 @@ function calculate(variance::Variance, sim::AbstractSimulator)
 end
 
 function calculate(dm::DensityMatrix, sim::AbstractSimulator)
-    ρ = density_matrix(sim)
     full_qubits = collect(0:qubit_count(sim)-1)
-    (collect(dm.targets) == full_qubits || isnothing(dm.targets) || isempty(dm.targets)) && return ρ
-    length(dm.targets) == sim.qubit_count && return permute_density_matrix(ρ, sim.qubit_count, collect(dm.targets))
+    (collect(dm.targets) == full_qubits || isnothing(dm.targets) || isempty(dm.targets)) && return density_matrix(sim)
+    length(dm.targets) == sim.qubit_count && return permute_density_matrix(density_matrix(sim), sim.qubit_count, collect(dm.targets))
     # otherwise must compute a partial trace
-    return partial_trace(ρ, dm.targets)
+    return partial_trace(sim, dm.targets)
 end
