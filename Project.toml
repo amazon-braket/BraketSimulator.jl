@@ -1,7 +1,7 @@
 name = "BraketSimulator"
 uuid = "76d27892-9a0b-406c-98e4-7c178e9b3dff"
 authors = ["Katharine Hyatt <hyatkath@amazon.com> and contributors"]
-version = "0.0.2"
+version = "0.0.4"
 
 [deps]
 AbstractTrees = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"

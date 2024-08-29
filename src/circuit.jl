@@ -77,7 +77,11 @@ julia> qubit_count(c)
 qubit_count(c::Circuit) = length(qubits(c))
 qubit_count(p::Program) = length(qubits(p))
 
-Base.convert(::Type{Program}, c::Circuit) = (basis_rotation_instructions!(c); return Program(braketSchemaHeader("braket.ir.jaqcd.program" ,"1"), c.instructions, ir.(c.result_types, Val(:JAQCD)), c.basis_rotation_instructions))
+function Base.convert(::Type{Program}, c::Circuit) # nosemgrep
+    lowered_rts = map(StructTypes.lower, c.result_types)
+    header = braketSchemaHeader("braket.ir.jaqcd.program" ,"1")
+    return Program(header, c.instructions, lowered_rts, c.basis_rotation_instructions)
+end
 Program(c::Circuit) = convert(Program, c)
 
 extract_observable(rt::ObservableResult) = rt.observable

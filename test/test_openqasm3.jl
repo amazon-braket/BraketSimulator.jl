@@ -213,6 +213,23 @@ get_tol(shots::Int) = return (
                                        BraketSimulator.Instruction(BraketSimulator.Measure(), 1)]
         @test [qubit_count(ix.operator) for ix in circuit.instructions] == [1, 1]
     end
+    @testset "Measure with density matrix" begin
+        qasm = """
+        qubit[3] qs;
+        qubit q;
+
+        x qs[{0, 2}];
+        h q;
+        cphaseshift(1) qs, q;
+        phaseshift(-2) q;
+        measure qs;
+        measure q;
+        """
+        circuit    = BraketSimulator.Circuit(qasm)
+        simulation = BraketSimulator.DensityMatrixSimulator(4, 0)
+        BraketSimulator.evolve!(simulation, circuit.instructions)
+        @test BraketSimulator.probabilities(simulation) ≈ (1/2)*[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0]
+    end
     @testset "GPhase" begin
         qasm = """
         qubit[2] qs;
@@ -1284,8 +1301,6 @@ get_tol(shots::Int) = return (
         """
         circuit        = BraketSimulator.Circuit(with_verbatim)
         sim_w_verbatim = BraketSimulator.StateVectorSimulator(2, 0)
-        pop!(circuit.instructions) 
-        pop!(circuit.instructions) 
         BraketSimulator.evolve!(sim_w_verbatim, circuit.instructions)
 
         without_verbatim = """
@@ -1302,8 +1317,6 @@ get_tol(shots::Int) = return (
         """
         circuit         = BraketSimulator.Circuit(without_verbatim)
         sim_wo_verbatim = BraketSimulator.StateVectorSimulator(2, 0)
-        pop!(circuit.instructions) 
-        pop!(circuit.instructions) 
         BraketSimulator.evolve!(sim_wo_verbatim, circuit.instructions)
 
         @test sim_w_verbatim.state_vector ≈ sim_wo_verbatim.state_vector

@@ -218,6 +218,56 @@ LARGE_TESTS = get(ENV, "BRAKET_SIM_LARGE_TESTS", "false") == "true"
             [0, 0, 0, 0, 0, 1, 0, 0],
             [0, 0, 0, 0, 0, 1, 0, 0],
         ),
+        (
+            [
+                BraketSimulator.Instruction(BraketSimulator.X(), [0]),
+                BraketSimulator.Instruction(BraketSimulator.X(), [2]),
+                BraketSimulator.Instruction(BraketSimulator.CSwap(), [0, 2, 1]),
+            ],
+            3,
+            [0, 0, 0, 0, 0, 0, 1, 0],
+            [0, 0, 0, 0, 0, 0, 1, 0],
+        ),
+        (
+            [
+                BraketSimulator.Instruction(BraketSimulator.X(), [1]),
+                BraketSimulator.Instruction(BraketSimulator.X(), [2]),
+                BraketSimulator.Instruction(BraketSimulator.CSwap(), [1, 2, 0]),
+            ],
+            3,
+            [0, 0, 0, 0, 0, 0, 1, 0],
+            [0, 0, 0, 0, 0, 0, 1, 0],
+        ),
+        (
+            [
+                BraketSimulator.Instruction(BraketSimulator.X(), [1]),
+                BraketSimulator.Instruction(BraketSimulator.X(), [2]),
+                BraketSimulator.Instruction(BraketSimulator.CSwap(), [2, 1, 0]),
+            ],
+            3,
+            [0, 0, 0, 0, 0, 1, 0, 0],
+            [0, 0, 0, 0, 0, 1, 0, 0],
+        ),
+        (
+            [
+                BraketSimulator.Instruction(BraketSimulator.X(), [0]),
+                BraketSimulator.Instruction(BraketSimulator.X(), [2]),
+                BraketSimulator.Instruction(BraketSimulator.CSwap(), [2, 0, 1]),
+            ],
+            3,
+            [0, 0, 0, 1, 0, 0, 0, 0],
+            [0, 0, 0, 1, 0, 0, 0, 0],
+        ),
+        (
+            [
+                BraketSimulator.Instruction(BraketSimulator.X(), [0]),
+                BraketSimulator.Instruction(BraketSimulator.X(), [1]),
+                BraketSimulator.Instruction(BraketSimulator.CSwap(), [1, 0, 2]),
+            ],
+            3,
+            [0, 0, 0, 1, 0, 0, 0, 0],
+            [0, 0, 0, 1, 0, 0, 0, 0],
+        ),
     ]
         @testset "Simulator $sim" for sim in (StateVectorSimulator, DensityMatrixSimulator) 
             simulation = sim(qubit_count, 0)

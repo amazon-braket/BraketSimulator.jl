@@ -51,6 +51,7 @@ using Test, LinearAlgebra, Logging, BraketSimulator, DataStructures
                                         BraketSimulator.CPhaseShift00(ϕ),
                                         BraketSimulator.CPhaseShift01(ϕ),
                                         BraketSimulator.CPhaseShift10(ϕ),
+                                        BraketSimulator.SingleExcitation(ϕ),
                                         BraketSimulator.Unitary(q2_mat),
                                         BraketSimulator.CNot(),
                                         BraketSimulator.CY(),
@@ -124,6 +125,7 @@ using Test, LinearAlgebra, Logging, BraketSimulator, DataStructures
                                         BraketSimulator.CPhaseShift00(ϕ),
                                         BraketSimulator.CPhaseShift01(ϕ),
                                         BraketSimulator.CPhaseShift10(ϕ),
+                                        BraketSimulator.SingleExcitation(ϕ),
                                         BraketSimulator.Unitary(q2_mat),
                                         BraketSimulator.Control(BraketSimulator.MultiQubitPhaseShift{2}(ϕ), (0,0)),
                                         BraketSimulator.MultiQubitPhaseShift{2}(ϕ),]
@@ -162,6 +164,19 @@ using Test, LinearAlgebra, Logging, BraketSimulator, DataStructures
                 @test BraketSimulator.matrix_rep(g)^pow ≈ BraketSimulator.matrix_rep(g^pow)
             end
             sim = BraketSimulator.evolve!(sim, instructions)
+            new_sim = BraketSimulator.evolve!(new_sim, new_instructions)
+            @test new_sim.state_vector ≈ sim.state_vector
+        end
+        @testset "4q Gate $g" for g in [BraketSimulator.DoubleExcitation(ϕ),]
+            nq  = 5
+            sim = StateVectorSimulator(nq, 0)
+            new_sim = StateVectorSimulator(nq, 0)
+            instructions     = vcat([BraketSimulator.Instruction(BraketSimulator.H(), [q]) for q in 0:nq-1], [BraketSimulator.Instruction(g^pow, [0, 1, 3, 2])])
+            new_instructions = vcat([BraketSimulator.Instruction(BraketSimulator.H(), [q]) for q in 0:nq-1], [BraketSimulator.Instruction(BraketSimulator.Unitary(Matrix(BraketSimulator.matrix_rep(g)))^pow, [0, 1, 3, 2])])
+            if !isa(g^pow, BraketSimulator.I)
+                @test BraketSimulator.matrix_rep(g)^pow ≈ BraketSimulator.matrix_rep(g^pow)
+            end
+            sim     = BraketSimulator.evolve!(sim, instructions)
             new_sim = BraketSimulator.evolve!(new_sim, new_instructions)
             @test new_sim.state_vector ≈ sim.state_vector
         end

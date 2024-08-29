@@ -226,4 +226,18 @@ all_qubit_observables_testdata = [
             @test all(s->s ∈ [0, 2^30-1], shot_results)
         end
     end
+    @testset "Result type $rt translation" for (rt, ir_rt) in ((BraketSimulator.StateVector(), BraketSimulator.IR.StateVector("statevector")),
+                                                               (BraketSimulator.DensityMatrix([0, 1]), BraketSimulator.IR.DensityMatrix([0, 1], "densitymatrix")),
+                                                               (BraketSimulator.Probability([0, 1]), BraketSimulator.IR.Probability([0, 1], "probability")),
+                                                               (BraketSimulator.Amplitude(["01", "10"]), BraketSimulator.IR.Amplitude(["01", "10"], "amplitude")),
+                                                              )
+        @test BraketSimulator._translate_result_type(ir_rt) == rt
+    end
+    @testset "Result type $rt translation" for (rt, ir_rt) in ((BraketSimulator.Expectation(BraketSimulator.Observables.TensorProduct(["z", "x"]), [1, 0]), BraketSimulator.IR.Expectation(["z", "x"], [1, 0], "expectation")),
+                                                               (BraketSimulator.Variance(BraketSimulator.Observables.TensorProduct(["z", "x"]), [1, 0]), BraketSimulator.IR.Variance(["z", "x"], [1, 0], "variance")),
+                                                               (BraketSimulator.Sample(BraketSimulator.Observables.TensorProduct(["z", "x"]), [1, 0]), BraketSimulator.IR.Sample(["z", "x"], [1, 0], "sample")),
+                                                              )
+        @test BraketSimulator._translate_result_type(ir_rt).observable == rt.observable
+        @test BraketSimulator._translate_result_type(ir_rt).targets    == rt.targets
+    end
 end
