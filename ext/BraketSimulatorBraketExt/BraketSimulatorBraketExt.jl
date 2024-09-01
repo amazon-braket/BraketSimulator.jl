@@ -153,7 +153,13 @@ function Base.convert(::Type{BraketSimulator.Program}, p::Braket.Program)
 end
 Base.convert(::Type{Braket.AbstractProgram}, p::BraketSimulator.Program) = Braket.Program(Braket.braketSchemaHeader("braket.ir.jaqcd.program", "1"), [convert(Braket.Instruction, ix) for ix in p.instructions],[convert(Braket.AbstractProgramResult, rt) for rt in p.results], [convert(Braket.Instruction, ix) for ix in p.basis_rotation_instructions])
 Base.convert(::Type{Braket.AbstractProgram}, p::BraketSimulator.OpenQasmProgram) = Braket.OpenQasmProgram(Braket.braketSchemaHeader("braket.ir.openqasm.program", "1"), p.source, p.inputs)
-Base.convert(::Type{Braket.Circuit}, c::BraketSimulator.Circuit) = convert(Braket.Circuit, convert(Braket.AbstractProgram, BraketSimulator.Program(c)))
+
+function Base.convert(::Type{Braket.Circuit}, c::BraketSimulator.Circuit) 
+    ixs = [convert(Braket.Instruction, ix) for ix in c.instructions]
+    rts = isempty(c.result_types) ? Braket.Result[] : [convert(Braket.Result, rt) for rt in c.result_types]
+    brs = [convert(Braket.Instruction, ix) for ix in c.basis_rotation_instructions] 
+    Braket.Circuit(Braket.Moments(), ixs, rts, brs)
+end
 
 function __init__()
     Braket._simulator_devices[]["braket_dm_v2"] =
