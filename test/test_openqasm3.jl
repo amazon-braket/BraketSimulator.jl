@@ -568,6 +568,33 @@ get_tol(shots::Int) = return (
         """
         @test_warn "reset expression encountered -- currently `reset` is a no-op" parse_qasm(qasm)
     end
+    @testset "Cannot apply instructions after measurement" begin
+
+        qasm = """
+        qubit[4] q;
+        bit[3] b;
+        x q[0];
+        b[0] = measure q[0];
+        x q[0];
+        """
+        @test_throws ErrorException("cannot apply instruction to measured qubits.") BraketSimulator.Circuit(qasm)
+    end
+    @testset "Can apply instructions after reset measurement" begin
+
+        qasm = """
+        qubit[4] q;
+        bit[3] b;
+        x q[0];
+        b[0] = measure q[0];
+        reset q[0];
+        x q[0];
+        """
+        circ = Circuit(qasm)
+        @test circ.instructions == [BraketSimulator.Instruction(BraketSimulator.X(), 0),
+                                    BraketSimulator.Instruction(BraketSimulator.Measure(), 0),
+                                    BraketSimulator.Instruction(BraketSimulator.Reset(), 0),
+                                    BraketSimulator.Instruction(BraketSimulator.X(), 0)]
+    end
     @testset "Gate call missing/extra args" begin
         qasm = """
         qubit[4] q;

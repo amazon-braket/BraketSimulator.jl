@@ -240,15 +240,14 @@ function _check_if_measured_qubit_is_reset(c::Circuit, qubit::Int)
 
     # Iterate through the instructions in the circuit
     for instruction in c.instructions
-        if instruction isa BraketSimulator.Measure && instruction.target == qubit
+        if instruction isa BraketSimulator.Instruction{BraketSimulator.Measure} && in(qubit, instruction.target)
             # If we encounter a measurement instruction, check the next instruction
             reset_after_measurement = false
-        elseif instruction isa BraketSimulator.Reset && instruction.target == qubit
+          elseif instruction isa BraketSimulator.Instruction{BraketSimulator.Reset} && in(qubit, instruction.target)
             # If we encounter a reset instruction for the same qubit, set the flag
             reset_after_measurement = true
         end
     end
-
     reset_after_measurement 
 end
 
@@ -262,7 +261,10 @@ end
 _check_if_qubit_measured(c::Circuit, qubits) = foreach(q->_check_if_qubit_measured(c, Int(q)), qubits)
 
 function add_instruction!(c::Circuit, ix::Instruction{O}) where {O<:Operator}
+  # Adding a reset instruction to a measured qubit is allowed. No need to check
+  if !(ix isa BraketSimulator.Instruction{BraketSimulator.Reset})
     _check_if_qubit_measured(c, ix.target)
+    end
     to_add = [ix]
     if ix.operator isa QuantumOperator && Parametrizable(ix.operator) == Parametrized()
         for param in parameters(ix.operator)
