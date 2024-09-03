@@ -1,4 +1,4 @@
-using Test, BraketSimulator, DataStructures
+using Test, BraketSimulator, DataStructures, LinearAlgebra, BraketSimulator.Combinatorics
 
 LARGE_TESTS = get(ENV, "BRAKET_SIM_LARGE_TESTS", "false") == "true"
 
@@ -707,6 +707,15 @@ LARGE_TESTS = get(ENV, "BRAKET_SIM_LARGE_TESTS", "false") == "true"
         new_sv_props = BraketSimulator.StructTypes.constructfrom(BraketSimulator.GateModelSimulatorDeviceCapabilities, new_sv_props_dict)
         @test new_sv_props.paradigm.qubitCount == new_sv_qubit_count
         @test BraketSimulator.supported_result_types(sim) == BraketSimulator.supported_result_types(sim, Val(:OpenQASM))
+    end
+    @testset "partial trace $nq" for nq in 3:6
+        ψ       = normalize(rand(ComplexF64, 2^nq))
+        full_ρ  = kron(ψ, adjoint(ψ))
+        @testset "output qubits $q" for q in combinations(0:nq-1)
+            ρ       = BraketSimulator.partial_trace(ψ, q)
+            full_pt = BraketSimulator.partial_trace(full_ρ, q)
+            @test full_pt ≈ ρ
+        end
     end
     @testset "inputs handling" begin
         sv_adder_qasm = """

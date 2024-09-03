@@ -318,3 +318,4 @@ function partial_trace(
     end
     return final_ρ
 end
+partial_trace(sim::DensityMatrixSimulator, output_qubits = collect(0:qubit_count(sim)-1)) = partial_trace(density_matrix(sim), output_qubits)

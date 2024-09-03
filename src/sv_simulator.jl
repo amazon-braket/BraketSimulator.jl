@@ -272,3 +272,50 @@ end
 Compute the observation probabilities of all amplitudes in the state vector in `svs`.
 """
 probabilities(svs::StateVectorSimulator) = abs2.(svs.state_vector)
+
+function partial_trace(
+    sv::AbstractVector{ComplexF64},
+    output_qubits = collect(0:Int(log2(size(sv, 1)))-1),
+)
+    isempty(output_qubits) && return mapreduce(abs2, +, sv)
+    n_amps   = length(sv)
+    n_qubits = Int(log2(n_amps))
+    length(unique(output_qubits)) == n_qubits && return kron(sv, adjoint(sv))
+
+    qubits        = setdiff(collect(0:n_qubits-1), output_qubits)
+    endian_qubits = sort(n_qubits .- qubits .- 1)
+    qubit_combos  = vcat([Int[]], collect(combinations(endian_qubits)))
+    final_ρ_dim   = 2^(n_qubits - length(qubits))
+    final_ρ       = zeros(ComplexF64, final_ρ_dim, final_ρ_dim)
+    # handle possibly permuted targets
+    needs_perm     = !issorted(output_qubits)
+    final_n_qubits = length(output_qubits)
+    output_qubit_mapping = if needs_perm
+            original_outputs = final_n_qubits .- output_qubits .- 1
+            permuted_outputs = final_n_qubits .- collect(0:final_n_qubits-1) .- 1
+            Dict(zip(original_outputs, permuted_outputs))
+        else
+            Dict{Int,Int}()
+        end
+    for ix = 0:final_ρ_dim-1, jx = ix:final_ρ_dim-1
+        padded_ix   = pad_bits(ix, endian_qubits)
+        padded_jx   = pad_bits(jx, endian_qubits)
+        flipped_ixs = Vector{Int}(undef, length(qubit_combos))
+        flipped_jxs = Vector{Int}(undef, length(qubit_combos))
+        for (c_ix, flipped_qubits) in enumerate(qubit_combos)
+            flipped_ixs[c_ix] = flip_bits(padded_ix, flipped_qubits) + 1
+            flipped_jxs[c_ix] = flip_bits(padded_jx, flipped_qubits) + 1
+        end
+        # if the output qubits weren't in sorted order, we need to permute the
+        # final indices of ρ to match the desired qubit mapping
+        out_ix = needs_perm ? swap_bits(ix, output_qubit_mapping) : ix
+        out_jx = needs_perm ? swap_bits(jx, output_qubit_mapping) : jx
+        traced = @inbounds dot(sv[flipped_jxs], sv[flipped_ixs])
+        @inbounds final_ρ[out_ix+1, out_jx+1] += traced
+        if out_jx != out_ix
+            @inbounds final_ρ[out_jx+1, out_ix+1] += conj(traced)
+        end
+    end
+    return final_ρ
+end
+partial_trace(sim::StateVectorSimulator, output_qubits = collect(0:qubit_count(sim)-1)) = partial_trace(state_vector(sim), output_qubits)
