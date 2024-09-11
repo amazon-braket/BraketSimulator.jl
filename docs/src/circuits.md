@@ -15,7 +15,6 @@ BraketSimulator.FreeParameter
 BraketSimulator.Measure
 BraketSimulator.Instruction
 BraketSimulator.QubitSet
-BraketSimulator.Qubit
 BraketSimulator.qubit_count
 BraketSimulator.qubits
 BraketSimulator.basis_rotation_instructions!

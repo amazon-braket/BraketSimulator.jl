@@ -708,6 +708,14 @@ LARGE_TESTS = get(ENV, "BRAKET_SIM_LARGE_TESTS", "false") == "true"
         @test new_sv_props.paradigm.qubitCount == new_sv_qubit_count
         @test BraketSimulator.supported_result_types(sim) == BraketSimulator.supported_result_types(sim, Val(:OpenQASM))
     end
+    @testset "mmaping large results" begin
+        oq3_source = """OPENQASM 3.0;\nqubit[18] q;\nh q;\n#pragma braket result state_vector\n"""
+        oq3_result  = BraketSimulator.simulate("braket_sv_v2", oq3_source, "{}", 0)
+        result      = JSON3.read(oq3_result[1], BraketSimulator.GateModelTaskResult)
+        @test isempty(result.resultTypes[1].value)
+        @test !isnothing(oq3_result[2]) && !isempty(oq3_result[2])
+        @test !isnothing(oq3_result[3]) && !isempty(oq3_result[3])
+    end
     @testset "partial trace $nq" for nq in 3:6
         ψ       = normalize(rand(ComplexF64, 2^nq))
         full_ρ  = kron(ψ, adjoint(ψ))

@@ -4,6 +4,7 @@ using
     Dates,
     Combinatorics,
     LinearAlgebra,
+    JSON3,
     StaticArrays,
     StatsBase,
     UUIDs,
@@ -145,11 +146,7 @@ function _generate_results(
 ) where {D<:AbstractSimulator}
     result_values = map(result_type -> calculate(result_type, simulator), result_types)
     ir_results    = map(StructTypes.lower, result_types)
-    results = map(zip(ir_results, result_values)) do (ir, val)
-        ir_val = complex_matrix_to_ir(val)
-        return ResultTypeValue(ir, ir_val)
-    end
-    return results
+    return [ResultTypeValue(ir_results[r_ix], complex_matrix_to_ir(result_values[r_ix])) for r_ix in 1:length(result_values)]
 end
 
 _translate_result_type(r::IR.Amplitude)     = Amplitude(r.states)
@@ -202,8 +199,10 @@ parsing and the qubit count of the circuit.
 """
 function _prepare_program(circuit_ir::OpenQasmProgram, inputs::Dict{String, <:Any}, shots::Int)
     ir_inputs = isnothing(circuit_ir.inputs) ? Dict{String, Float64}() : circuit_ir.inputs 
-    circuit   = Circuit(circuit_ir.source, merge(ir_inputs, inputs))
-    n_qubits  = qubit_count(circuit)
+    merged_inputs = merge(ir_inputs, inputs)
+    src           = circuit_ir.source::String
+    circuit       = Quasar.to_circuit(src, merged_inputs)
+    n_qubits      = qubit_count(circuit)
     if shots > 0
         _verify_openqasm_shots_observables(circuit, n_qubits)
         basis_rotation_instructions!(circuit)
@@ -379,6 +378,68 @@ function simulate(simulator::AbstractSimulator,
         @assert isassigned(results, r_ix)
     end
     return results
+end
+
+# these functions are for calls from an "external" language
+# like Python or Rust, when we're calling this package from a
+# separate process and thus don't want to have to IPC large
+# blobs of data back and forth/deal with having to serialize
+# Julia objects
+function create_sim(simulator_id::String, shots::Int)
+    return if simulator_id == "braket_sv_v2"
+        StateVectorSimulator(0, shots)
+    elseif simulator_id == "braket_dm_v2"
+        DensityMatrixSimulator(0, shots)
+    end
+end
+
+function _mmap_large_result_values(results)
+    to_mmap     = findall(rt->sizeof(rt.value) > 2^20, results.resultTypes)
+    isempty(to_mmap) && return nothing, nothing
+    mmap_files  = String[]
+    obj_lengths = Int[]
+    for r_ix in to_mmap
+        push!(obj_lengths, length(results.resultTypes[r_ix].value))
+        tmp_path, io = mktemp()
+        write(io, results.resultTypes[r_ix].value)
+        empty!(results.resultTypes[r_ix].value)
+        close(io)
+        push!(mmap_files, tmp_path)
+    end
+    py_paths    = tuple(mmap_files...)
+    py_lens     = tuple(obj_lengths...)
+    mmap_files  = nothing
+    obj_lengths = nothing
+    return py_paths, py_lens
+end
+
+function BraketSimulator.simulate(simulator_id::String, task_spec::String, py_inputs::String, shots::Int; kwargs...)
+    inputs     = JSON3.read(py_inputs, Dict{String, Any})
+    jl_spec    = BraketSimulator.OpenQasmProgram(BraketSimulator.braketSchemaHeader("braket.ir.openqasm.program", "1"), task_spec, inputs)
+    simulator  = create_sim(simulator_id, shots)
+    jl_results = simulate(simulator, jl_spec, shots; kwargs...)
+    py_paths, py_lens = _mmap_large_result_values(jl_results)
+    py_results = JSON3.write(jl_results)
+    simulator  = nothing
+    inputs     = nothing
+    jl_spec    = nothing
+    jl_results = nothing
+    return py_results, py_paths, py_lens
+end
+function BraketSimulator.simulate(simulator_id::String, task_specs::AbstractVector, py_inputs::String, shots::Int; kwargs...)
+    inputs    = JSON3.read(py_inputs, Vector{Dict{String, Any}})
+    jl_specs  = map(zip(task_specs, inputs)) do (task_spec, input)
+        BraketSimulator.OpenQasmProgram(BraketSimulator.braketSchemaHeader("braket.ir.openqasm.program", "1"), task_spec, input)
+    end
+    simulator  = create_sim(simulator_id, shots)
+    jl_results = simulate(simulator, jl_specs, shots; kwargs...)
+    paths_and_lens = JSON3.write(map(_mmap_large_result_values, jl_results))
+    jsons      = JSON3.write(jl_results)
+    simulator  = nothing
+    jl_results = nothing
+    inputs     = nothing
+    jl_specs   = nothing
+    return jsons, paths_and_lens
 end
 
 include("result_types.jl")
@@ -699,6 +760,7 @@ include("dm_simulator.jl")
         #pragma braket result probability
         #pragma braket result expectation x(q[0])
         #pragma braket result variance x(q[0]) @ y(q[1])
+        #pragma braket result variance y(q[0])
         """
     shots_results_qasm = """
         OPENQASM 3.0;
@@ -714,48 +776,58 @@ include("dm_simulator.jl")
         simulator = StateVectorSimulator(5, 0)
         oq3_program = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), custom_qasm, nothing)
         simulate(simulator, oq3_program, 100)
+        simulate("braket_sv_v2", custom_qasm, "{}", 100)
 
         simulator = DensityMatrixSimulator(2, 0)
         oq3_program = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), noise_qasm, nothing)
         simulate(simulator, oq3_program, 100)
         simulate(simulator, [oq3_program, oq3_program], 100)
+        simulate("braket_dm_v2", noise_qasm, "{}", 100)
+        simulate("braket_dm_v2", [noise_qasm, noise_qasm], "[{}, {}]", 100)
 
         simulator = StateVectorSimulator(3, 0)
         oq3_program = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), unitary_qasm, nothing)
         simulate(simulator, oq3_program, 100)
         simulate(simulator, [oq3_program, oq3_program], 100)
+        simulate("braket_sv_v2", unitary_qasm, "{}", 100)
+        simulate("braket_sv_v2", [unitary_qasm, unitary_qasm], "[{}, {}]", 100)
 
         simulator = StateVectorSimulator(6, 0)
         oq3_program = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), sv_adder_qasm, Dict("a_in"=>3, "b_in"=>7))
         simulate(simulator, oq3_program, 0)
-        
+        simulate("braket_sv_v2", sv_adder_qasm, "{\"a_in\":3,\"b_in\":7}", 100)
+
         simulator = StateVectorSimulator(16, 0)
         oq3_program = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), grcs_16_qasm, nothing)
         simulate(simulator, oq3_program, 0)
+        simulate("braket_sv_v2", grcs_16_qasm, "{}", 0)
 
         simulator = StateVectorSimulator(2, 0)
         oq3_program = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), vqe_qasm, nothing)
         simulate(simulator, oq3_program, 100)
+        simulate("braket_sv_v2", vqe_qasm, "{}", 100)
 
         sv_simulator = StateVectorSimulator(3, 0)
         dm_simulator = DensityMatrixSimulator(3, 0)
         oq3_program  = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), all_gates_qasm, Dict("theta"=>0.665))
         simulate(sv_simulator, oq3_program, 100)
         simulate(dm_simulator, oq3_program, 100)
+        simulate("braket_sv_v2", all_gates_qasm, "{\"theta\":0.665}", 100)
+        simulate("braket_dm_v2", all_gates_qasm, "{\"theta\":0.665}",  100)
 
         sv_simulator = StateVectorSimulator(2, 0)
         dm_simulator = DensityMatrixSimulator(2, 0)
         sv_oq3_program = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), sv_exact_results_qasm, nothing)
         dm_oq3_program = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), dm_exact_results_qasm, nothing)
-        results = simulate(sv_simulator, sv_oq3_program, 0)
-        map(StructTypes.lower, results.resultTypes) 
-        results = simulate(dm_simulator, dm_oq3_program, 0)
-        map(StructTypes.lower, results.resultTypes) 
+        simulate(sv_simulator, sv_oq3_program, 0)
+        simulate("braket_sv_v2", sv_exact_results_qasm, "{}", 0)
+        simulate(dm_simulator, dm_oq3_program, 0)
+        simulate("braket_dm_v2", dm_exact_results_qasm, "{}", 0)
         oq3_program = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), shots_results_qasm, nothing)
-        results = simulate(sv_simulator, oq3_program, 10)
-        map(StructTypes.lower, results.resultTypes) 
-        results = simulate(dm_simulator, oq3_program, 10)
-        map(StructTypes.lower, results.resultTypes) 
+        simulate(sv_simulator, oq3_program, 10)
+        simulate(dm_simulator, oq3_program, 10)
+        simulate("braket_sv_v2", shots_results_qasm, "{}", 10)
+        simulate("braket_dm_v2", shots_results_qasm, "{}", 10)
     end
 end
 end # module BraketSimulator

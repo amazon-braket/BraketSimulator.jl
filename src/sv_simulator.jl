@@ -241,13 +241,12 @@ given the evolved state vector in `svs`. In other words, compute
 """
 function expectation(
     svs::StateVectorSimulator,
-    observable::Observables.Observable,
+    observable,
     targets::Int...,
 )
     bra = svs.state_vector
     ket = apply_observable(observable, svs.state_vector, targets...)
-    expectation_value = dot(bra, ket)
-    return real(expectation_value)
+    return real(dot(bra, ket))
 end
 
 function state_with_observables(svs::StateVectorSimulator)

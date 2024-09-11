@@ -220,10 +220,10 @@ function apply_observable!(
 end
 apply_observable(observable::O, sv_or_dm, target::Int...) where {O<:Observables.Observable} = apply_observable!(observable, deepcopy(sv_or_dm), target...)
 
-function calculate(variance::Variance, sim::AbstractSimulator)
+function calculate(variance::Variance, sim)
     obs     = variance.observable
     targets = (isnothing(variance.targets) || isempty(variance.targets)) ? collect(0:qubit_count(sim)-1) : variance.targets
-    obs_qubit_count = qubit_count(obs)
+    obs_qubit_count = qubit_count(obs)::Int
     if length(targets) == obs_qubit_count
         var2 = expectation_op_squared(sim, obs, targets...)
         mean = expectation(sim, obs, targets...)
@@ -237,7 +237,7 @@ function calculate(variance::Variance, sim::AbstractSimulator)
     end
 end
 
-function calculate(dm::DensityMatrix, sim::AbstractSimulator)
+function calculate(dm::DensityMatrix, sim)
     full_qubits = collect(0:qubit_count(sim)-1)
     (collect(dm.targets) == full_qubits || isnothing(dm.targets) || isempty(dm.targets)) && return density_matrix(sim)
     length(dm.targets) == sim.qubit_count && return permute_density_matrix(density_matrix(sim), sim.qubit_count, collect(dm.targets))
