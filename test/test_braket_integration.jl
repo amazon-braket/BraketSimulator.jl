@@ -36,12 +36,18 @@ end
     prob2 = 0.1
     prob3 = 0.002
     gamma = 0.23
+    prob_dict = Dict("XX"=>prob, "YY"=>prob2, "ZZ"=>prob3)
     @test convert(Braket.Operator, convert(BraketSimulator.Operator, Braket.MS(angle1, angle2, angle3))) == Braket.MS(angle1, angle2, angle3)
     @test convert(Braket.Operator, convert(BraketSimulator.Operator, Braket.U(angle1, angle2, angle3))) == Braket.U(angle1, angle2, angle3)
     @test convert(Braket.Operator, convert(BraketSimulator.Operator, Braket.PRx(angle1, angle2))) == Braket.PRx(angle1, angle2)
     @test convert(Braket.Operator, convert(BraketSimulator.Operator, Braket.GeneralizedAmplitudeDamping(prob, gamma))) == Braket.GeneralizedAmplitudeDamping(prob, gamma)
     @test convert(Braket.Operator, convert(BraketSimulator.Operator, Braket.PauliChannel(prob, prob3, prob3))) == Braket.PauliChannel(prob, prob3, prob3)
+    @test convert(Braket.Operator, convert(BraketSimulator.Operator, Braket.MultiQubitPauliChannel{2}(prob_dict))) == Braket.MultiQubitPauliChannel{2}(prob_dict)
     @test convert(Braket.AbstractProgramResult, convert(BraketSimulator.AbstractProgramResult, Braket.IR.StateVector("statevector"))) == Braket.IR.StateVector("statevector")
+    @test qubit_count(BraketSimulator.Observables.X()) == 1
+    @test qubit_count(BraketSimulator.Observables.Y()) == 1
+    @test qubit_count(BraketSimulator.Observables.Z()) == 1
+    @test qubit_count(BraketSimulator.Observables.TensorProduct(["x", "h", "y"])) == 3
 end
 
 @testset "Correctness" begin
