@@ -27,7 +27,7 @@ using Test, LinearAlgebra, Logging, BraketSimulator, DataStructures
                                         BraketSimulator.Vi(),
                                         BraketSimulator.U(θ, ϕ, λ),
                                         BraketSimulator.Unitary(q1_mat),
-                                        BraketSimulator.MultiQubitPhaseShift{1}(ϕ),
+                                        BraketSimulator.GPhase{1}(ϕ),
                                        ]
             @test inv(BraketSimulator.matrix_rep(g)) ≈ BraketSimulator.matrix_rep(inv(g))
             @test BraketSimulator.matrix_rep(inv(g)) * BraketSimulator.matrix_rep(g) ≈ Diagonal(ones(2))
@@ -57,8 +57,8 @@ using Test, LinearAlgebra, Logging, BraketSimulator, DataStructures
                                         BraketSimulator.CY(),
                                         BraketSimulator.CZ(),
                                         BraketSimulator.CV(),
-                                        BraketSimulator.MultiQubitPhaseShift{2}(ϕ),
-                                        BraketSimulator.Control(BraketSimulator.MultiQubitPhaseShift{2}(ϕ), (0,0)),
+                                        BraketSimulator.GPhase{2}(ϕ),
+                                        BraketSimulator.Control(BraketSimulator.GPhase{2}(ϕ), (0,0)),
                                         BraketSimulator.Control(BraketSimulator.X(), (1,)),
                                         BraketSimulator.Control(BraketSimulator.U(θ, ϕ, λ), (1,))]
             @test inv(BraketSimulator.matrix_rep(g)) ≈ BraketSimulator.matrix_rep(inv(g))
@@ -101,7 +101,7 @@ using Test, LinearAlgebra, Logging, BraketSimulator, DataStructures
                                         BraketSimulator.Vi(),
                                         BraketSimulator.U(θ, ϕ, λ),
                                         BraketSimulator.Unitary(q1_mat),
-                                        BraketSimulator.MultiQubitPhaseShift{1}(ϕ)
+                                        BraketSimulator.GPhase{1}(ϕ)
                                        ]
             sim = StateVectorSimulator(nq, 0)
             new_sim = StateVectorSimulator(nq, 0)
@@ -127,8 +127,8 @@ using Test, LinearAlgebra, Logging, BraketSimulator, DataStructures
                                         BraketSimulator.CPhaseShift10(ϕ),
                                         BraketSimulator.SingleExcitation(ϕ),
                                         BraketSimulator.Unitary(q2_mat),
-                                        BraketSimulator.Control(BraketSimulator.MultiQubitPhaseShift{2}(ϕ), (0,0)),
-                                        BraketSimulator.MultiQubitPhaseShift{2}(ϕ),]
+                                        BraketSimulator.Control(BraketSimulator.GPhase{2}(ϕ), (0,0)),
+                                        BraketSimulator.GPhase{2}(ϕ),]
             sim              = StateVectorSimulator(nq, 0)
             new_sim          = StateVectorSimulator(nq, 0)
             new_ixs          = [BraketSimulator.Instruction(BraketSimulator.Unitary(Matrix(BraketSimulator.matrix_rep(g)^pow)), [0, 1])]

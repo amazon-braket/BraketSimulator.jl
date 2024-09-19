@@ -259,3 +259,38 @@ function add_instruction!(c::Circuit, ix::Instruction{O}) where {O<:Operator}
     push!(c.instructions, ix)
     return c
 end
+
+function to_circuit(v::Quasar.QasmProgramVisitor)
+    c = Circuit()
+    foreach(v.instructions) do ix
+        sim_op = StructTypes.constructfrom(QuantumOperator, ix)
+        op     = isempty(ix.controls) ? sim_op : Control(sim_op, tuple(map(c->getindex(c, 2), ix.controls)...))
+        sim_ix = Instruction(op, ix.targets)
+        add_instruction!(c, sim_ix)
+    end
+    for rt in v.results
+        sim_rt = StructTypes.constructfrom(Result, rt)
+        obs    = extract_observable(sim_rt)
+        if !isnothing(obs) && c.observables_simultaneously_measureable && !(rt isa AdjointGradient)
+            add_to_qubit_observable_mapping!(c, obs, sim_rt.targets)
+        end
+        add_to_qubit_observable_set!(c, sim_rt)
+        push!(c.result_types, sim_rt)
+    end
+    return c
+end
+
+# semgrep rules can't handle this macro properly yet
+function to_circuit(qasm_source::String, inputs)
+    input_qasm = if endswith(qasm_source, ".qasm") && isfile(qasm_source)
+        read(qasm_source, String)
+    else
+        qasm_source
+    end
+    endswith(input_qasm, "\n") || (input_qasm *= "\n")
+    parsed  = parse_qasm(input_qasm)
+    visitor = QasmProgramVisitor(inputs)
+    visitor(parsed)
+    return to_circuit(visitor) 
+end
+to_circuit(qasm_source::String) = to_circuit(qasm_source, Dict{String, Float64}())

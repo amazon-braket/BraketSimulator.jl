@@ -15,6 +15,7 @@ struct Kraus <: Noise
 end
 Base.:(==)(k1::Kraus, k2::Kraus) = k1.matrices == k2.matrices
 qubit_count(g::Kraus) = convert(Int, log2(size(g.matrices[1], 1)))
+StructTypes.constructfrom(::Type{Kraus}, nt::Quasar.CircuitInstruction) = Kraus(nt.arguments)
 
 """
     BitFlip <: Noise
@@ -26,6 +27,7 @@ struct BitFlip <: Noise
 end
 Parametrizable(g::BitFlip) = Parametrized()
 qubit_count(g::BitFlip) = 1
+StructTypes.constructfrom(::Type{BitFlip}, nt::Quasar.CircuitInstruction) = BitFlip(only(nt.arguments))
 
 """
     PhaseFlip <: Noise
@@ -37,6 +39,7 @@ struct PhaseFlip <: Noise
 end
 Parametrizable(g::PhaseFlip) = Parametrized()
 qubit_count(g::PhaseFlip) = 1
+StructTypes.constructfrom(::Type{PhaseFlip}, nt::Quasar.CircuitInstruction) = PhaseFlip(only(nt.arguments))
 
 """
     PauliChannel <: Noise
@@ -50,6 +53,7 @@ struct PauliChannel <: Noise
 end
 Parametrizable(g::PauliChannel) = Parametrized()
 qubit_count(g::PauliChannel) = 1
+StructTypes.constructfrom(::Type{PauliChannel}, nt::Quasar.CircuitInstruction) = PauliChannel(nt.arguments...)
 
 """
     AmplitudeDamping <: Noise
@@ -61,6 +65,7 @@ struct AmplitudeDamping <: Noise
 end
 Parametrizable(g::AmplitudeDamping) = Parametrized()
 qubit_count(g::AmplitudeDamping) = 1
+StructTypes.constructfrom(::Type{AmplitudeDamping}, nt::Quasar.CircuitInstruction) = AmplitudeDamping(only(nt.arguments))
 
 """
     PhaseDamping <: Noise
@@ -72,6 +77,7 @@ struct PhaseDamping <: Noise
 end
 Parametrizable(g::PhaseDamping) = Parametrized()
 qubit_count(g::PhaseDamping) = 1
+StructTypes.constructfrom(::Type{PhaseDamping}, nt::Quasar.CircuitInstruction) = PhaseDamping(only(nt.arguments))
 
 """
     Depolarizing <: Noise
@@ -83,6 +89,7 @@ struct Depolarizing <: Noise
 end
 Parametrizable(g::Depolarizing) = Parametrized()
 qubit_count(g::Depolarizing) = 1
+StructTypes.constructfrom(::Type{Depolarizing}, nt::Quasar.CircuitInstruction) = Depolarizing(only(nt.arguments))
 
 """
     TwoQubitDephasing <: Noise
@@ -94,6 +101,7 @@ struct TwoQubitDephasing <: Noise
 end
 Parametrizable(g::TwoQubitDephasing) = Parametrized()
 qubit_count(g::TwoQubitDephasing) = 2
+StructTypes.constructfrom(::Type{TwoQubitDephasing}, nt::Quasar.CircuitInstruction) = TwoQubitDephasing(only(nt.arguments))
 
 """
     TwoQubitDepolarizing <: Noise
@@ -105,6 +113,7 @@ struct TwoQubitDepolarizing <: Noise
 end
 Parametrizable(g::TwoQubitDepolarizing) = Parametrized()
 qubit_count(g::TwoQubitDepolarizing) = 2
+StructTypes.constructfrom(::Type{TwoQubitDepolarizing}, nt::Quasar.CircuitInstruction) = TwoQubitDepolarizing(only(nt.arguments))
 
 """
     GeneralizedAmplitudeDamping <: Noise
@@ -117,6 +126,7 @@ struct GeneralizedAmplitudeDamping <: Noise
 end
 Parametrizable(g::GeneralizedAmplitudeDamping) = Parametrized()
 qubit_count(g::GeneralizedAmplitudeDamping) = 1
+StructTypes.constructfrom(::Type{GeneralizedAmplitudeDamping}, nt::Quasar.CircuitInstruction) = GeneralizedAmplitudeDamping(nt.arguments...)
 
 """
     MultiQubitPauliChannel{N} <: Noise

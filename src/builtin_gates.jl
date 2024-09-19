@@ -1,92 +1,79 @@
 # OpenQASM 3 Braket Standard Gates
-builtin_gates() = Dict{String, GateDefinition}(
+builtin_gates() = Dict{String, BuiltinGateDefinition}(
     # identity gate
-    "i"=>GateDefinition("i", String[], ["a"], Instruction(BraketSimulator.I(), 0)),
+    "i"=>BuiltinGateDefinition("i", String[], ["a"], (type="i", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[], targets=[0], controls=Pair{Int,Int}[], exponent=1.0)),
     # phase gate
-    "phaseshift"=>GateDefinition("phaseshift", ["λ"], ["a"], Instruction(BraketSimulator.PhaseShift(BraketSimulator.FreeParameter(:λ)), 0)),
+    "phaseshift"=>BuiltinGateDefinition("phaseshift", ["λ"], ["a"], (type="phaseshift", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[:λ], targets=[0], controls=Pair{Int,Int}[], exponent=1.0)),
     # pauli X gate
-    "x"=>GateDefinition("x", String[], ["a"], Instruction(BraketSimulator.X(), 0)),
+    "x"=>BuiltinGateDefinition("x", String[], ["a"], (type="x", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[], targets=[0], controls=Pair{Int,Int}[], exponent=1.0)),
     # pauli Y gate
-    "y"=>GateDefinition("y", String[], ["a"], Instruction(BraketSimulator.Y(), 0)),
+    "y"=>BuiltinGateDefinition("y", String[], ["a"], (type="y", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[], targets=[0], controls=Pair{Int,Int}[], exponent=1.0)),
     # pauli Z gate
-    "z"=>GateDefinition("z", String[], ["a"], Instruction(BraketSimulator.Z(), 0)),
+    "z"=>BuiltinGateDefinition("z", String[], ["a"], (type="z", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[], targets=[0], controls=Pair{Int,Int}[], exponent=1.0)),
     # Hadamard gate
-    "h"=>GateDefinition("h", String[], ["a"], Instruction(BraketSimulator.H(), 0)),
+    "h"=>BuiltinGateDefinition("h", String[], ["a"], (type="h", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[], targets=[0], controls=Pair{Int,Int}[], exponent=1.0)),
     # S gate
-    "s"=>GateDefinition("s", String[], ["a"], Instruction(BraketSimulator.S(), 0)),
+    "s"=>BuiltinGateDefinition("s", String[], ["a"], (type="s", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[], targets=[0], controls=Pair{Int,Int}[], exponent=1.0)),
     # Si gate
-    "si"=>GateDefinition("si", String[], ["a"], Instruction(BraketSimulator.Si(), 0)),
+    "si"=>BuiltinGateDefinition("si", String[], ["a"], (type="si", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[], targets=[0], controls=Pair{Int,Int}[], exponent=1.0)),
     # T gate
-    "t"=>GateDefinition("t", String[], ["a"], Instruction(BraketSimulator.T(), 0)),
+    "t"=>BuiltinGateDefinition("t", String[], ["a"], (type="t", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[], targets=[0], controls=Pair{Int,Int}[], exponent=1.0)),
     # Ti gate
-    "ti"=>GateDefinition("ti", String[], ["a"], Instruction(BraketSimulator.Ti(), 0)),
+    "ti"=>BuiltinGateDefinition("ti", String[], ["a"], (type="ti", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[], targets=[0], controls=Pair{Int,Int}[], exponent=1.0)),
     # V gate
-    "v"=>GateDefinition("v", String[], ["a"], Instruction(BraketSimulator.V(), 0)),
+    "v"=>BuiltinGateDefinition("v", String[], ["a"], (type="v", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[], targets=[0], controls=Pair{Int,Int}[], exponent=1.0)),
     # Vi gate
-    "vi"=>GateDefinition("vi", String[], ["a"], Instruction(BraketSimulator.Vi(), 0)),
+    "vi"=>BuiltinGateDefinition("vi", String[], ["a"], (type="vi", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[], targets=[0], controls=Pair{Int,Int}[], exponent=1.0)),
     # RotX gate
-    "rx"=>GateDefinition("rx", ["θ"], ["a"], Instruction(BraketSimulator.Rx(BraketSimulator.FreeParameter(:θ)), 0)),
+    "rx"=>BuiltinGateDefinition("rx", ["θ"], ["a"], (type="rx", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[:θ], targets=[0], controls=Pair{Int,Int}[], exponent=1.0)),
     # RotY gate
-    "ry"=>GateDefinition("ry", ["θ"], ["a"], Instruction(BraketSimulator.Ry(BraketSimulator.FreeParameter(:θ)), 0)),
+    "ry"=>BuiltinGateDefinition("ry", ["θ"], ["a"], (type="ry", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[:θ], targets=[0], controls=Pair{Int,Int}[], exponent=1.0)),
     # RotZ gate
-    "rz"=>GateDefinition("rz", ["θ"], ["a"], Instruction(BraketSimulator.Rz(BraketSimulator.FreeParameter(:θ)), 0)),
+    "rz"=>BuiltinGateDefinition("rz", ["θ"], ["a"], (type="rz", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[:θ], targets=[0], controls=Pair{Int,Int}[], exponent=1.0)),
     # CNot gate
-    "cnot"=>GateDefinition("cnot", String[], ["a", "b"], Instruction(BraketSimulator.CNot(), BraketSimulator.QubitSet(0, 1))),
+    "cnot"=>BuiltinGateDefinition("cnot", String[], ["a", "b"], (type="cnot", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[], targets=[0, 1], controls=Pair{Int,Int}[], exponent=1.0)),
     # CY gate
-    "cy"=>GateDefinition("cy", String[], ["a", "b"], Instruction(BraketSimulator.CY(), BraketSimulator.QubitSet(0, 1))),
+    "cy"=>BuiltinGateDefinition("cy", String[], ["a", "b"], (type="cy", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[], targets=[0, 1], controls=Pair{Int,Int}[], exponent=1.0)),
     # CZ gate
-    "cz"=>GateDefinition("cz", String[], ["a", "b"], Instruction(BraketSimulator.CZ(), BraketSimulator.QubitSet(0, 1))),
+    "cz"=>BuiltinGateDefinition("cz", String[], ["a", "b"], (type="cz", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[], targets=[0, 1], controls=Pair{Int,Int}[], exponent=1.0)),
     # CV gate
-    "cv"=>GateDefinition("cv", String[], ["a", "b"], Instruction(BraketSimulator.CV(), BraketSimulator.QubitSet(0, 1))),
+    "cv"=>BuiltinGateDefinition("cv", String[], ["a", "b"], (type="cv", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[], targets=[0, 1], controls=Pair{Int,Int}[], exponent=1.0)),
     # controlled-phase
-    "cphaseshift"=>GateDefinition("cphaseshift", ["λ"], ["a", "b"], Instruction(BraketSimulator.CPhaseShift(BraketSimulator.FreeParameter(:λ)), BraketSimulator.QubitSet(0, 1))),
+    "cphaseshift"=>BuiltinGateDefinition("cphaseshift", ["λ"], ["a", "b"], (type="cphaseshift", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[:λ], targets=[0, 1], controls=Pair{Int,Int}[], exponent=1.0)),
     # controlled-phase-00
-    "cphaseshift00"=>GateDefinition("cphaseshift00", ["λ"], ["a", "b"], Instruction(BraketSimulator.CPhaseShift00(BraketSimulator.FreeParameter(:λ)), BraketSimulator.QubitSet(0, 1))),
+    "cphaseshift00"=>BuiltinGateDefinition("cphaseshift00", ["λ"], ["a", "b"], (type="cphaseshift00", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[:λ], targets=[0, 1], controls=Pair{Int,Int}[], exponent=1.0)),
     # controlled-phase-01
-    "cphaseshift01"=>GateDefinition("cphaseshift01", ["λ"], ["a", "b"], Instruction(BraketSimulator.CPhaseShift01(BraketSimulator.FreeParameter(:λ)), BraketSimulator.QubitSet(0, 1))),
+    "cphaseshift01"=>BuiltinGateDefinition("cphaseshift01", ["λ"], ["a", "b"], (type="cphaseshift01", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[:λ], targets=[0, 1], controls=Pair{Int,Int}[], exponent=1.0)),
     # controlled-phase-10
-    "cphaseshift10"=>GateDefinition("cphaseshift10", ["λ"], ["a", "b"], Instruction(BraketSimulator.CPhaseShift10(BraketSimulator.FreeParameter(:λ)), BraketSimulator.QubitSet(0, 1))),
+    "cphaseshift10"=>BuiltinGateDefinition("cphaseshift10", ["λ"], ["a", "b"], (type="cphaseshift10", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[:λ], targets=[0, 1], controls=Pair{Int,Int}[], exponent=1.0)),
     # Swap gate
-    "swap"=>GateDefinition("swap", String[], ["a", "b"], Instruction(BraketSimulator.Swap(), BraketSimulator.QubitSet(0, 1))),
+    "swap"=>BuiltinGateDefinition("swap", String[], ["a", "b"], (type="swap", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[], targets=[0, 1], controls=Pair{Int,Int}[], exponent=1.0)),
     # ISwap gate
-    "iswap"=>GateDefinition("iswap", String[], ["a", "b"], Instruction(BraketSimulator.ISwap(), BraketSimulator.QubitSet(0, 1))),
+    "iswap"=>BuiltinGateDefinition("iswap", String[], ["a", "b"], (type="iswap", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[], targets=[0, 1], controls=Pair{Int,Int}[], exponent=1.0)),
     # ISwap gate
-    "pswap"=>GateDefinition("pswap", ["θ"], ["a", "b"], Instruction(BraketSimulator.PSwap(BraketSimulator.FreeParameter(:θ)), BraketSimulator.QubitSet(0, 1))),
+    "pswap"=>BuiltinGateDefinition("pswap", ["θ"], ["a", "b"], (type="pswap", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[:θ], targets=[0, 1], controls=Pair{Int,Int}[], exponent=1.0)),
     # controlled-swap gate
-    "cswap"=>GateDefinition("cswap", String[], ["a", "b", "c"], Instruction(BraketSimulator.CSwap(), BraketSimulator.QubitSet(0, 1, 2))),
+    "cswap"=>BuiltinGateDefinition("cswap", String[], ["a", "b", "c"], (type="cswap", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[], targets=[0, 1, 2], controls=Pair{Int,Int}[], exponent=1.0)),
     # ccnot/Toffoli gate
-    "ccnot"=>GateDefinition("ccnot", String[], ["a", "b", "c"], Instruction(BraketSimulator.CCNot(), BraketSimulator.QubitSet(0, 1, 2))),
+    "ccnot"=>BuiltinGateDefinition("ccnot", String[], ["a", "b", "c"], (type="ccnot", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[], targets=[0, 1, 2], controls=Pair{Int,Int}[], exponent=1.0)),
     # XX gate
-    "xx"=>GateDefinition("xx", ["θ"], ["a", "b"], Instruction(BraketSimulator.XX(BraketSimulator.FreeParameter(:θ)), BraketSimulator.QubitSet(0, 1))),
+    "xx"=>BuiltinGateDefinition("xx", ["θ"], ["a", "b"], (type="xx", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[:θ], targets=[0, 1], controls=Pair{Int,Int}[], exponent=1.0)),
     # XY gate
-    "xy"=>GateDefinition("xy", ["θ"], ["a", "b"], Instruction(BraketSimulator.XY(BraketSimulator.FreeParameter(:θ)), BraketSimulator.QubitSet(0, 1))),
+    "xy"=>BuiltinGateDefinition("xy", ["θ"], ["a", "b"], (type="xy", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[:θ], targets=[0, 1], controls=Pair{Int,Int}[], exponent=1.0)),
     # YY gate
-    "yy"=>GateDefinition("yy", ["θ"], ["a", "b"], Instruction(BraketSimulator.YY(BraketSimulator.FreeParameter(:θ)), BraketSimulator.QubitSet(0, 1))),
+    "yy"=>BuiltinGateDefinition("yy", ["θ"], ["a", "b"], (type="yy", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[:θ], targets=[0, 1], controls=Pair{Int,Int}[], exponent=1.0)),
     # ZZ gate
-    "zz"=>GateDefinition("zz", ["θ"], ["a", "b"], Instruction(BraketSimulator.ZZ(BraketSimulator.FreeParameter(:θ)), BraketSimulator.QubitSet(0, 1))),
+    "zz"=>BuiltinGateDefinition("zz", ["θ"], ["a", "b"], (type="zz", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[:θ], targets=[0, 1], controls=Pair{Int,Int}[], exponent=1.0)),
     # ECR gate
-    "ecr"=>GateDefinition("ecr", String[], ["a", "b"], Instruction(BraketSimulator.ECR(), BraketSimulator.QubitSet(0, 1))),
+    "ecr"=>BuiltinGateDefinition("ecr", String[], ["a", "b"], (type="ecr", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[], targets=[0, 1], controls=Pair{Int,Int}[], exponent=1.0)),
     # MS gate
-    "ms"=>GateDefinition("ms", ["ϕ", "θ", "λ"], ["a", "b"], Instruction(BraketSimulator.MS(BraketSimulator.FreeParameter(:ϕ), BraketSimulator.FreeParameter(:θ), BraketSimulator.FreeParameter(:λ)), BraketSimulator.QubitSet(0, 1))),
+    "ms"=>BuiltinGateDefinition("ms", ["ϕ", "θ", "λ"], ["a", "b"], (type="ms", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[:ϕ, :θ, :λ], targets=[0, 1], controls=Pair{Int,Int}[], exponent=1.0)),
     # GPi gate
-    "gpi"=>GateDefinition("gpi", ["θ"], ["a"], Instruction(BraketSimulator.GPi(BraketSimulator.FreeParameter(:θ)), 0)),
+    "gpi"=>BuiltinGateDefinition("gpi", ["θ"], ["a"], (type="gpi", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[:θ], targets=[0], controls=Pair{Int,Int}[], exponent=1.0)),
     # GPi2 gate
-    "gpi2"=>GateDefinition("gpi2", ["θ"], ["a"], Instruction(BraketSimulator.GPi2(BraketSimulator.FreeParameter(:θ)), 0)),
+    "gpi2"=>BuiltinGateDefinition("gpi2", ["θ"], ["a"], (type="gpi2", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[:θ], targets=[0], controls=Pair{Int,Int}[], exponent=1.0)),
     # PRx gate
-    "prx"=>GateDefinition("prx", ["θ", "ϕ"], ["a"], Instruction(BraketSimulator.PRx(BraketSimulator.FreeParameter(:θ), BraketSimulator.FreeParameter(:ϕ)), 0)),
+    "prx"=>BuiltinGateDefinition("prx", ["θ", "ϕ"], ["a"], (type="prx", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[:θ, :ϕ], targets=[0], controls=Pair{Int,Int}[], exponent=1.0)),
     # 3-angle U gate
-    "U"=>GateDefinition("U", ["θ", "ϕ", "λ"], ["a"], Instruction(BraketSimulator.U(BraketSimulator.FreeParameter(:θ), BraketSimulator.FreeParameter(:ϕ), BraketSimulator.FreeParameter(:λ)), 0)),
+    "U"=>BuiltinGateDefinition("U", ["θ", "ϕ", "λ"], ["a"], (type="u", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[:θ, :ϕ, :λ], targets=[0], controls=Pair{Int,Int}[], exponent=1.0)),
 )
-
-const noise_types = Dict{String, Type}(
-                                       "bit_flip"=>BraketSimulator.BitFlip,
-                                       "phase_flip"=>BraketSimulator.PhaseFlip,
-                                       "pauli_channel"=>BraketSimulator.PauliChannel,
-                                       "depolarizing"=>BraketSimulator.Depolarizing,
-                                       "two_qubit_depolarizing"=>BraketSimulator.TwoQubitDepolarizing,
-                                       "two_qubit_dephasing"=>BraketSimulator.TwoQubitDephasing,
-                                       "amplitude_damping"=>BraketSimulator.AmplitudeDamping,
-                                       "generalized_amplitude_damping"=>BraketSimulator.GeneralizedAmplitudeDamping,
-                                       "phase_damping"=>BraketSimulator.PhaseDamping,
-                                       "kraus"=>BraketSimulator.Kraus,
-                                      )

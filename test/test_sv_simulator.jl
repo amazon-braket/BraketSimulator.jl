@@ -157,7 +157,7 @@ LARGE_TESTS = get(ENV, "BRAKET_SIM_LARGE_TESTS", "false") == "true"
             [0.44285171, 0.55714829],
         ),
         (
-            [BraketSimulator.Instruction(BraketSimulator.H(), [0]), BraketSimulator.Instruction(BraketSimulator.MultiQubitPhaseShift{1}(0.15), [0])],
+            [BraketSimulator.Instruction(BraketSimulator.H(), [0]), BraketSimulator.Instruction(BraketSimulator.GPhase{1}(0.15), [0])],
             1,
             [0.69916673 + 0.10566872im, 0.69916673 + 0.10566872im],
             [0.5, 0.5],

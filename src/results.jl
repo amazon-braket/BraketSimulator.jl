@@ -9,6 +9,8 @@ See also: [`Expectation`](@ref), [`Variance`](@ref),
 [`DensityMatrix`](@ref), and [`Amplitude`](@ref).
 """
 abstract type Result end
+StructTypes.StructType(::Type{Result}) = StructTypes.AbstractType()
+StructTypes.subtypes(::Type{Result}) = (amplitude=Amplitude, expectation=Expectation, variance=Variance, sample=Sample, state_vector=StateVector, density_matrix=DensityMatrix, probability=Probability)
 
 for (typ, ir_typ, label) in ((:Expectation, :(IR.Expectation), "expectation"), (:Variance, :(IR.Variance), "variance"), (:Sample, :(IR.Sample), "sample"))
     @eval begin
@@ -40,6 +42,7 @@ for (typ, ir_typ, label) in ((:Expectation, :(IR.Expectation), "expectation"), (
         end
         label(::$typ) = $label
         StructTypes.lower(x::$typ) = $ir_typ(StructTypes.lower(x.observable), (isempty(x.targets) ? nothing : Int.(x.targets)), $label)
+        StructTypes.constructfrom(::Type{$typ}, nt) = $typ(StructTypes.constructfrom(Observables.Observable, nt.operator), nt.targets)
     end
 end
 
@@ -72,6 +75,7 @@ for (typ, ir_typ, label) in ((:Probability, :(IR.Probability), "probability"), (
         $typ(targets::Vararg{IntOrQubit}) = $typ(QubitSet(targets...))
         label(::$typ) = $label
         StructTypes.lower(x::$typ) = $ir_typ(isempty(x.targets) ? nothing : Int.(x.targets), $label)
+        StructTypes.constructfrom(::Type{$typ}, nt) = $typ(nt.targets)
     end
 end
 
@@ -176,6 +180,7 @@ All elements of `states` must be `'0'` or `'1'`.
 Amplitude(s::String) = Amplitude([s])
 Base.:(==)(a1::Amplitude, a2::Amplitude) = (a1.states == a2.states)
 label(::Amplitude) = "amplitude"
+StructTypes.constructfrom(::Type{Amplitude}, nt) = Amplitude(nt.states)
 
 """
     StateVector <: Result
@@ -185,6 +190,7 @@ Struct which represents a state vector measurement on a [`Circuit`](@ref).
 struct StateVector <: Result end
 Base.:(==)(sv1::StateVector, sv2::StateVector) = true
 label(::StateVector) = "statevector"
+StructTypes.constructfrom(::Type{StateVector}, nt) = StateVector()
 
 const ObservableResult = Union{Expectation, Variance, Sample}
 const ObservableParameterResult = Union{AdjointGradient,}

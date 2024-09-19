@@ -37,21 +37,22 @@ end
 qubit_count(g::MultiRZ) = 1
 
 """
-    MultiQubitPhaseShift{N}(angle)
+    GPhase{N}(angle)
 
 Global phase shift on `N` qubits. Equivalent to
 the OpenQASM3 built-in [`gphase` gate](https://openqasm.com/language/gates.html#gphase).
 Controls/negative controls applied to this gate control
-which states are rotated, so that `Control(g::MultiQubitPhaseShift{2})` will apply the rotation
+which states are rotated, so that `Control(g::GPhase{2})` will apply the rotation
 to the `|11>` state.
 """
-mutable struct MultiQubitPhaseShift{N} <: AngledGate{1}
+mutable struct GPhase{N} <: AngledGate{1}
     angle::NTuple{1,Union{Real,FreeParameter}}
     pow_exponent::Float64
-    MultiQubitPhaseShift{N}(angle::T, pow_exponent::Float64=1.0) where {N, T<:NTuple{1,Union{Real,FreeParameter}}} = new(angle, pow_exponent)
+    GPhase{N}(angle::T, pow_exponent::Float64=1.0) where {N, T<:NTuple{1,Union{Real,FreeParameter}}} = new(angle, pow_exponent)
 end
-matrix_rep_raw(g::MultiQubitPhaseShift{N}) where {N} = Diagonal(SVector{2^N, ComplexF64}(exp(im*g.angle[1]) for _ in 1:2^N))
-qubit_count(g::MultiQubitPhaseShift{N}) where {N} = N
+matrix_rep_raw(g::GPhase{N}) where {N} = Diagonal(SVector{2^N, ComplexF64}(exp(im*g.angle[1]) for _ in 1:2^N))
+qubit_count(g::GPhase{N}) where {N} = N
+StructTypes.constructfrom(::Type{GPhase}, nt::Quasar.CircuitInstruction) = GPhase{length(nt.targets)}(only(nt.arguments), nt.exponent)
 
 function apply_gate!(
     factor::ComplexF64,
@@ -75,7 +76,7 @@ for (V, f) in ((true, :conj), (false, :identity))
         apply_gate!(::Val{$V}, g::MultiRZ, state_vec::AbstractStateVector{T}, t::Int) where {T<:Complex} = apply_gate!(Val($V), Rz(g.angle, g.pow_exponent), state_vec, t)
         apply_gate!(::Val{$V}, g::MultiRZ, state_vec::AbstractStateVector{T}, t1::Int,t2::Int,) where {T<:Complex} = apply_gate!(Val($V), ZZ(g.angle, g.pow_exponent), state_vec, t1, t2)
         apply_gate!(::Val{$V}, g::MultiRZ, state_vec::AbstractStateVector{T}, ts::Vararg{Int,N}) where {T<:Complex,N} = apply_gate!($f(-im * g.angle[1] / 2.0), PauliEigenvalues(Val(N)), state_vec, ts...)
-        apply_gate!(::Val{$V}, g::MultiQubitPhaseShift{N}, state_vec::AbstractStateVector{T}, ts::Vararg{Int,N}) where {T<:Complex, N} = apply_gate!($f(exp(im*g.angle[1]*g.pow_exponent)), state_vec, ts...)
+        apply_gate!(::Val{$V}, g::GPhase{N}, state_vec::AbstractStateVector{T}, ts::Vararg{Int,N}) where {T<:Complex, N} = apply_gate!($f(exp(im*g.angle[1]*g.pow_exponent)), state_vec, ts...)
     end
 end
 
@@ -119,7 +120,7 @@ Control(g::Control{G, BC}, bitvals::NTuple{0, Int}, pow_exponent::Float64=1.0) w
 Control(g::G, bitvals::NTuple{0, Int}, pow_exponent::Float64=1.0) where {G<:Gate} = g
 Base.copy(c::Control{G, B}) where {G<:Gate, B} = Control(copy(c.g), c.bitvals, c.pow_exponent)
 qubit_count(c::Control{G, B}) where {G<:Gate, B} = qubit_count(c.g) + B
-qubit_count(c::Control{MultiQubitPhaseShift{N}, B}) where {N, B} = N
+qubit_count(c::Control{GPhase{N}, B}) where {N, B} = N
 function matrix_rep_raw(c::Control{G, B}) where {G<:Gate, B}
     inner_mat = matrix_rep(c.g)
     inner_qc  = qubit_count(c.g)
@@ -134,7 +135,7 @@ function matrix_rep_raw(c::Control{G, B}) where {G<:Gate, B}
     end
     return full_mat
 end
-function matrix_rep_raw(c::Control{MultiQubitPhaseShift{N}, B}) where {N, B}
+function matrix_rep_raw(c::Control{GPhase{N}, B}) where {N, B}
     g_mat    = matrix_rep(c.g)
     qc       = N 
     ctrl_ix  = 0

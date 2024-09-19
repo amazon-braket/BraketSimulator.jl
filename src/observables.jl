@@ -211,6 +211,7 @@ function StructTypes.constructfrom(::Type{Observable}, obj::String)
     (obj == "h" || obj == "H") && return H()
     throw(ArgumentError("Observable of type \"$obj\" provided, only \"i\", \"x\", \"y\", \"z\", and \"h\" are valid."))
 end
+StructTypes.constructfrom(::Type{Observable}, obj::Matrix{ComplexF64})              = HermitianObservable(obj)
 StructTypes.constructfrom(::Type{Observable}, obj::Vector{Vector{Vector{Float64}}}) = HermitianObservable(obj)
 StructTypes.constructfrom(::Type{Observable}, obj::Vector{T}) where {T} = length(obj) == 1 ? StructTypes.constructfrom(Observable, obj[1]) : TensorProduct([StructTypes.constructfrom(Observable, o) for o in obj])
 

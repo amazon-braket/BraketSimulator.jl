@@ -60,20 +60,21 @@ complex_matrix_to_ir(m) = m
 include("raw_schema.jl")
 include("qubit_set.jl")
 include("operators.jl")
-include("gates.jl")
-include("noises.jl")
-include("schemas.jl")
 include("observables.jl")
 using .Observables
 include("results.jl")
+include("Quasar.jl")
+using .Quasar
+include("pragmas.jl")
+include("gates.jl")
+include("noises.jl")
+include("schemas.jl")
 include("circuit.jl")
 include("validation.jl")
 include("custom_gates.jl")
 include("pow_gates.jl")
 include("gate_kernels.jl")
 include("noise_kernels.jl")
-include("Quasar.jl")
-using .Quasar
 
 const LOG2_CHUNK_SIZE = 10
 const CHUNK_SIZE      = 2^LOG2_CHUNK_SIZE
@@ -201,7 +202,7 @@ function _prepare_program(circuit_ir::OpenQasmProgram, inputs::Dict{String, <:An
     ir_inputs = isnothing(circuit_ir.inputs) ? Dict{String, Float64}() : circuit_ir.inputs 
     merged_inputs = merge(ir_inputs, inputs)
     src           = circuit_ir.source::String
-    circuit       = Quasar.to_circuit(src, merged_inputs)
+    circuit       = to_circuit(src, merged_inputs)
     n_qubits      = qubit_count(circuit)
     if shots > 0
         _verify_openqasm_shots_observables(circuit, n_qubits)
@@ -776,58 +777,58 @@ include("dm_simulator.jl")
         simulator = StateVectorSimulator(5, 0)
         oq3_program = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), custom_qasm, nothing)
         simulate(simulator, oq3_program, 100)
-        simulate("braket_sv_v2", custom_qasm, "{}", 100)
+        #simulate("braket_sv_v2", custom_qasm, "{}", 100)
 
         simulator = DensityMatrixSimulator(2, 0)
         oq3_program = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), noise_qasm, nothing)
         simulate(simulator, oq3_program, 100)
         simulate(simulator, [oq3_program, oq3_program], 100)
-        simulate("braket_dm_v2", noise_qasm, "{}", 100)
-        simulate("braket_dm_v2", [noise_qasm, noise_qasm], "[{}, {}]", 100)
+        #simulate("braket_dm_v2", noise_qasm, "{}", 100)
+        #simulate("braket_dm_v2", [noise_qasm, noise_qasm], "[{}, {}]", 100)
 
         simulator = StateVectorSimulator(3, 0)
         oq3_program = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), unitary_qasm, nothing)
         simulate(simulator, oq3_program, 100)
         simulate(simulator, [oq3_program, oq3_program], 100)
-        simulate("braket_sv_v2", unitary_qasm, "{}", 100)
-        simulate("braket_sv_v2", [unitary_qasm, unitary_qasm], "[{}, {}]", 100)
+        #simulate("braket_sv_v2", unitary_qasm, "{}", 100)
+        #simulate("braket_sv_v2", [unitary_qasm, unitary_qasm], "[{}, {}]", 100)
 
         simulator = StateVectorSimulator(6, 0)
         oq3_program = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), sv_adder_qasm, Dict("a_in"=>3, "b_in"=>7))
         simulate(simulator, oq3_program, 0)
-        simulate("braket_sv_v2", sv_adder_qasm, "{\"a_in\":3,\"b_in\":7}", 100)
+        #simulate("braket_sv_v2", sv_adder_qasm, "{\"a_in\":3,\"b_in\":7}", 100)
 
         simulator = StateVectorSimulator(16, 0)
         oq3_program = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), grcs_16_qasm, nothing)
         simulate(simulator, oq3_program, 0)
-        simulate("braket_sv_v2", grcs_16_qasm, "{}", 0)
+        #simulate("braket_sv_v2", grcs_16_qasm, "{}", 0)
 
         simulator = StateVectorSimulator(2, 0)
         oq3_program = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), vqe_qasm, nothing)
         simulate(simulator, oq3_program, 100)
-        simulate("braket_sv_v2", vqe_qasm, "{}", 100)
+        #simulate("braket_sv_v2", vqe_qasm, "{}", 100)
 
         sv_simulator = StateVectorSimulator(3, 0)
         dm_simulator = DensityMatrixSimulator(3, 0)
         oq3_program  = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), all_gates_qasm, Dict("theta"=>0.665))
         simulate(sv_simulator, oq3_program, 100)
         simulate(dm_simulator, oq3_program, 100)
-        simulate("braket_sv_v2", all_gates_qasm, "{\"theta\":0.665}", 100)
-        simulate("braket_dm_v2", all_gates_qasm, "{\"theta\":0.665}",  100)
+        #simulate("braket_sv_v2", all_gates_qasm, "{\"theta\":0.665}", 100)
+        #simulate("braket_dm_v2", all_gates_qasm, "{\"theta\":0.665}",  100)
 
         sv_simulator = StateVectorSimulator(2, 0)
         dm_simulator = DensityMatrixSimulator(2, 0)
         sv_oq3_program = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), sv_exact_results_qasm, nothing)
         dm_oq3_program = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), dm_exact_results_qasm, nothing)
         simulate(sv_simulator, sv_oq3_program, 0)
-        simulate("braket_sv_v2", sv_exact_results_qasm, "{}", 0)
         simulate(dm_simulator, dm_oq3_program, 0)
-        simulate("braket_dm_v2", dm_exact_results_qasm, "{}", 0)
+        #simulate("braket_sv_v2", sv_exact_results_qasm, "{}", 0)
+        #simulate("braket_dm_v2", dm_exact_results_qasm, "{}", 0)
         oq3_program = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), shots_results_qasm, nothing)
         simulate(sv_simulator, oq3_program, 10)
         simulate(dm_simulator, oq3_program, 10)
-        simulate("braket_sv_v2", shots_results_qasm, "{}", 10)
-        simulate("braket_dm_v2", shots_results_qasm, "{}", 10)
+        #simulate("braket_sv_v2", shots_results_qasm, "{}", 10)
+        #simulate("braket_dm_v2", shots_results_qasm, "{}", 10)
     end
 end
 end # module BraketSimulator
