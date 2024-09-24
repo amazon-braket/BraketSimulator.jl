@@ -11,7 +11,7 @@ and a `target` set of qubits to which the `operator` is applied.
 julia> Instruction(H(), 1)
 Instruction{H}(H(1.0), QubitSet(1))
 
-julia> Instruction(CNot(), [1, Qubit(4)])
+julia> Instruction(CNot(), [1, 4])
 Instruction{CNot}(CNot(1.0), QubitSet(1, 4))
 ```
 """

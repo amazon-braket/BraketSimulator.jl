@@ -13,10 +13,6 @@ using BraketSimulator, Test
         @test 10 == BraketSimulator.Qubit(10)
         @test BraketSimulator.Qubit(10) == BigInt(10)
     end
-    @testset "Convert to Int" begin
-        @test Int(BraketSimulator.Qubit(1)) == 1
-        @test convert(Int, BraketSimulator.Qubit(1)) == 1
-    end
     @testset "show" begin
         s = sprint(show, BraketSimulator.Qubit(1))
         @test s == "Qubit(1)"

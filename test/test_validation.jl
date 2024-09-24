@@ -731,7 +731,7 @@ using Test, BraketSimulator
             #pragma braket result expectation z(q[3]) @ z(q[4]) @ z(q[5]) @ z(q[6]) @ z(q[7])
             #pragma braket result expectation z(q[0]) @ z(q[3]) @ z(q[4]) @ z(q[5]) @ z(q[6]) @ z(q[7])
             """
-            circ = BraketSimulator.Circuit(source, inputs)
+            circ = BraketSimulator.Quasar.to_circuit(source, inputs)
             @test isnothing(BraketSimulator._verify_openqasm_shots_observables(circ, 8))
             # differs from source above by change of one Z to X in observables list
             bad_source = """
@@ -1399,7 +1399,7 @@ using Test, BraketSimulator
             #pragma braket result expectation z(q[3]) @ z(q[4]) @ z(q[5]) @ z(q[6]) @ z(q[7])
             #pragma braket result expectation z(q[0]) @ z(q[3]) @ z(q[4]) @ z(q[5]) @ x(q[6]) @ z(q[7])
             """
-            circ = BraketSimulator.Circuit(bad_source, inputs)
+            circ = BraketSimulator.Quasar.to_circuit(bad_source, inputs)
             @test_throws ValidationError BraketSimulator._verify_openqasm_shots_observables(circ, 8)
         end
     end

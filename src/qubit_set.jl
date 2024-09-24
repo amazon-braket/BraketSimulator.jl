@@ -1,19 +1,5 @@
 using OrderedCollections
 
-"""
-    Qubit <: Integer
-
-Wrapper `struct` representing a qubit.
-
-# Examples
-```jldoctest
-julia> q = Qubit(0)
-Qubit(0)
-
-julia> q == 0
-true
-```
-"""
 struct Qubit <: Integer
     index::Int
     Qubit(q::Integer) = new(q)
@@ -27,8 +13,6 @@ Base.:(==)(i::BigInt, q::Qubit) = big(q.index)==i
 Base.:(==)(q::Qubit, i::BigInt) = big(q.index)==i
 Base.:(==)(q1::Qubit, q2::Qubit) = q1.index==q2.index
 
-Base.convert(::Type{Int}, q::Qubit) = q.index
-Base.Int(q::Qubit) = q.index
 Base.hash(q::Qubit, h::UInt) = hash(q.index, h)
 Base.show(io::IO, q::Qubit) = print(io, "Qubit($(q.index))")
 const IntOrQubit    = Union{Int, Qubit}
@@ -39,15 +23,9 @@ const IntOrQubit    = Union{Int, Qubit}
 An `OrderedSet`-like object which represents the qubits a
 [`Circuit`](@ref), [`Instruction`](@ref), or [`Result`](@ref)
 acts on and their ordering.
-Elements may be `Int`s or [`Qubit`](@ref)s.
 
 # Examples
 ```jldoctest
-julia> QubitSet(1, Qubit(0))
-QubitSet with 2 elements:
-  1
-  Qubit(0)
-
 julia> QubitSet([2, 1])
 QubitSet with 2 elements:
   2

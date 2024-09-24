@@ -1,7 +1,6 @@
 using Coverage
 # process '*.cov' files
 coverage = process_folder()
-coverage = append!(coverage, process_folder("ext/BraketSimulatorPythonExt/"))
 coverage = append!(coverage, process_folder("ext/BraketSimulatorBraketExt/"))
 coverage = merge_coverage_counts(coverage)
 # Get total coverage for all Julia files
@@ -15,6 +14,11 @@ end
 for fi in readdir("src")
     if endswith(fi, ".jl")
         println("Coverage for file $fi: $(get_summary(process_file(joinpath("src", fi))))")
+    end
+end
+for fi in readdir("ext/BraketSimulatorBraketExt")
+    if endswith(fi, ".jl")
+        println("Coverage for file $fi: $(get_summary(process_file(joinpath("ext/BraketSimulatorBraketExt", fi))))")
     end
 end
 

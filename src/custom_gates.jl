@@ -46,7 +46,7 @@ which states are rotated, so that `Control(g::MultiQubitPhaseShift{2})` will app
 to the `|11>` state.
 """
 mutable struct MultiQubitPhaseShift{N} <: AngledGate{1}
-    angle::NTuple{1,Union{Float64,FreeParameter}}
+    angle::NTuple{1,Union{Real,FreeParameter}}
     pow_exponent::Float64
     MultiQubitPhaseShift{N}(angle::T, pow_exponent::Float64=1.0) where {N, T<:NTuple{1,Union{Real,FreeParameter}}} = new(angle, pow_exponent)
 end
