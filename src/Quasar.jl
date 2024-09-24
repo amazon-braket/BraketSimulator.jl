@@ -1463,6 +1463,7 @@ function evaluate(v::V, expr::QasmExpression) where {V<:AbstractVisitor}
 end
 evaluate(v::AbstractVisitor, exprs::Vector{QasmExpression}) = [evaluate(v, expr) for expr in exprs] 
 
+# nosemgrep
 function _evaluate_qubits(::Val{:identifier}, v, qubit_expr::QasmExpression)::Vector{Int}
     qubit_name = name(qubit_expr)
     mapping    = qubit_mapping(v)::Dict{String, Vector{Int}}
@@ -1470,6 +1471,7 @@ function _evaluate_qubits(::Val{:identifier}, v, qubit_expr::QasmExpression)::Ve
     return mapping[qubit_name]
 end
 
+# nosemgrep
 function _evaluate_qubits(::Val{:indexed_identifier}, v, qubit_expr::QasmExpression)::Vector{Int}
     qubit_name = name(qubit_expr)
     mapping    = qubit_mapping(v)::Dict{String, Vector{Int}}
