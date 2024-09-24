@@ -110,9 +110,15 @@ const qasm_tokens = [
         :spaces          => re"[\t ]+",
         :classical_type    => re"bool|uint|int|float|angle|complex|array|bit|stretch|duration",
         :durationof_token  => re"durationof", # this MUST be lower than classical_type to preempt duration
-        :duration_literal  => (float | integer) * re"dt|ns|µs|us|ms|s",
+        :duration_literal  => (float | integer) * re"dt|ns|us|ms|s|\xce\xbc\x73", # transcode'd μs
         :forbidden_keyword => re"cal|defcal|extern",
 ]
+
+const dt_type = Ref{DataType}()
+
+function __init__()
+    dt_type[] = Nanosecond
+end
 
 @eval @enum Token error $(first.(qasm_tokens)...)
 make_tokenizer((error,
@@ -444,6 +450,8 @@ function parse_duration_literal(token, qasm)
             Microsecond(tryparse(Int, chop(str, tail=2)))
         elseif endswith(str, "s")
             Second(tryparse(Int, chop(str, tail=1)))
+        elseif endswith(str, "dt")
+            dt_type[](tryparse(Int, chop(str, tail=2)))
         end
     QasmExpression(:duration_literal, duration)
 end

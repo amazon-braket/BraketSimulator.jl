@@ -558,7 +558,9 @@ get_tol(shots::Int) = return (
         @test_throws Quasar.QasmParseError parse_qasm(qasm)
     end
     @testset "Delay $duration" for (duration, ix) in (("200us", Microsecond(200)),
+                                                      ("100μs", Microsecond(100)),
                                                       ("50ns", Nanosecond(50)),
+                                                      ("20dt", Nanosecond(20)),
                                                       ("10ms", Millisecond(10)),
                                                       ("1s", Second(1)),
                                                      )
@@ -570,7 +572,7 @@ get_tol(shots::Int) = return (
         delay[$duration] q[0], q[1];
         """
         @test_warn "delay expression encountered -- currently `delay` is a no-op" parse_qasm(qasm)
-        circuit = BraketSimulator.Circuit(qasm)
+        circuit = Quasar.to_circuit(qasm)
         @test circuit.instructions == [BraketSimulator.Instruction(BraketSimulator.X(), 0),
                                        BraketSimulator.Instruction(BraketSimulator.Delay(ix), 0),
                                        BraketSimulator.Instruction(BraketSimulator.Delay(ix), 1),
@@ -594,7 +596,7 @@ get_tol(shots::Int) = return (
         #pragma braket result state_vector
         """
         @test_warn "barrier expression encountered -- currently `barrier` is a no-op" parse_qasm(qasm)
-        circuit = BraketSimulator.Circuit(qasm)
+        circuit = Quasar.to_circuit(qasm)
         @test circuit.instructions == [BraketSimulator.Instruction(BraketSimulator.X(), 0), BraketSimulator.Instruction(BraketSimulator.Barrier(), 0)]
         simulation = BraketSimulator.StateVectorSimulator(4, 0)
         ref_circ   = BraketSimulator.Circuit()
@@ -626,7 +628,7 @@ get_tol(shots::Int) = return (
         reset q[0];
         """
         @test_warn "reset expression encountered -- currently `reset` is a no-op" parse_qasm(qasm)
-        circuit = BraketSimulator.Circuit(qasm)
+        circuit = Quasar.to_circuit(qasm)
         @test circuit.instructions == [BraketSimulator.Instruction(BraketSimulator.X(), 0), BraketSimulator.Instruction(BraketSimulator.Reset(), 0)]
         simulation = BraketSimulator.StateVectorSimulator(4, 0)
         ref_circ   = BraketSimulator.Circuit()
