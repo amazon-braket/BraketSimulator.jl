@@ -23,7 +23,6 @@ const IntOrQubit    = Union{Int, Qubit}
 An `OrderedSet`-like object which represents the qubits a
 [`Circuit`](@ref), [`Instruction`](@ref), or [`Result`](@ref)
 acts on and their ordering.
-Elements may be `Int`s or [`Qubit`](@ref)s.
 
 # Examples
 ```jldoctest
