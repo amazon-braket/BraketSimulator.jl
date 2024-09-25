@@ -12,6 +12,9 @@ BraketSimulator.Circuit
 BraketSimulator.Operator
 BraketSimulator.QuantumOperator
 BraketSimulator.FreeParameter
+BraketSimulator.Reset
+BraketSimulator.Barrier
+BraketSimulator.Delay
 BraketSimulator.Measure
 BraketSimulator.Instruction
 BraketSimulator.QubitSet

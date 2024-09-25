@@ -1,4 +1,4 @@
-using BraketSimulator.Quasar, Statistics, LinearAlgebra, BraketSimulator, BraketSimulator.Observables
+using BraketSimulator.Quasar, BraketSimulator.Dates, Statistics, LinearAlgebra, BraketSimulator, BraketSimulator.Observables
 
 get_tol(shots::Int) = return (
     shots > 0 ? Dict("atol" => 0.1, "rtol" => 0.15) : Dict("atol" => 0.01, "rtol" => 0)
@@ -557,13 +557,57 @@ get_tol(shots::Int) = return (
         """
         @test_throws Quasar.QasmParseError parse_qasm(qasm)
     end
+    @testset "Delay $duration" for (duration, ix) in (("200us", Microsecond(200)),
+                                                      ("100μs", Microsecond(100)),
+                                                      ("50ns", Nanosecond(50)),
+                                                      ("20dt", Nanosecond(20)),
+                                                      ("10ms", Millisecond(10)),
+                                                      ("1s", Second(1)),
+                                                     )
+        
+
+        qasm = """
+        qubit[4] q;
+        x q[0];
+        delay[$duration] q[0], q[1];
+        """
+        @test_warn "delay expression encountered -- currently `delay` is a no-op" parse_qasm(qasm)
+        circuit = Quasar.to_circuit(qasm)
+        @test circuit.instructions == [BraketSimulator.Instruction(BraketSimulator.X(), 0),
+                                       BraketSimulator.Instruction(BraketSimulator.Delay(ix), 0),
+                                       BraketSimulator.Instruction(BraketSimulator.Delay(ix), 1),
+                                      ]
+        simulation = BraketSimulator.StateVectorSimulator(4, 0)
+        ref_circ   = BraketSimulator.Circuit()
+        push!(ref_circ.instructions, BraketSimulator.Instruction(BraketSimulator.X(), 0))
+        push!(ref_circ.instructions, BraketSimulator.Instruction(BraketSimulator.I(), 1))
+        push!(ref_circ.instructions, BraketSimulator.Instruction(BraketSimulator.I(), 2))
+        push!(ref_circ.instructions, BraketSimulator.Instruction(BraketSimulator.I(), 3))
+        ref_sim    = BraketSimulator.StateVectorSimulator(4, 0)
+        BraketSimulator.evolve!(simulation, circuit.instructions)
+        BraketSimulator.evolve!(ref_sim, ref_circ.instructions)
+        @test simulation.state_vector ≈ ref_sim.state_vector
+    end
     @testset "Barrier" begin
         qasm = """
         qubit[4] q;
         x q[0];
         barrier q[0];
+        #pragma braket result state_vector
         """
         @test_warn "barrier expression encountered -- currently `barrier` is a no-op" parse_qasm(qasm)
+        circuit = Quasar.to_circuit(qasm)
+        @test circuit.instructions == [BraketSimulator.Instruction(BraketSimulator.X(), 0), BraketSimulator.Instruction(BraketSimulator.Barrier(), 0)]
+        simulation = BraketSimulator.StateVectorSimulator(4, 0)
+        ref_circ   = BraketSimulator.Circuit()
+        push!(ref_circ.instructions, BraketSimulator.Instruction(BraketSimulator.X(), 0))
+        push!(ref_circ.instructions, BraketSimulator.Instruction(BraketSimulator.I(), 1))
+        push!(ref_circ.instructions, BraketSimulator.Instruction(BraketSimulator.I(), 2))
+        push!(ref_circ.instructions, BraketSimulator.Instruction(BraketSimulator.I(), 3))
+        ref_sim    = BraketSimulator.StateVectorSimulator(4, 0)
+        BraketSimulator.evolve!(simulation, circuit.instructions)
+        BraketSimulator.evolve!(ref_sim, ref_circ.instructions)
+        @test simulation.state_vector ≈ ref_sim.state_vector
     end
     @testset "Stretch" begin
         qasm = """
@@ -584,6 +628,18 @@ get_tol(shots::Int) = return (
         reset q[0];
         """
         @test_warn "reset expression encountered -- currently `reset` is a no-op" parse_qasm(qasm)
+        circuit = Quasar.to_circuit(qasm)
+        @test circuit.instructions == [BraketSimulator.Instruction(BraketSimulator.X(), 0), BraketSimulator.Instruction(BraketSimulator.Reset(), 0)]
+        simulation = BraketSimulator.StateVectorSimulator(4, 0)
+        ref_circ   = BraketSimulator.Circuit()
+        push!(ref_circ.instructions, BraketSimulator.Instruction(BraketSimulator.X(), 0))
+        push!(ref_circ.instructions, BraketSimulator.Instruction(BraketSimulator.I(), 1))
+        push!(ref_circ.instructions, BraketSimulator.Instruction(BraketSimulator.I(), 2))
+        push!(ref_circ.instructions, BraketSimulator.Instruction(BraketSimulator.I(), 3))
+        ref_sim    = BraketSimulator.StateVectorSimulator(4, 0)
+        BraketSimulator.evolve!(simulation, circuit.instructions)
+        BraketSimulator.evolve!(ref_sim, ref_circ.instructions)
+        @test simulation.state_vector ≈ ref_sim.state_vector
     end
     @testset "Gate call missing/extra args" begin
         qasm = """
