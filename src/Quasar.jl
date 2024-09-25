@@ -1148,7 +1148,6 @@ qubit_mapping(v::QasmGateDefVisitor)  = v.qubit_mapping
 
 qubit_count(o::String)              = length(o)
 qubit_count(o::Matrix)              = Int(log2(size(o, 1)))
-qubit_count(o::Vector)              = sum(qubit_count, o)
 qubit_count(v::AbstractVisitor)     = qubit_count(parent(v))
 qubit_count(v::QasmProgramVisitor)  = v.qubit_count
 qubit_count(v::QasmFunctionVisitor) = v.qubit_count
@@ -1302,7 +1301,6 @@ function process_gate_arguments(v::AbstractVisitor, gate_name::String, defined_a
         return deepcopy(gate_body)
     end
 end
-process_gate_arguments(v::AbstractVisitor, gate_name::String, defined_arguments::Vector{String}, called_arguments::QasmExpression, gate_body::CircuitInstruction) = process_gate_arguments(v, gate_name, defined_arguments, called_arguments, [gate_body])
 
 function handle_gate_modifiers(ixs, mods::Vector{QasmExpression}, control_qubits::Vector{Int}, is_gphase::Bool)
     for mod in Iterators.reverse(mods)

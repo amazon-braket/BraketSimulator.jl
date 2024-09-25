@@ -1,7 +1,4 @@
-function _check_observable_targets(observable::Matrix{ComplexF64}, targets)
-    qc = Quasar.qubit_count(observable)
-    qc == 1 && (isempty(targets) || length(targets) == 1) && return
-    qc == length(targets) && return
+function _error_representation(observable::Matrix{ComplexF64})
     mat = Vector{Vector{Vector{Float64}}}(undef, size(observable, 1))
     for row in 1:size(observable, 1)
         mat[row] = Vector{Vector{Float64}}(undef, size(observable, 2))
@@ -9,7 +6,15 @@ function _check_observable_targets(observable::Matrix{ComplexF64}, targets)
             mat[row][col] = [real(observable[row, col]), imag(observable[row, col])]
         end
     end
-    throw(Quasar.QasmVisitorError("Invalid observable specified: $mat, targets: $targets", "ValueError"))
+    return mat
+end
+_error_representation(observable::String) = observable
+
+function _check_observable_targets(observable::Union{Matrix{ComplexF64}, String}, targets)
+    qc = Quasar.qubit_count(observable)
+    qc == 1 && (isempty(targets) || length(targets) == 1) && return
+    qc == length(targets) && return
+    throw(Quasar.QasmVisitorError("Invalid observable specified: $(_error_representation(observable)), targets: $targets", "ValueError"))
 end
 function _check_observable_targets(observable::Vector{Union{String, Matrix{ComplexF64}}}, targets)
     if length(observable) == 1
