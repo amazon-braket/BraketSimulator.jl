@@ -983,7 +983,8 @@ struct Qubit
     size::Int
 end
 
-const CircuitInstruction = @NamedTuple begin type::String; arguments::Vector{Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}}; targets::Vector{Int}; controls::Vector{Pair{Int, Int}}; exponent::Float64 end
+const InstructionArgument = Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}
+const CircuitInstruction = @NamedTuple begin type::String; arguments::Vector{InstructionArgument}; targets::Vector{Int}; controls::Vector{Pair{Int, Int}}; exponent::Float64 end
 const CircuitResult = @NamedTuple begin type::Symbol; operator::Vector{Union{String, Matrix{ComplexF64}}}; targets::Vector{Int}; states::Vector{String}; end
 
 abstract type AbstractGateDefinition end
@@ -1282,7 +1283,7 @@ function remap(ix, target_mapper::Dict{Int, Int})
     return (type=ix.type, arguments=ix.arguments, targets=mapped_targets, controls=mapped_controls, exponent=ix.exponent)
 end
 function bind_arguments!(ix::CircuitInstruction, argument_values::Dict{Symbol, <:Real})
-    new_arguments = Union{Symbol, Dates.Period,Real,Matrix{ComplexF64}}[get(argument_values, arg, arg) for arg in ix.arguments]
+    new_arguments = InstructionArgument[get(argument_values, arg, arg) for arg in ix.arguments]
     return (type=ix.type, arguments=new_arguments, targets=ix.targets, controls=ix.controls, exponent=ix.exponent)
 end
 
@@ -1420,13 +1421,13 @@ function (v::AbstractVisitor)(program_expr::QasmExpression)
     elseif head(program_expr) == :reset
         targets = program_expr.args[1]::QasmExpression
         target_qubits = evaluate_qubits(v, targets)
-        ixs = [(type="reset", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[], targets=[t], controls=Pair{Int, Int}[], exponent=1.0) for t in target_qubits]
+        ixs = [(type="reset", arguments=InstructionArgument[], targets=[t], controls=Pair{Int, Int}[], exponent=1.0) for t in target_qubits]
         push!(v, ixs)
         return v
     elseif head(program_expr) == :barrier
         targets = program_expr.args[1]::QasmExpression
         target_qubits = evaluate_qubits(v, targets)
-        ixs = [(type="barrier", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[], targets=[t], controls=Pair{Int, Int}[], exponent=1.0) for t in target_qubits]
+        ixs = [(type="barrier", arguments=InstructionArgument[], targets=[t], controls=Pair{Int, Int}[], exponent=1.0) for t in target_qubits]
         push!(v, ixs)
         return v
     elseif head(program_expr) == :delay
@@ -1434,7 +1435,7 @@ function (v::AbstractVisitor)(program_expr::QasmExpression)
         targets       = program_expr.args[2].args[1]::QasmExpression
         target_qubits = evaluate_qubits(v, targets)
         duration      = v(duration_expr)
-        ixs = [(type="delay", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[duration], targets=[t], controls=Pair{Int, Int}[], exponent=1.0) for t in target_qubits]
+        ixs = [(type="delay", arguments=InstructionArgument[duration], targets=[t], controls=Pair{Int, Int}[], exponent=1.0) for t in target_qubits]
         push!(v, ixs)
         return v
     elseif head(program_expr) == :stretch
@@ -1750,7 +1751,7 @@ function (v::AbstractVisitor)(program_expr::QasmExpression)
         return ()
     elseif head(program_expr) == :measure
         qubits_to_measure = evaluate_qubits(v, program_expr.args[1])
-        push!(v, CircuitInstruction[(type="measure", arguments=Union{Symbol, Dates.Period,Real,Matrix{ComplexF64}}[], targets=[q], controls=Pair{Int,Int}[], exponent=1.0) for q in qubits_to_measure])
+        push!(v, CircuitInstruction[(type="measure", arguments=InstructionArgument[], targets=[q], controls=Pair{Int,Int}[], exponent=1.0) for q in qubits_to_measure])
         return false
     elseif head(program_expr) == :hw_qubit
         return tryparse(Int, name(program_expr))

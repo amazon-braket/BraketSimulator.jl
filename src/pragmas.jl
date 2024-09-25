@@ -1,4 +1,4 @@
-function _error_representation(observable::Matrix{ComplexF64})
+function _observable_targets_error(observable::Matrix{ComplexF64}, targets)
     mat = Vector{Vector{Vector{Float64}}}(undef, size(observable, 1))
     for row in 1:size(observable, 1)
         mat[row] = Vector{Vector{Float64}}(undef, size(observable, 2))
@@ -6,15 +6,15 @@ function _error_representation(observable::Matrix{ComplexF64})
             mat[row][col] = [real(observable[row, col]), imag(observable[row, col])]
         end
     end
-    return mat
+    throw(Quasar.QasmVisitorError("Invalid observable specified: $mat, targets: $targets", "ValueError"))
 end
-_error_representation(observable::String) = observable
+_observable_targets_error(::String, targets) = throw(Quasar.QasmVisitorError("Standard observable target must be exactly 1 qubit.", "ValueError"))
 
 function _check_observable_targets(observable::Union{Matrix{ComplexF64}, String}, targets)
     qc = Quasar.qubit_count(observable)
     qc == 1 && (isempty(targets) || length(targets) == 1) && return
     qc == length(targets) && return
-    throw(Quasar.QasmVisitorError("Invalid observable specified: $(_error_representation(observable)), targets: $targets", "ValueError"))
+    _observable_targets_error(observable, targets)
 end
 function _check_observable_targets(observable::Vector{Union{String, Matrix{ComplexF64}}}, targets)
     if length(observable) == 1
@@ -23,7 +23,6 @@ function _check_observable_targets(observable::Vector{Union{String, Matrix{Compl
         return nothing
     end
 end
-_check_observable_targets(observable, targets) = nothing
 
 function visit_observable(v, expr)
     raw_obs = expr.args[1]::Quasar.QasmExpression
@@ -61,9 +60,6 @@ function Quasar.visit_pragma(v, program_expr)
             has_targets = !isempty(raw_targets.args)
             targets     = has_targets ? Quasar.evaluate_qubits(v, raw_targets.args[1]) : Int[] 
             observable  = visit_observable(v, raw_obs)
-            if length(observable) == 1 && only(observable) ∈ ("x", "y", "z", "h", "i") && length(targets) > 1
-                throw(Quasar.QasmVisitorError("Standard observable target must be exactly 1 qubit.", "ValueError"))
-            end
             _check_observable_targets(observable, targets)
             push!(v, (type=result_type, operator=observable, targets=targets, states=String[]))
         elseif result_type == :adjoint_gradient
@@ -76,7 +72,7 @@ function Quasar.visit_pragma(v, program_expr)
             unitary_matrix[ii] = v(raw_mat[ii])
         end
         targets = Quasar.evaluate_qubits(v, program_expr.args[end].args[1])
-        push!(v, (type="unitary", arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[unitary_matrix], targets=targets, controls=Pair{Int,Int}[], exponent=1.0))
+        push!(v, (type="unitary", arguments=Quasar.InstructionArgument[unitary_matrix], targets=targets, controls=Pair{Int,Int}[], exponent=1.0))
     elseif pragma_type == :noise
         noise_type::String = program_expr.args[2].args[1]::String
         raw_args::Quasar.QasmExpression = program_expr.args[3].args[1]::Quasar.QasmExpression
@@ -84,11 +80,11 @@ function Quasar.visit_pragma(v, program_expr)
         targets = Quasar.evaluate_qubits(v, raw_targets.args[1])::Vector{Int}
         if noise_type == "kraus"
             raw_mats = raw_args.args
-            kraus_matrices = Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[broadcast(expr->convert(ComplexF64, v(expr)), raw_mat)::Matrix{ComplexF64} for raw_mat in raw_mats]
+            kraus_matrices = Quasar.InstructionArgument[broadcast(expr->convert(ComplexF64, v(expr)), raw_mat)::Matrix{ComplexF64} for raw_mat in raw_mats]
             push!(v, (type="kraus", arguments=kraus_matrices, targets=targets, controls=Pair{Int,Int}[], exponent=1.0))
         else
             args = map(Float64, v(raw_args))
-            push!(v, (type=noise_type, arguments=Union{Symbol, Dates.Period, Real, Matrix{ComplexF64}}[args...], targets=targets, controls=Pair{Int,Int}[], exponent=1.0))
+            push!(v, (type=noise_type, arguments=Quasar.InstructionArgument[args...], targets=targets, controls=Pair{Int,Int}[], exponent=1.0))
         end
     elseif pragma_type == :verbatim
     end
