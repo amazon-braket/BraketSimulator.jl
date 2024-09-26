@@ -1769,10 +1769,21 @@ function (v::AbstractVisitor)(program_expr::QasmExpression)
         return evaluate_unary_op(op, arg)
     elseif head(program_expr) == :cast
         casting_to = program_expr.args[1].args[1]
-        value = v(program_expr.args[2])
-        if casting_to == Bool
-            return value > 0
-        # TODO
+        value      = v(program_expr.args[2])
+        if casting_to == Bool && !(value isa Period)
+            return value isa BitVector ? any(value) : value > 0
+        elseif casting_to isa SizedBitVector && !(value isa Period || value isa AbstractFloat)
+            new_size = v(casting_to.size)
+            return value isa BitVector ? value[1:new_size] : BitVector(reverse(digits(value, base=2, pad=new_size)))
+        elseif casting_to isa SizedNumber && !(value isa Period)
+            num_value = value isa BitVector ? sum(reverse(value)[k]*2^(k-1) for k=1:length(value)) : value
+            if casting_to isa SizedInt
+                return Int(num_value)
+            elseif casting_to isa SizedUInt
+                return UInt(num_value)
+            elseif casting_to isa SizedFloat
+                return Float64(num_value)
+            end
         else
             throw(QasmVisitorError("unable to evaluate cast expression $program_expr"))
         end
