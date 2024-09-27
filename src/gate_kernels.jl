@@ -468,7 +468,7 @@ end
 for (V, f) in ((true, :conj), (false, :identity))
     @eval begin
         apply_gate!(::Val{$V}, gate::Control{G, B}, state_vec::AbstractStateVector{T}, qubits::Int...) where {T<:Complex, G<:Gate, B} = apply_controlled_gate!(Val($V), Val(B), gate, gate.g ^ gate.pow_exponent, state_vec, gate.bitvals, qubits...)
-        apply_gate!(::Val{$V}, gate::Control{MultiQubitPhaseShift{N}, B}, state_vec::AbstractStateVector{T}, qubits::Int...) where {T<:Complex, N, B} = apply_gate!($f(im), gate, state_vec, qubits...)
+        apply_gate!(::Val{$V}, gate::Control{GPhase{N}, B}, state_vec::AbstractStateVector{T}, qubits::Int...) where {T<:Complex, N, B} = apply_gate!($f(im), gate, state_vec, qubits...)
         apply_gate!(::Val{$V}, gate::Unitary, state_vec::AbstractStateVector{T}, targets::Vararg{Int,NQ}) where {T<:Complex,NQ} = apply_gate!($f(SMatrix{2^NQ, 2^NQ, ComplexF64}(matrix_rep(gate))), state_vec, targets...)
         apply_gate!(::Val{$V}, g::G, state_vec::AbstractStateVector{T}, qubits::Int...) where {G<:Gate,T<:Complex} = (mat = $f(matrix_rep(g)); apply_gate!(mat, state_vec, qubits...))
         apply_controlled_gate!(
@@ -526,7 +526,7 @@ end
 
 function apply_gate!(
     factor::Complex,
-    gate::Control{MultiQubitPhaseShift{N}, B},
+    gate::Control{GPhase{N}, B},
     state_vec::AbstractStateVector{T},
     qubits::Int...,
 ) where {T<:Complex, N, B}

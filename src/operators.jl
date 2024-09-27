@@ -13,6 +13,9 @@ Abstract type representing *quantum* operations that can be applied to a [`Circu
 Subtypes include [`Gate`](@ref) and [`Noise`](@ref).
 """
 abstract type QuantumOperator <: Operator end
+StructTypes.StructType(::Type{QuantumOperator}) = StructTypes.AbstractType()
+StructTypes.subtypes(::Type{QuantumOperator}) = (h=H, i=I, x=X, y=Y, z=Z, s=S, si=Si, t=T, ti=Ti, v=V, vi=Vi, cnot=CNot, swap=Swap, iswap=ISwap, cv=CV, cy=CY, cz=CZ, ecr=ECR, ccnot=CCNot, cswap=CSwap, unitary=Unitary, rx=Rx, ry=Ry, rz=Rz, phaseshift=PhaseShift, pswap=PSwap, xy=XY, cphaseshift=CPhaseShift, cphaseshift00=CPhaseShift00, cphaseshift01=CPhaseShift01, cphaseshift10=CPhaseShift10, xx=XX, yy=YY, zz=ZZ, gpi=GPi, gpi2=GPi2, ms=MS, prx=PRx, u=U, gphase=GPhase, kraus=Kraus, bit_flip=BitFlip, phase_flip=PhaseFlip, pauli_channel=PauliChannel, amplitude_damping=AmplitudeDamping, phase_damping=PhaseDamping, depolarizing=Depolarizing, two_qubit_dephasing=TwoQubitDephasing, two_qubit_depolarizing=TwoQubitDepolarizing, generalized_amplitude_damping=GeneralizedAmplitudeDamping, multi_qubit_pauli_channel=MultiQubitPauliChannel, measure=Measure, reset=Reset, barrier=Barrier, delay=Delay)
+
 
 abstract type Parametrizable end
 struct Parametrized end 
@@ -68,6 +71,7 @@ Measure() = Measure(-1)
 Parametrizable(m::Measure) = NonParametrized()
 qubit_count(::Type{Measure}) = 1
 qubit_count(m::Measure) = qubit_count(Measure)
+StructTypes.constructfrom(::Type{Measure}, nt) = Measure()
 
 """
     Reset(index) <: QuantumOperator
@@ -82,6 +86,7 @@ Reset() = Reset(-1)
 Parametrizable(m::Reset) = NonParametrized()
 qubit_count(::Type{Reset}) = 1
 qubit_count(m::Reset) = qubit_count(Reset)
+StructTypes.constructfrom(::Type{Reset}, nt) = Reset()
 
 """
     Barrier(index) <: QuantumOperator
@@ -96,6 +101,7 @@ Barrier() = Barrier(-1)
 Parametrizable(m::Barrier) = NonParametrized()
 qubit_count(::Type{Barrier}) = 1
 qubit_count(m::Barrier) = qubit_count(Barrier)
+StructTypes.constructfrom(::Type{Barrier}, nt) = Barrier()
 
 """
     Delay(index, duration::Time) <: QuantumOperator
@@ -112,3 +118,4 @@ Delay(duration::Dates.Period) = Delay(-1, duration)
 Parametrizable(m::Delay) = NonParametrized()
 qubit_count(::Type{Delay}) = 1
 qubit_count(m::Delay) = qubit_count(Delay)
+StructTypes.constructfrom(::Type{Delay}, nt) = Delay(only(nt.arguments))

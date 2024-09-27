@@ -60,20 +60,21 @@ complex_matrix_to_ir(m) = m
 include("raw_schema.jl")
 include("qubit_set.jl")
 include("operators.jl")
-include("gates.jl")
-include("noises.jl")
-include("schemas.jl")
 include("observables.jl")
 using .Observables
 include("results.jl")
+include("Quasar.jl")
+using .Quasar
+include("pragmas.jl")
+include("gates.jl")
+include("noises.jl")
+include("schemas.jl")
 include("circuit.jl")
 include("validation.jl")
 include("custom_gates.jl")
 include("pow_gates.jl")
 include("gate_kernels.jl")
 include("noise_kernels.jl")
-include("Quasar.jl")
-using .Quasar
 
 const LOG2_CHUNK_SIZE = 10
 const CHUNK_SIZE      = 2^LOG2_CHUNK_SIZE
@@ -201,7 +202,7 @@ function _prepare_program(circuit_ir::OpenQasmProgram, inputs::Dict{String, <:An
     ir_inputs = isnothing(circuit_ir.inputs) ? Dict{String, Float64}() : circuit_ir.inputs 
     merged_inputs = merge(ir_inputs, inputs)
     src           = circuit_ir.source::String
-    circuit       = Quasar.to_circuit(src, merged_inputs)
+    circuit       = to_circuit(src, merged_inputs)
     n_qubits      = qubit_count(circuit)
     if shots > 0
         _verify_openqasm_shots_observables(circuit, n_qubits)
@@ -820,8 +821,8 @@ include("dm_simulator.jl")
         sv_oq3_program = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), sv_exact_results_qasm, nothing)
         dm_oq3_program = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), dm_exact_results_qasm, nothing)
         simulate(sv_simulator, sv_oq3_program, 0)
-        simulate("braket_sv_v2", sv_exact_results_qasm, "{}", 0)
         simulate(dm_simulator, dm_oq3_program, 0)
+        simulate("braket_sv_v2", sv_exact_results_qasm, "{}", 0)
         simulate("braket_dm_v2", dm_exact_results_qasm, "{}", 0)
         oq3_program = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), shots_results_qasm, nothing)
         simulate(sv_simulator, oq3_program, 10)

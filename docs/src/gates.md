@@ -26,7 +26,7 @@ BraketSimulator.Si
 BraketSimulator.U
 BraketSimulator.Unitary
 BraketSimulator.PhaseShift
-BraketSimulator.MultiQubitPhaseShift
+BraketSimulator.GPhase
 BraketSimulator.PRx
 BraketSimulator.GPi
 BraketSimulator.GPi2

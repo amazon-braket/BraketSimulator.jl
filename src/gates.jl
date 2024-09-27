@@ -49,6 +49,7 @@ for gate_def in (
             $G(angle::T, pow_exponent::Float64=1.0) where {T<:NTuple{$n_angle, Union{Real, FreeParameter}}} = new(angle, pow_exponent)
         end
         qubit_count(::Type{$G}) = $qc
+        StructTypes.constructfrom(::Type{$G}, nt::Quasar.CircuitInstruction) = $G(tuple(nt.arguments...), nt.exponent)
     end
 end
 Base.:(==)(g1::G, g2::G) where {G<:AngledGate} = g1.pow_exponent == g2.pow_exponent && g1.angle == g2.angle
@@ -88,6 +89,7 @@ for gate_def in (
             $G(pow_exponent::Float64=1.0) = new(pow_exponent)
         end
         qubit_count(::Type{$G}) = $qc
+        StructTypes.constructfrom(::Type{$G}, nt::Quasar.CircuitInstruction) = $G(nt.exponent)
     end
 end
 (::Type{G})(angle::T, pow_exponent=1.0) where {G<:AngledGate{1}, T<:Union{Real, FreeParameter}} = G((angle,), Float64(pow_exponent))
@@ -111,6 +113,7 @@ mutable struct Unitary <: Gate
 end
 Base.:(==)(u1::Unitary, u2::Unitary) = u1.matrix == u2.matrix && u1.pow_exponent == u2.pow_exponent
 qubit_count(g::Unitary) = convert(Int, log2(size(g.matrix, 1)))
+StructTypes.constructfrom(::Type{Unitary}, nt::Quasar.CircuitInstruction) = Unitary(only(nt.arguments), nt.exponent)
 
 Parametrizable(g::AngledGate) = Parametrized()
 Parametrizable(g::Gate)       = NonParametrized()

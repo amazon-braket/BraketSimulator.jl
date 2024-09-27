@@ -86,14 +86,14 @@ using Test, Logging, BraketSimulator, DataStructures
         @test BraketSimulator.qubit_count(BraketSimulator.U) == 1
         @test inv(BraketSimulator.U(θ, ϕ, λ)) == BraketSimulator.U(θ, ϕ, λ, -1)
     end
-    @testset "MultiQubitPhaseShift" begin
+    @testset "GPhase" begin
         ϕ = 2.12
         @testset "Simulator $sim, n_qubits $nq" for sim in (StateVectorSimulator, DensityMatrixSimulator), nq in 1:4
-            instructions = vcat([BraketSimulator.Instruction(BraketSimulator.H(), [q]) for q in 0:nq-1], [BraketSimulator.Instruction(BraketSimulator.MultiQubitPhaseShift{nq}(ϕ), collect(0:nq-1))])
-            u_instructions = vcat([BraketSimulator.Instruction(BraketSimulator.H(), [q]) for q in 0:nq-1], [BraketSimulator.Instruction(BraketSimulator.Unitary(Matrix(BraketSimulator.matrix_rep(BraketSimulator.MultiQubitPhaseShift{nq}(ϕ)))), collect(0:nq-1))])
+            instructions = vcat([BraketSimulator.Instruction(BraketSimulator.H(), [q]) for q in 0:nq-1], [BraketSimulator.Instruction(BraketSimulator.GPhase{nq}(ϕ), collect(0:nq-1))])
+            u_instructions = vcat([BraketSimulator.Instruction(BraketSimulator.H(), [q]) for q in 0:nq-1], [BraketSimulator.Instruction(BraketSimulator.Unitary(Matrix(BraketSimulator.matrix_rep(BraketSimulator.GPhase{nq}(ϕ)))), collect(0:nq-1))])
             state_vector = exp(im*ϕ)/√(2^nq) * ones(2^nq)
             probability_amplitudes = 1/2^nq * ones(2^nq)
-            @test BraketSimulator.qubit_count(BraketSimulator.MultiQubitPhaseShift{nq}(ϕ)) == nq
+            @test BraketSimulator.qubit_count(BraketSimulator.GPhase{nq}(ϕ)) == nq
             @testset "BraketSimulator.Instruction set $ix_label" for (ix_label, ixs) in (("raw", instructions), ("unitary", u_instructions))
                 simulation = sim(nq, 0)
                 simulation = BraketSimulator.evolve!(simulation, ixs)
@@ -104,9 +104,9 @@ using Test, Logging, BraketSimulator, DataStructures
                       collect(BraketSimulator.probabilities(simulation))
             end
         end
-        @test BraketSimulator.qubit_count(BraketSimulator.MultiQubitPhaseShift{2}(ϕ)) == 2
-        @test BraketSimulator.qubit_count(BraketSimulator.MultiQubitPhaseShift{3}(ϕ)) == 3
-        @test inv(BraketSimulator.MultiQubitPhaseShift{2}(ϕ)) == BraketSimulator.MultiQubitPhaseShift{2}(ϕ, -1.0)
+        @test BraketSimulator.qubit_count(BraketSimulator.GPhase{2}(ϕ)) == 2
+        @test BraketSimulator.qubit_count(BraketSimulator.GPhase{3}(ϕ)) == 3
+        @test inv(BraketSimulator.GPhase{2}(ϕ)) == BraketSimulator.GPhase{2}(ϕ, -1.0)
     end
     @testset "MultiRz" begin
         ϕ = 2.12
@@ -158,9 +158,9 @@ using Test, Logging, BraketSimulator, DataStructures
         end
         @testset for nq in 1:2
             ϕ = 2.12
-            @test BraketSimulator.qubit_count(BraketSimulator.Control(BraketSimulator.MultiQubitPhaseShift{nq}(ϕ), ntuple(i->0, nq))) == nq
-            instructions     = vcat([BraketSimulator.Instruction(BraketSimulator.H(), [q]) for q in 0:nq-1], [BraketSimulator.Instruction(BraketSimulator.Control(BraketSimulator.MultiQubitPhaseShift{nq}(ϕ), ntuple(i->0, nq)), collect(0:nq-1))])
-            u                = Matrix(BraketSimulator.matrix_rep(BraketSimulator.Control(BraketSimulator.MultiQubitPhaseShift{nq}(ϕ), ntuple(i->0, nq))))
+            @test BraketSimulator.qubit_count(BraketSimulator.Control(BraketSimulator.GPhase{nq}(ϕ), ntuple(i->0, nq))) == nq
+            instructions     = vcat([BraketSimulator.Instruction(BraketSimulator.H(), [q]) for q in 0:nq-1], [BraketSimulator.Instruction(BraketSimulator.Control(BraketSimulator.GPhase{nq}(ϕ), ntuple(i->0, nq)), collect(0:nq-1))])
+            u                = Matrix(BraketSimulator.matrix_rep(BraketSimulator.Control(BraketSimulator.GPhase{nq}(ϕ), ntuple(i->0, nq))))
             u_instructions   = vcat([BraketSimulator.Instruction(BraketSimulator.H(), [q]) for q in 0:nq-1], [BraketSimulator.Instruction(BraketSimulator.Unitary(u), collect(0:nq-1))])
             state_vector     = 1/√(2^nq) * ones(ComplexF64, 2^nq)
             state_vector[1] *= exp(im*ϕ)
