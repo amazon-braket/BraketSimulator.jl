@@ -86,7 +86,7 @@ function Quasar.visit_pragma(v, program_expr)
             args = map(Float64, v(raw_args))
             push!(v, (type=noise_type, arguments=Quasar.InstructionArgument[args...], targets=targets, controls=Pair{Int,Int}[], exponent=1.0))
         end
-    elseif pragma_type == :verbatim
+    # elseif pragma_type == :verbatim # a no-op for now
     end
     return v
 end
