@@ -261,6 +261,50 @@ get_tol(shots::Int) = return (
         @test simulation.state_vector ≈ sv 
         @test circuit.result_types == [BraketSimulator.Amplitude(["00", "01", "10", "11"])]
     end
+    @testset "Casting" begin
+        @testset "Casting to $to_type from $from_type" for (to_type, to_value) in (("bool", true),), (from_type, from_value) in (("int[32]", "32",),
+                                                                                                                              ("uint[16]", "1",),
+                                                                                                                              ("float", "2.5",),
+                                                                                                                              ("bool", "true",),
+                                                                                                                              ("bit", "\"1\"",),
+                                                                                                                             )
+            qasm = """
+            $from_type a = $from_value;
+            $to_type b = $to_type(a);
+            """
+            parsed  = parse_qasm(qasm)
+            visitor = QasmProgramVisitor()
+            visitor(parsed)
+            @test visitor.classical_defs["b"].val == to_value
+        end
+        @testset "Casting to $to_type from $from_type" for (to_type, to_value) in (("uint[32]", 32), ("int[16]", 32), ("float", 32.0)), (from_type, from_value) in (("int[32]", "32",),
+                                                                                                                                                   ("uint[16]", "32",),
+                                                                                                                                                   ("float", "32.0",),
+                                                                                                                                                   ("bit[6]", "\"100000\"",),
+                                                                                                                                                  )
+            qasm = """
+            $from_type a = $from_value;
+            $to_type b = $to_type(a);
+            """
+            parsed  = parse_qasm(qasm)
+            visitor = QasmProgramVisitor()
+            visitor(parsed)
+            @test visitor.classical_defs["b"].val == to_value
+        end
+        @testset "Casting to $to_type from $from_type" for (to_type, to_value) in (("bit[6]", BitVector([1,0,0,0,0,0])),), (from_type, from_value) in (("int[32]", "32",),
+                                                                                                                                                   ("uint[16]", "32",),
+                                                                                                                                                   ("bit[6]", "\"100000\"",),
+                                                                                                                                                  )
+            qasm = """
+            $from_type a = $from_value;
+            $to_type b = $to_type(a);
+            """
+            parsed  = parse_qasm(qasm)
+            visitor = QasmProgramVisitor()
+            visitor(parsed)
+            @test visitor.classical_defs["b"].val == to_value
+        end
+    end
     @testset "Numbers $qasm_str" for (qasm_str, var_name, output_val) in (("float[32] a = 1.24e-3;", "a", 1.24e-3),
                                                                           ("complex[float] b = 1-0.23im;", "b", 1-0.23im),
                                                                           ("const bit c = \"0\";", "c", falses(1)),
