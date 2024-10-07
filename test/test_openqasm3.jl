@@ -725,6 +725,24 @@ get_tol(shots::Int) = return (
         BraketSimulator.evolve!(simulation, circuit.instructions)
         BraketSimulator.evolve!(ref_sim, ref_circ.instructions)
         @test simulation.state_vector ≈ ref_sim.state_vector
+        @testset "Reset after Measure" begin
+            good_qasm = """
+            qubit[4] q;
+            measure q[0];
+            reset q[0];
+            x q[0];
+            """
+            circuit = BraketSimulator.to_circuit(good_qasm) # no error
+            @test circuit.instructions == [BraketSimulator.Instruction(BraketSimulator.Measure(), 0), BraketSimulator.Instruction(BraketSimulator.Reset(), 0), BraketSimulator.Instruction(BraketSimulator.X(), 0)]
+            bad_qasm = """
+            qubit[4] q;
+            measure q[0];
+            reset q[0];
+            measure q[0];
+            x q[0];
+            """
+            @test_throws ErrorException("cannot apply instruction to measured qubits.") BraketSimulator.to_circuit(bad_qasm)
+        end
     end
     @testset "Gate call missing/extra args" begin
         qasm = """

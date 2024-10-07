@@ -21,13 +21,14 @@ mutable struct Circuit
     parameters::Set{FreeParameter}
     observables_simultaneously_measureable::Bool
     measure_targets::Vector{Int} 
+    reset_targets::Vector{Int} 
 
     @doc """
         Circuit()
     
     Construct an empty `Circuit`.
     """
-    Circuit() = new([], [], [], Dict(), Dict(), Set{Int}(), Set{FreeParameter}(), true, Int[])
+    Circuit() = new([], [], [], Dict(), Dict(), Set{Int}(), Set{FreeParameter}(), true, Int[], Int[])
 end
 
 """
@@ -241,12 +242,21 @@ add_to_qubit_observable_set!(c::Circuit, rt::Result) = c.qubit_observable_set
 function _check_if_qubit_measured(c::Circuit, qubit::Int)
     isempty(c.measure_targets) && return
     # check if there is a measure instruction on the targeted qubit(s)
-    isempty(intersect(c.measure_targets, qubit)) || error("cannot apply instruction to measured qubits.")
+    qubit_measured = !isempty(intersect(c.measure_targets, qubit))
+    !qubit_measured && return
+    qubit_reset    = !isempty(intersect(c.reset_targets, qubit))
+    !qubit_reset && error("cannot apply instruction to measured qubits.")
+    # reset must occur AFTER last measurement of the qubit
+    last_measurement = findlast(ix->ix.operator isa Measure && !isempty(intersect(ix.target, qubit)), c.instructions)
+    last_reset       = findlast(ix->ix.operator isa Reset   && !isempty(intersect(ix.target, qubit)), c.instructions)
+    # neither can be nothing since we know Measure and Reset are both present
+    last_measurement > last_reset && error("cannot apply instruction to measured qubits.")
+    return
 end
 _check_if_qubit_measured(c::Circuit, qubits) = foreach(q->_check_if_qubit_measured(c, Int(q)), qubits)
 
 function add_instruction!(c::Circuit, ix::Instruction{O}) where {O<:Operator}
-    _check_if_qubit_measured(c, ix.target)
+    ix.operator isa Union{Reset,Barrier,Delay} || _check_if_qubit_measured(c, ix.target)
     to_add = [ix]
     if ix.operator isa QuantumOperator && Parametrizable(ix.operator) == Parametrized()
         for param in parameters(ix.operator)
@@ -255,6 +265,9 @@ function add_instruction!(c::Circuit, ix::Instruction{O}) where {O<:Operator}
     end
     if ix.operator isa Measure
         append!(c.measure_targets, ix.target)
+    end
+    if ix.operator isa Reset 
+        append!(c.reset_targets, ix.target)
     end
     push!(c.instructions, ix)
     return c
