@@ -98,7 +98,7 @@ using Test, JSON3, PythonCall, BraketSimulator
                 @test result.resultTypes[1].type.type    == "expectation"
                 @test result.resultTypes[1].type.targets == [0] 
                 @test result.resultTypes[1].type.observable == ["z"]
-                @test result.resultTypes[1].value == 0.0
+                @test abs(result.resultTypes[1].value) ≈ 0.0 atol=√eps(result.resultTypes[1].value)
 
                 simple_bell_qasm = """
                 h \$0;
