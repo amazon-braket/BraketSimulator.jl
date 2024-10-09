@@ -278,7 +278,7 @@ struct SingleExcitationMinus <: AngledGate{1}
         new(angle, Float64(pow_exponent))
 end
 qubit_count(::Type{SingleExcitationMinus}) = 2
-function matrix_rep_raw(::SingleExcitationMinus, ϕ)
+function matrix_rep_raw(::SingleExcitationMinus, ϕ) # nosemgrep
     sϕ, cϕ = sincos(ϕ / 2.0)
     eiϕ2   = exp(-im * ϕ / 2.0)
     return SMatrix{4,4,ComplexF64}(eiϕ2, 0, 0, 0, 0, cϕ, -sϕ, 0, 0, sϕ, cϕ, 0, 0, 0, 0, eiϕ2)
