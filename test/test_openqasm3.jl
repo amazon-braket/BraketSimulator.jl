@@ -1748,5 +1748,15 @@ get_tol(shots::Int) = return (
             visitor(parsed)
             @test haskey(visitor.gate_defs, "u3")
         end
+        @testset "stdgates.inc" begin
+            qasm = """
+            OPENQASM 3.0;
+            include "stdgates.inc";
+            """
+            parsed  = parse_qasm(qasm)
+            visitor = QasmProgramVisitor()
+            visitor(parsed)
+            @test haskey(visitor.gate_defs, "tdg")
+        end
     end
 end
