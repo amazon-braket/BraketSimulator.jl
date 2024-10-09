@@ -93,12 +93,6 @@ function matrix_rep_raw(::DoubleExcitationPlus, ϕ) # nosemgrep
     sϕ, cϕ = sincos(ϕ / 2.0)
     eiϕ2   = exp(im * ϕ / 2.0)
     mat    = diagm(eiϕ2 * ones(ComplexF64, 16))
-    @views begin
-        mat[4, :]  .= 0
-        mat[:, 4]  .= 0
-        mat[13, :] .= 0
-        mat[:, 13] .= 0
-    end
     # Apply phase-shift to states outside rotation subspace
     mat[4, 4]   = cϕ
     mat[13, 13] = cϕ
@@ -152,12 +146,6 @@ function matrix_rep_raw(::DoubleExcitationMinus, ϕ) # nosemgrep
     sϕ, cϕ = sincos(ϕ / 2.0)
     eiϕ2   = exp(-im * ϕ / 2.0)
     mat    = diagm(eiϕ2 * ones(ComplexF64, 16))
-    @views begin
-        mat[4, :]  .= 0
-        mat[:, 4]  .= 0
-        mat[13, :] .= 0
-        mat[:, 13] .= 0
-    end
     # Apply phase-shift to states outside rotation subspace
     mat[4, 4]   = cϕ
     mat[13, 13] = cϕ

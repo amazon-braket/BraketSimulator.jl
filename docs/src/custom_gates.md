@@ -8,4 +8,11 @@ CurrentModule = BraketSimulator
 
 ```@docs
 BraketSimulator.MultiRZ
+BraketSimulator.DoubleExcitation
+BraketSimulator.DoubleExcitationMinus
+BraketSimulator.DoubleExcitationPlus
+BraketSimulator.SingleExcitation
+BraketSimulator.SingleExcitationMinus
+BraketSimulator.SingleExcitationPlus
+BraketSimulator.FermionicSWAP
 ```
