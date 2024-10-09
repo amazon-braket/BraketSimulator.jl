@@ -29,6 +29,9 @@ end
 
 @testset "Type conversions" begin
     @test convert(Braket.Operator, convert(BraketSimulator.Operator, Braket.Measure(2))) == Braket.Measure(2)
+    @test convert(Braket.Operator, convert(BraketSimulator.Operator, Braket.Reset())) == Braket.Reset()
+    @test convert(Braket.Operator, convert(BraketSimulator.Operator, Braket.Barrier())) == Braket.Barrier()
+    @test convert(Braket.Operator, convert(BraketSimulator.Operator, Braket.Delay(Braket.Nanosecond(2)))) == Braket.Delay(Braket.Nanosecond(2))
     angle1 = 0.2
     angle2 = 0.1
     angle3 = π

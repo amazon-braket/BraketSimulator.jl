@@ -220,9 +220,12 @@ function _prepare_program(circuit_ir::Program, inputs::Dict{String, <:Any}, shot
     operations::Vector{Instruction} = circuit_ir.instructions
     symbol_inputs = Dict(Symbol(k) => v for (k, v) in inputs)
     operations    = [bind_value!(operation, symbol_inputs) for operation in operations]
-    qc            = qubit_count(circuit_ir)
-    bound_program = Program(circuit_ir.braketSchemaHeader, operations, circuit_ir.results, circuit_ir.basis_rotation_instructions)
-    return bound_program, qc
+    bound_program = Program(circuit_ir.braketSchemaHeader,
+                            operations,
+                            circuit_ir.results,
+                            circuit_ir.basis_rotation_instructions,
+                    )
+    return bound_program, qubit_count(circuit_ir)
 end
 """
     _combine_operations(program, shots::Int) -> Program

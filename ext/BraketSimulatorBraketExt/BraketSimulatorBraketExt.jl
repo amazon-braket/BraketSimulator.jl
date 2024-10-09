@@ -30,9 +30,9 @@ function Base.convert(::Type{Braket.GateModelTaskResult}, r::BraketSimulator.Gat
                                       addl_meta)
 end
 
-Braket.qubit_count(o::O) where {O<:BraketSimulator.Operator}  = BraketSimulator.qubit_count(o)
-Braket.qubit_count(o::O) where {O<:BraketSimulator.Observables.Observable}  = BraketSimulator.qubit_count(o)
-Braket.qubit_count(::Type{O}) where {O<:BraketSimulator.Operator}  = BraketSimulator.qubit_count(O)
+Braket.qubit_count(o::O) where {O<:BraketSimulator.Operator}               = BraketSimulator.qubit_count(o)
+Braket.qubit_count(o::O) where {O<:BraketSimulator.Observables.Observable} = BraketSimulator.qubit_count(o)
+Braket.qubit_count(::Type{O}) where {O<:BraketSimulator.Operator}          = BraketSimulator.qubit_count(O)
 
 for (braket_sim, simulator_sym) in ((:(Braket.X), :(BraketSimulator.X)),
                                     (:(Braket.Y), :(BraketSimulator.Y)),
@@ -106,6 +106,12 @@ Base.convert(::Type{Braket.AbstractProgramResult}, rt::BraketSimulator.IR.Amplit
 Base.convert(::Type{BraketSimulator.AbstractProgramResult}, rt::Braket.IR.Amplitude) = BraketSimulator.IR.Amplitude(rt.states, rt.type)
 Base.convert(::Type{BraketSimulator.Operator}, m::Braket.Measure) = BraketSimulator.Measure(m.index)
 Base.convert(::Type{Braket.Operator}, m::BraketSimulator.Measure) = Braket.Measure(m.index)
+Base.convert(::Type{BraketSimulator.Operator}, ::Braket.Reset) = BraketSimulator.Reset()
+Base.convert(::Type{Braket.Operator}, ::BraketSimulator.Reset) = Braket.Reset()
+Base.convert(::Type{BraketSimulator.Operator}, ::Braket.Barrier) = BraketSimulator.Barrier()
+Base.convert(::Type{Braket.Operator}, ::BraketSimulator.Barrier) = Braket.Barrier()
+Base.convert(::Type{BraketSimulator.Operator}, d::Braket.Delay) = BraketSimulator.Delay(d.duration)
+Base.convert(::Type{Braket.Operator}, d::BraketSimulator.Delay) = Braket.Delay(d.duration)
 
 Base.convert(::Type{BraketSimulator.Operator}, g::Braket.MS) = BraketSimulator.MS(ntuple(i->convert(Union{FreeParameter, Real}, g.angle[i]), 3))
 Base.convert(::Type{Braket.Operator}, g::BraketSimulator.MS) = Braket.MS(ntuple(i->convert(Union{Braket.FreeParameter, Real}, g.angle[i]), 3))
