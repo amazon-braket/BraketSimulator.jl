@@ -83,31 +83,30 @@ julia> eq2 ==  [exp(im*ϕ/2), 0, 0, -sin(ϕ/2), 0, 0, 0, 0, 0, 0, 0, 0, cos(ϕ/2
 
 """
 struct DoubleExcitationPlus <: AngledGate{1}
-    angle::NTuple{1,Union{Float64,FreeParameter}}
-    DoubleExcitationPlus(angle::T) where {T<:NTuple{1,Union{Float64,FreeParameter}}} =
-        new(angle)
+    angle::NTuple{1,Union{Real,FreeParameter}}
+    pow_exponent::Float64
+    DoubleExcitationPlus(angle::T, pow_exponent=1.0) where {T<:NTuple{1,Union{Real,FreeParameter}}} =
+        new(angle, Float64(pow_exponent))
 end
-Braket.chars(::Type{DoubleExcitationPlus}) = "G2+(ang)"
-Braket.qubit_count(::Type{DoubleExcitationPlus}) = 4
-Base.inv(g::DoubleExcitationPlus) = DoubleExcitationPlus(-g.angle[1])
-Base.:^(g::DoubleExcitationPlus, power::Integer) = power == -1 ? inv(g) : (iszero(power) ? Braket.I() : (power < 0 ? inv(g^(-power)) : DoubleExcitationPlus((g.angle[1] * power,))))
-function matrix_rep(g::DoubleExcitationPlus)
-    cosϕ = cos(g.angle[1] / 2.0)
-    sinϕ = sin(g.angle[1] / 2.0)
-    eiϕ2 = exp(im * g.angle[1] / 2.0)
-    mat = diagm(eiϕ2 * ones(ComplexF64, 16))
-
-    mat[4, :] .= 0
-    mat[:, 4] .= 0
-    mat[13, :] .= 0
-    mat[:, 13] .= 0
+qubit_count(::Type{DoubleExcitationPlus}) = 4
+function matrix_rep_raw(::DoubleExcitationPlus, ϕ) # nosemgrep
+    sϕ, cϕ = sincos(ϕ / 2.0)
+    eiϕ2   = exp(im * ϕ / 2.0)
+    mat    = diagm(eiϕ2 * ones(ComplexF64, 16))
+    @views begin
+        mat[4, :]  .= 0
+        mat[:, 4]  .= 0
+        mat[13, :] .= 0
+        mat[:, 13] .= 0
+    end
     # Apply phase-shift to states outside rotation subspace
-    mat[4, 4]   = cosϕ
-    mat[13, 13] = cosϕ
-    mat[4, 13]  = -sinϕ
-    mat[13, 4]  = sinϕ
+    mat[4, 4]   = cϕ
+    mat[13, 13] = cϕ
+    mat[4, 13]  = -sϕ
+    mat[13, 4]  = sϕ
     return SMatrix{16, 16, ComplexF64}(mat)
 end
+
 """
     DoubleExcitationMinus(ϕ)
 
@@ -143,29 +142,27 @@ julia> eq2 ==  [exp(-im*ϕ/2), 0, 0, -sin(ϕ/2), 0, 0, 0, 0, 0, 0, 0, 0, cos(ϕ/
 
 """
 struct DoubleExcitationMinus <: AngledGate{1}
-    angle::NTuple{1,Union{Float64,FreeParameter}}
-    DoubleExcitationMinus(angle::T) where {T<:NTuple{1,Union{Float64,FreeParameter}}} =
-        new(angle)
+    angle::NTuple{1,Union{Real,FreeParameter}}
+    pow_exponent::Float64
+    DoubleExcitationMinus(angle::T, pow_exponent=1.0) where {T<:NTuple{1,Union{Real,FreeParameter}}} =
+        new(angle, Float64(pow_exponent))
 end
-Braket.chars(::Type{DoubleExcitationMinus}) = "G2-(ang)"
-Braket.qubit_count(::Type{DoubleExcitationMinus}) = 4
-Base.inv(g::DoubleExcitationMinus) = DoubleExcitationMinus(-g.angle[1])
-Base.:^(g::DoubleExcitationMinus, power::Integer) = power == -1 ? inv(g) : (iszero(power) ? Braket.I() : (power < 0 ? inv(g^(-power)) : DoubleExcitationMinus((g.angle[1] * power,))))
-function matrix_rep(g::DoubleExcitationMinus)
-    cosϕ = cos(g.angle[1] / 2.0)
-    sinϕ = sin(g.angle[1] / 2.0)
-    eiϕ2 = exp(-im * g.angle[1] / 2.0)
-    mat = diagm(eiϕ2 * ones(ComplexF64, 16))
-    
-    mat[4, :] .= 0
-    mat[:, 4] .= 0
-    mat[13, :] .= 0
-    mat[:, 13] .= 0
+qubit_count(::Type{DoubleExcitationMinus}) = 4
+function matrix_rep_raw(::DoubleExcitationMinus, ϕ) # nosemgrep
+    sϕ, cϕ = sincos(ϕ / 2.0)
+    eiϕ2   = exp(-im * ϕ / 2.0)
+    mat    = diagm(eiϕ2 * ones(ComplexF64, 16))
+    @views begin
+        mat[4, :]  .= 0
+        mat[:, 4]  .= 0
+        mat[13, :] .= 0
+        mat[:, 13] .= 0
+    end
     # Apply phase-shift to states outside rotation subspace
-    mat[4, 4]   = cosϕ
-    mat[13, 13] = cosϕ
-    mat[4, 13]  = -sinϕ
-    mat[13, 4]  = sinϕ
+    mat[4, 4]   = cϕ
+    mat[13, 13] = cϕ
+    mat[4, 13]  = -sϕ
+    mat[13, 4]  = sϕ
     return SMatrix{16, 16, ComplexF64}(mat)
 end
 
@@ -234,19 +231,16 @@ julia> eq2 == [exp(im*ϕ/2), sin(ϕ/2), cos(ϕ/2), 0] == true;
 
 """
 struct SingleExcitationPlus <: AngledGate{1}
-    angle::NTuple{1,Union{Float64,FreeParameter}}
-    SingleExcitationPlus(angle::T) where {T<:NTuple{1,Union{Float64,FreeParameter}}} =
-        new(angle)
+    angle::NTuple{1,Union{Real,FreeParameter}}
+    pow_exponent::Float64
+    SingleExcitationPlus(angle::T, pow_exponent=1.0) where {T<:NTuple{1,Union{Real,FreeParameter}}} =
+        new(angle, Float64(pow_exponent))
 end
-Braket.chars(::Type{SingleExcitationPlus}) = "G+(ang)"
-Braket.qubit_count(::Type{SingleExcitationPlus}) = 2
-Base.inv(g::SingleExcitationPlus) = SingleExcitationPlus(-g.angle[1])
-Base.:^(g::SingleExcitationPlus, power::Integer) = power == -1 ? inv(g) : (iszero(power) ? Braket.I() : (power < 0 ? inv(g^(-power)) : SingleExcitationPlus((g.angle[1] * power,))))
-function matrix_rep(g::SingleExcitationPlus)
-    cosϕ = cos(g.angle[1] / 2.0)
-    sinϕ = sin(g.angle[1] / 2.0)
-    eiϕ2 = exp(im * g.angle[1] / 2.0)
-    return SMatrix{4,4,ComplexF64}([eiϕ2 0 0 0; 0 cosϕ sinϕ 0; 0 -sinϕ cosϕ 0; 0 0 0 eiϕ2])
+qubit_count(::Type{SingleExcitationPlus}) = 2
+function matrix_rep_raw(::SingleExcitationPlus, ϕ) # nosemgrep
+    sϕ, cϕ = sincos(ϕ / 2.0)
+    eiϕ2   = exp(im * ϕ / 2.0)
+    return SMatrix{4,4,ComplexF64}(eiϕ2, 0, 0, 0, 0, cϕ, -sϕ, 0, 0, sϕ, cϕ, 0, 0, 0, 0, eiϕ2)
 end
 
 """
@@ -278,19 +272,16 @@ julia> eq2 == [exp(-im*ϕ/2), sin(ϕ/2), cos(ϕ/2), 0] == true;
 
 """
 struct SingleExcitationMinus <: AngledGate{1}
-    angle::NTuple{1,Union{Float64,FreeParameter}}
-    SingleExcitationMinus(angle::T) where {T<:NTuple{1,Union{Float64,FreeParameter}}} =
-        new(angle)
+    angle::NTuple{1,Union{Real,FreeParameter}}
+    pow_exponent::Float64
+    SingleExcitationMinus(angle::T, pow_exponent=1.0) where {T<:NTuple{1,Union{Real,FreeParameter}}} =
+        new(angle, Float64(pow_exponent))
 end
-Braket.chars(::Type{SingleExcitationMinus}) = "G-(ang)"
-Braket.qubit_count(::Type{SingleExcitationMinus}) = 2
-Base.inv(g::SingleExcitationMinus) = SingleExcitationMinus(-g.angle[1])
-Base.:^(g::SingleExcitationMinus, power::Integer) = power == -1 ? inv(g) : (iszero(power) ? Braket.I() : (power < 0 ? inv(g^(-power)) : SingleExcitationMinus((g.angle[1] * power,))))
-function matrix_rep(g::SingleExcitationMinus)
-    cosϕ = cos(g.angle[1] / 2.0)
-    sinϕ = sin(g.angle[1] / 2.0)
-    eiϕ2 = exp(-im * g.angle[1] / 2.0)
-    return SMatrix{4,4,ComplexF64}([eiϕ2 0 0 0; 0 cosϕ sinϕ 0; 0 -sinϕ cosϕ 0; 0 0 0 eiϕ2])
+qubit_count(::Type{SingleExcitationMinus}) = 2
+function matrix_rep_raw(::SingleExcitationMinus, ϕ)
+    sϕ, cϕ = sincos(ϕ / 2.0)
+    eiϕ2   = exp(-im * ϕ / 2.0)
+    return SMatrix{4,4,ComplexF64}(eiϕ2, 0, 0, 0, 0, cϕ, -sϕ, 0, 0, sϕ, cϕ, 0, 0, 0, 0, eiϕ2)
 end
 
 """
@@ -337,22 +328,18 @@ julia> eq4 == [0, 0, 0, exp(im * ϕ)] == true;
 
 """
 struct FermionicSWAP <: AngledGate{1}
-    angle::NTuple{1,Union{Float64,FreeParameter}}
-    FermionicSWAP(angle::T) where {T<:NTuple{1,Union{Float64,FreeParameter}}} =
-        new(angle)
+    angle::NTuple{1,Union{Real,FreeParameter}}
+    pow_exponent::Float64
+    FermionicSWAP(angle::T, pow_exponent=1.0) where {T<:NTuple{1,Union{Real,FreeParameter}}} =
+        new(angle, Float64(pow_exponent))
 end
-Braket.chars(::Type{FermionicSWAP}) = "FSWAP(ang)"
-Braket.qubit_count(::Type{FermionicSWAP}) = 2
-Base.inv(g::FermionicSWAP) = FermionicSWAP(-g.angle[1])
-Base.:^(g::FermionicSWAP, power::Integer) = power == -1 ? inv(g) : (power == 0 ? Braket.I() : (power < 0 ? inv(g^(-power)) : FermionicSWAP((g.angle[1] * power,))))
-function matrix_rep(g::FermionicSWAP)
-    cosϕ = cos(g.angle[1] / 2.0)
-    sinϕ = sin(g.angle[1] / 2.0)
-    eiϕ2 = exp(im * g.angle[1] / 2.0)
-    eiϕ = exp(im * g.angle[1])
-    ieiϕ2 = im * eiϕ2
-
-    return SMatrix{4,4,ComplexF64}([1.0 0 0 0; 0 eiϕ2 * cosϕ -ieiϕ2 * sinϕ 0; 0 -ieiϕ2 * sinϕ eiϕ2 * cosϕ 0; 0 0 0 eiϕ])
+qubit_count(::Type{FermionicSWAP}) = 2
+function matrix_rep_raw(::FermionicSWAP, ϕ) # nosemgrep
+    sϕ, cϕ = sincos(ϕ / 2.0)
+    eiϕ2   = exp(im * ϕ / 2.0)
+    eiϕ    = exp(im * ϕ)
+    ieiϕ2  = im * eiϕ2
+    return SMatrix{4,4,ComplexF64}(1, 0, 0, 0, 0, eiϕ2 * cϕ, -ieiϕ2 * sϕ, 0, 0, -ieiϕ2*sϕ, eiϕ2*cϕ, 0, 0, 0, 0, eiϕ)
 end
 
 """
