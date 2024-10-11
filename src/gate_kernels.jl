@@ -116,7 +116,7 @@ for G in (:CPhaseShift, :CPhaseShift00, :CPhaseShift01, :CPhaseShift10, :ZZ)
     end
 end
 
-for G in (:XX, :YY, :XY, :SingleExcitation)
+for G in (:XX, :YY, :XY, :SingleExcitation, :SingleExcitationPlus, :SingleExcitationMinus, :FermionicSWAP)
     @eval function matrix_rep(g::$G)
         n = g.pow_exponent::Float64
         θ = @inbounds g.angle[1]
@@ -127,7 +127,7 @@ for G in (:XX, :YY, :XY, :SingleExcitation)
     end
 end
 
-for G in (:DoubleExcitation, :MultiRZ)
+for G in (:DoubleExcitation, :DoubleExcitationPlus, :DoubleExcitationMinus, :MultiRZ)
     @eval function matrix_rep(g::$G)
         n = g.pow_exponent::Float64
         θ = @inbounds g.angle[1]

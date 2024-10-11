@@ -1,3 +1,36 @@
+"""
+    DoubleExcitation(ϕ)
+
+Generate the matrix representation of the [DoubleExcitation](https://docs.pennylane.ai/en/stable/code/api/pennylane.DoubleExcitation.html) gate.
+
+This gate performs an SO(2) rotation in the subspace ``{|1100\\rangle, |0011\\rangle}``, transforming the states as follows:
+
+```math
+|0011\\rangle & \\rightarrow \\cos\\left(\\frac{\\phi}{2}\\right)|0011\\rangle + \\sin\\left(\\frac{\\phi}{2}\\right)|1100\\rangle \\
+|1100\\rangle & \\rightarrow \\cos\\left(\\frac{\\phi}{2}\\right)|1100\\rangle - \\sin\\left(\\frac{\\phi}{2}\\right)|0011\\rangle
+```
+
+# Examples
+
+```jldoctest
+julia> using BraketSimulator
+
+julia> ϕ = 3.56;
+
+julia> gate_matrix =  BraketSimulator.DoubleExcitation(ϕ);
+
+julia> m  = BraketSimulator.matrix_rep(gate_matrix);
+
+julia> eq1 = m * [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
+julia> eq2 = m * [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0];
+
+julia> eq1 ==  [0, 0, 0, cos(ϕ/2), 0, 0, 0, 0, 0, 0, 0, 0, sin(ϕ/2), 0, 0, 0] == true;
+
+julia> eq2 ==  [0, 0, 0, -sin(ϕ/2), 0, 0, 0, 0, 0, 0, 0, 0, cos(ϕ/2), 0, 0, 0] == true;
+```
+
+"""
 mutable struct DoubleExcitation <: AngledGate{1}
     angle::NTuple{1,Union{Real,FreeParameter}}
     pow_exponent::Float64
@@ -15,6 +48,140 @@ function matrix_rep_raw(::DoubleExcitation, ϕ) # nosemgrep
     return SMatrix{16,16,ComplexF64}(mat)
 end
 
+"""
+    DoubleExcitationPlus(ϕ)
+
+Generate the matrix representation of the [DoubleExcitationPlus](https://docs.pennylane.ai/en/stable/code/api/pennylane.DoubleExcitationPlus.html) gate.
+
+This gate performs an SO(2) rotation in the subspace ``{|1100\\rangle, |0011\\rangle}`` with a phase-shift on other states:
+
+```math
+|0011\\rangle & \\rightarrow \\cos\\left(\\frac{\\phi}{2}\\right)|0011\\rangle - \\sin\\left(\\frac{\\phi}{2}\\right)|1100\\rangle \\
+|1100\\rangle & \\rightarrow \\cos\\left(\\frac{\\phi}{2}\\right)|1100\\rangle + \\sin\\left(\\frac{\\phi}{2}\\right)|0011\\rangle \\
+|x\\rangle & \\rightarrow e^{\\frac{i\\phi}{2}}|x\\rangle \\quad \\text{for all other basis states } |x\\rangle
+```
+
+# Examples
+
+```jldoctest
+julia> using BraketSimulator
+
+julia> ϕ = 3.56;
+
+julia> gate_matrix = BraketSimulator.DoubleExcitationPlus(ϕ);
+
+julia> m  = BraketSimulator.matrix_rep(gate_matrix);
+
+julia> eq1 = m * [1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
+
+julia> eq2 = m * [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1];
+
+julia> eq1 ==  [exp(im*ϕ/2), 0, 0, cos(ϕ/2), 0, 0, 0, 0, 0, 0, 0, 0, sin(ϕ/2), 0, 0, exp(im*ϕ/2)] == true;
+
+julia> eq2 ==  [exp(im*ϕ/2), 0, 0, -sin(ϕ/2), 0, 0, 0, 0, 0, 0, 0, 0, cos(ϕ/2), 0, 0, exp(im*ϕ/2)] == true;
+```
+
+"""
+struct DoubleExcitationPlus <: AngledGate{1}
+    angle::NTuple{1,Union{Real,FreeParameter}}
+    pow_exponent::Float64
+    DoubleExcitationPlus(angle::T, pow_exponent=1.0) where {T<:NTuple{1,Union{Real,FreeParameter}}} =
+        new(angle, Float64(pow_exponent))
+end
+qubit_count(::Type{DoubleExcitationPlus}) = 4
+function matrix_rep_raw(::DoubleExcitationPlus, ϕ) # nosemgrep
+    sϕ, cϕ = sincos(ϕ / 2.0)
+    eiϕ2   = exp(im * ϕ / 2.0)
+    mat    = diagm(eiϕ2 * ones(ComplexF64, 16))
+    # Apply phase-shift to states outside rotation subspace
+    mat[4, 4]   = cϕ
+    mat[13, 13] = cϕ
+    mat[4, 13]  = -sϕ
+    mat[13, 4]  = sϕ
+    return SMatrix{16, 16, ComplexF64}(mat)
+end
+
+"""
+    DoubleExcitationMinus(ϕ)
+
+Generate the matrix representation of the [DoubleExcitationMinus](https://docs.pennylane.ai/en/stable/code/api/pennylane.DoubleExcitationMinus.html) gate.
+
+This gate performs an SO(2) rotation in the subspace ``{|1100\\rangle, |0011\\rangle}`` with a phase-shift on other states:
+
+```math
+|0011\\rangle & \\rightarrow \\cos\\left(\\frac{\\phi}{2}\\right)|0011\\rangle - \\sin\\left(\\frac{\\phi}{2}\\right)|1100\\rangle \\
+|1100\\rangle & \\rightarrow \\cos\\left(\\frac{\\phi}{2}\\right)|1100\\rangle + \\sin\\left(\\frac{\\phi}{2}\\right)|0011\\rangle \\
+|x\\rangle & \\rightarrow e^{-\\frac{i\\phi}{2}}|x\\rangle \\quad \\text{for all other basis states } |x\\rangle
+```
+
+# Examples
+
+```jldoctest
+julia> using BraketSimulator
+
+julia> ϕ = 3.56;
+
+julia> gate_matrix = BraketSimulator.DoubleExcitationMinus(ϕ);
+
+julia> m  = BraketSimulator.matrix_rep(gate_matrix);
+
+julia> eq1 = m * [1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
+
+julia> eq2 = m * [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1];
+
+julia> eq1 ==  [exp(-im*ϕ/2), 0, 0, cos(ϕ/2), 0, 0, 0, 0, 0, 0, 0, 0, sin(ϕ/2), 0, 0, exp(-im*ϕ/2)] == true;
+
+julia> eq2 ==  [exp(-im*ϕ/2), 0, 0, -sin(ϕ/2), 0, 0, 0, 0, 0, 0, 0, 0, cos(ϕ/2), 0, 0, exp(-im*ϕ/2)] == true;
+```
+
+"""
+struct DoubleExcitationMinus <: AngledGate{1}
+    angle::NTuple{1,Union{Real,FreeParameter}}
+    pow_exponent::Float64
+    DoubleExcitationMinus(angle::T, pow_exponent=1.0) where {T<:NTuple{1,Union{Real,FreeParameter}}} =
+        new(angle, Float64(pow_exponent))
+end
+qubit_count(::Type{DoubleExcitationMinus}) = 4
+function matrix_rep_raw(::DoubleExcitationMinus, ϕ) # nosemgrep
+    sϕ, cϕ = sincos(ϕ / 2.0)
+    eiϕ2   = exp(-im * ϕ / 2.0)
+    mat    = diagm(eiϕ2 * ones(ComplexF64, 16))
+    # Apply phase-shift to states outside rotation subspace
+    mat[4, 4]   = cϕ
+    mat[13, 13] = cϕ
+    mat[4, 13]  = -sϕ
+    mat[13, 4]  = sϕ
+    return SMatrix{16, 16, ComplexF64}(mat)
+end
+
+"""
+    SingleExcitation(ϕ)
+
+Generate the matrix representation of the [SingleExcitation](https://docs.pennylane.ai/en/stable/code/api/pennylane.SingleExcitation.html) gate. 
+
+This gate performs a rotation in the subspace ``{|01\\rangle, |10\\rangle}``.
+
+# Examples
+
+```jldoctest
+julia> using BraketSimulator
+
+julia> ϕ = 3.56;
+
+julia> gate_matrix = BraketSimulator.SingleExcitation(ϕ);
+
+julia> m  = BraketSimulator.matrix_rep(gate_matrix);
+
+julia> eq1 = m * [0, 1, 0, 0];
+
+julia> eq2 = m * [0, 0, 1, 0];
+
+julia> eq1 == [0, cos(ϕ/2), - sin(ϕ/2), 0] == true;
+ 
+julia> eq2 == [0, sin(ϕ/2), cos(ϕ/2), 0] == true;
+```
+
+"""
 mutable struct SingleExcitation <: AngledGate{1}
     angle::NTuple{1,Union{Real,FreeParameter}}
     pow_exponent::Float64
@@ -23,6 +190,146 @@ mutable struct SingleExcitation <: AngledGate{1}
 end
 qubit_count(::Type{SingleExcitation}) = 2
 matrix_rep_raw(::SingleExcitation, ϕ) = ((sθ, cθ) = sincos(ϕ/2.0); return SMatrix{4,4,ComplexF64}(complex(1.0), 0, 0, 0, 0, cθ, -sθ, 0, 0, sθ, cθ, 0, 0, 0, 0, complex(1.0)))
+"""
+    SingleExcitationPlus(ϕ)
+
+Generate the matrix representation of the [SingleExcitationPlus](https://docs.pennylane.ai/en/stable/code/api/pennylane.SingleExcitationPlus.html) gate.
+
+This gate performs a rotation in the subspace ``{|01\\rangle, |10\\rangle}`` with a phase-shift.
+
+# Examples
+
+```jldoctest
+julia> using BraketSimulator
+
+julia> ϕ = 3.56;
+
+julia> gate_matrix = BraketSimulator.SingleExcitationPlus(ϕ);
+
+julia> m  = BraketSimulator.matrix_rep(gate_matrix);
+
+julia> eq1 = m * [1, 1, 0, 0];
+
+julia> eq2 = m * [1, 0, 1, 0];
+
+julia> eq1 == [exp(im*ϕ/2), cos(ϕ/2), - sin(ϕ/2), 0] == true; 
+
+julia> eq2 == [exp(im*ϕ/2), sin(ϕ/2), cos(ϕ/2), 0] == true;
+```
+
+"""
+struct SingleExcitationPlus <: AngledGate{1}
+    angle::NTuple{1,Union{Real,FreeParameter}}
+    pow_exponent::Float64
+    SingleExcitationPlus(angle::T, pow_exponent=1.0) where {T<:NTuple{1,Union{Real,FreeParameter}}} =
+        new(angle, Float64(pow_exponent))
+end
+qubit_count(::Type{SingleExcitationPlus}) = 2
+function matrix_rep_raw(::SingleExcitationPlus, ϕ) # nosemgrep
+    sϕ, cϕ = sincos(ϕ / 2.0)
+    eiϕ2   = exp(im * ϕ / 2.0)
+    return SMatrix{4,4,ComplexF64}(eiϕ2, 0, 0, 0, 0, cϕ, -sϕ, 0, 0, sϕ, cϕ, 0, 0, 0, 0, eiϕ2)
+end
+
+"""
+    SingleExcitationMinus(ϕ)
+
+Generate the matrix representation of the [SingleExcitationMinus](https://docs.pennylane.ai/en/stable/code/api/pennylane.SingleExcitationMinus.html) gate.
+
+This gate performs a rotation in the subspace ``{|01\\rangle, |10\\rangle}`` with a phase-shift.
+
+# Examples
+
+```jldoctest
+julia> using BraketSimulator
+
+julia> ϕ = 3.56;
+
+julia> gate_matrix = BraketSimulator.SingleExcitationMinus(ϕ);
+
+julia> m  = BraketSimulator.matrix_rep(gate_matrix);
+
+julia> eq1 = m * [1, 1, 0, 0];
+
+julia> eq2 = m * [1, 0, 1, 0];
+
+julia> eq1 == [exp(-im*ϕ/2), cos(ϕ/2), - sin(ϕ/2), 0] == true;
+
+julia> eq2 == [exp(-im*ϕ/2), sin(ϕ/2), cos(ϕ/2), 0] == true;
+```
+
+"""
+struct SingleExcitationMinus <: AngledGate{1}
+    angle::NTuple{1,Union{Real,FreeParameter}}
+    pow_exponent::Float64
+    SingleExcitationMinus(angle::T, pow_exponent=1.0) where {T<:NTuple{1,Union{Real,FreeParameter}}} =
+        new(angle, Float64(pow_exponent))
+end
+qubit_count(::Type{SingleExcitationMinus}) = 2
+function matrix_rep_raw(::SingleExcitationMinus, ϕ) # nosemgrep
+    sϕ, cϕ = sincos(ϕ / 2.0)
+    eiϕ2   = exp(-im * ϕ / 2.0)
+    return SMatrix{4,4,ComplexF64}(eiϕ2, 0, 0, 0, 0, cϕ, -sϕ, 0, 0, sϕ, cϕ, 0, 0, 0, 0, eiϕ2)
+end
+
+"""
+    FermionicSWAP(ϕ)
+
+Generate the matrix representation of the [FermionicSWAP](https://docs.pennylane.ai/en/stable/code/api/pennylane.FermionicSWAP.html) gate.
+
+This gate performs a rotation in adjacent fermionic modes under the Jordan-Wigner mapping, transforming states as follows:
+
+```math
+|00\\rangle & \\rightarrow |00\\rangle \\
+|01\\rangle & \\rightarrow e^{\\frac{i\\phi}{2}}\\cos\\left(\\frac{\\phi}{2}\\right)|01\\rangle - ie^{\\frac{i\\phi}{2}}\\sin\\left(\\frac{\\phi}{2}\\right)|10\\rangle \\
+|10\\rangle & \\rightarrow -ie^{\\frac{i\\phi}{2}}\\sin\\left(\\frac{\\phi}{2}\\right)|01\\rangle + e^{\\frac{i\\phi}{2}}\\cos\\left(\\frac{\\phi}{2}\\right)|10\\rangle \\
+|11\\rangle & \\rightarrow e^{i\\phi}|11\\rangle
+```
+
+# Examples
+
+```jldoctest
+julia> using BraketSimulator
+
+julia> ϕ = 3.56;
+
+julia> gate_matrix = BraketSimulator.FermionicSWAP(ϕ);
+
+julia> m  = BraketSimulator.matrix_rep(gate_matrix);
+
+julia> eq1 = m * [0, 0, 0, 0];
+
+julia> eq2 = m * [0, 1, 0, 0];
+
+julia> eq3 = m * [0, 0, 1, 0];
+
+julia> eq4 = m * [0, 0, 0, 1];
+
+julia> eq1 == [0, 0, 0, 0] == true;
+ 
+julia> eq2 == [0, exp(im*ϕ/2.0)*cos(ϕ / 2.0), - im*exp(im*ϕ/2.0)*sin(ϕ/2.0), 0] == true;
+
+julia> eq3 == [0, - im*exp(im*ϕ/2.0)*sin(ϕ/2.0), exp(im*ϕ/2.0)*cos(ϕ/2.0), 0] == true;
+
+julia> eq4 == [0, 0, 0, exp(im * ϕ)] == true;
+```
+
+"""
+struct FermionicSWAP <: AngledGate{1}
+    angle::NTuple{1,Union{Real,FreeParameter}}
+    pow_exponent::Float64
+    FermionicSWAP(angle::T, pow_exponent=1.0) where {T<:NTuple{1,Union{Real,FreeParameter}}} =
+        new(angle, Float64(pow_exponent))
+end
+qubit_count(::Type{FermionicSWAP}) = 2
+function matrix_rep_raw(::FermionicSWAP, ϕ) # nosemgrep
+    sϕ, cϕ = sincos(ϕ / 2.0)
+    eiϕ2   = exp(im * ϕ / 2.0)
+    eiϕ    = exp(im * ϕ)
+    ieiϕ2  = im * eiϕ2
+    return SMatrix{4,4,ComplexF64}(1, 0, 0, 0, 0, eiϕ2 * cϕ, -ieiϕ2 * sϕ, 0, 0, -ieiϕ2*sϕ, eiϕ2*cϕ, 0, 0, 0, 0, eiϕ)
+end
+
 """
     MultiRz(angle)
 
