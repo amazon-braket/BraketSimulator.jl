@@ -10,6 +10,7 @@ using
     UUIDs,
     StructTypes,
     Random,
+    Quasar,
     PrecompileTools
 
 export StateVectorSimulator, DensityMatrixSimulator, evolve!, simulate, ValidationError
@@ -63,9 +64,8 @@ include("operators.jl")
 include("observables.jl")
 using .Observables
 include("results.jl")
-include("Quasar.jl")
-using .Quasar
 include("pragmas.jl")
+include("builtin_gates.jl")
 include("gates.jl")
 include("noises.jl")
 include("schemas.jl")
@@ -75,6 +75,10 @@ include("custom_gates.jl")
 include("pow_gates.jl")
 include("gate_kernels.jl")
 include("noise_kernels.jl")
+
+function __init__()
+    Quasar.builtin_gates[] = builtin_gates
+end
 
 const LOG2_CHUNK_SIZE = 10
 const CHUNK_SIZE      = 2^LOG2_CHUNK_SIZE
@@ -776,7 +780,8 @@ include("dm_simulator.jl")
         #pragma braket result sample x(q[0]) @ y(q[1])
         """
     @compile_workload begin
-        using BraketSimulator, BraketSimulator.Quasar, BraketSimulator.StructTypes
+        using BraketSimulator, Quasar
+        Quasar.builtin_gates[] = BraketSimulator.builtin_gates
         simulator = StateVectorSimulator(5, 0)
         oq3_program = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), custom_qasm, nothing)
         simulate(simulator, oq3_program, 100)

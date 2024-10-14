@@ -4,94 +4,6 @@ get_tol(shots::Int) = return (
     shots > 0 ? Dict("atol" => 0.1, "rtol" => 0.15) : Dict("atol" => 0.01, "rtol" => 0)
 )
 @testset "Quasar" begin
-    @testset "QasmExpression" begin
-        @testset "Printing" begin
-            expr = Quasar.QasmExpression(:head, Quasar.QasmExpression(:integer_literal, 2))
-            @test sprint(show, expr) == "QasmExpression :head\n└─ QasmExpression :integer_literal\n   └─ 2\n"
-            bad_expression = Quasar.QasmExpression(:invalid_expression, Quasar.QasmExpression(:error))
-            err = Quasar.QasmVisitorError("unable to evaluate expression $bad_expression")
-            @test sprint(showerror, err) == "QasmVisitorError: unable to evaluate expression $bad_expression"
-        end
-        @testset "Expression basics" begin
-            expr = Quasar.QasmExpression(:head, Quasar.QasmExpression(:integer_literal, 2))
-            @test length(expr) == 1
-            push!(expr, Quasar.QasmExpression(:integer_literal, 3))
-            @test length(expr.args) == 2
-            append!(expr, Quasar.QasmExpression(:integer_literal, 4))
-            @test length(expr.args) == 3 
-            append!(expr, [Quasar.QasmExpression(:integer_literal, 5), Quasar.QasmExpression(:integer_literal, 6)])
-            @test length(expr.args) == 5
-        end
-        @testset "Equality" begin
-            expr_a = Quasar.QasmExpression(:head, Quasar.QasmExpression(:integer_literal, 2))
-            expr_b = Quasar.QasmExpression(:head, Quasar.QasmExpression(:float_literal, 2.2))
-            @test expr_a != expr_b
-            expr_a = Quasar.QasmExpression(:head, Quasar.QasmExpression(:integer_literal, 2))
-            @test expr_a == copy(expr_a) 
-        end
-        @testset "Name undefined" begin
-            expr = Quasar.QasmExpression(:undef, Quasar.QasmExpression(:integer_literal, 2))
-            @test_throws Quasar.QasmVisitorError("name not defined for expressions of type undef") Quasar.name(expr)
-        end
-    end
-    @testset "Visiting/evaluating an invalid expression" begin
-        visitor = Quasar.QasmProgramVisitor()
-        bad_expression = Quasar.QasmExpression(:invalid_expression, Quasar.QasmExpression(:error))
-        @test_throws Quasar.QasmVisitorError("cannot visit expression $bad_expression.") visitor(bad_expression)
-        bad_expression = Quasar.QasmExpression(:invalid_expression, Quasar.QasmExpression(:error))
-        @test_throws Quasar.QasmVisitorError("unable to evaluate qubits for expression $bad_expression.") Quasar.evaluate_qubits(visitor, bad_expression)
-        cast_expression = Quasar.QasmExpression(:cast, Quasar.QasmExpression(:type_expr, Int32), Quasar.QasmExpression(:float_literal, 2.0))
-        @test_throws Quasar.QasmVisitorError("unable to evaluate cast expression $cast_expression") visitor(cast_expression)
-    end
-    @testset "Visitors and parents" begin
-        qasm = """
-               def flip(qubit q) {
-                 x q;
-               }
-               qubit[2] qs;
-               flip(qs[0]);
-               """
-        parsed = parse_qasm(qasm)
-        visitor = Quasar.QasmProgramVisitor()
-        visitor(parsed)
-        for_visitor = Quasar.QasmForLoopVisitor(visitor)
-        @test Quasar.function_defs(for_visitor) == Quasar.function_defs(visitor)
-        @test Quasar.qubit_defs(for_visitor)    == Quasar.qubit_defs(visitor)
-        @test Quasar.qubit_count(for_visitor)   == Quasar.qubit_count(visitor)
-        push!(for_visitor, (type=:amplitude, operator=Union{String,Matrix{ComplexF64}}[], targets=Int[], states=["00"]))
-        @test visitor.results[1] == (type=:amplitude, operator=Union{String,Matrix{ComplexF64}}[], targets=Int[], states=["00"])
-        push!(for_visitor, [(type=:state_vector, operator=Union{String,Matrix{ComplexF64}}[], targets=Int[], states=String[]), (type=:probability, operator=Union{String,Matrix{ComplexF64}}[], targets=Int[], states=String[])])
-        @test visitor.results[2] == (type=:state_vector, operator=Union{String,Matrix{ComplexF64}}[], targets=Int[], states=String[])
-        @test visitor.results[3] == (type=:probability, operator=Union{String,Matrix{ComplexF64}}[], targets=Int[], states=String[])
-        push!(for_visitor, [(type="x", arguments=Union{Symbol,Dates.Period,Real,Matrix{ComplexF64}}[], targets=[0], controls=Pair{Int,Int}[], exponent=1.0), (type="y", arguments=Union{Symbol,Dates.Period,Real,Matrix{ComplexF64}}[], targets=[1], controls=Pair{Int,Int}[], exponent=1.0)])
-        @test visitor.instructions == [(type="x", arguments=Union{Symbol,Dates.Period,Real,Matrix{ComplexF64}}[], targets=[0], controls=Pair{Int,Int}[], exponent=1.0), (type="x", arguments=Union{Symbol,Dates.Period,Real,Matrix{ComplexF64}}[], targets=[0], controls=Pair{Int,Int}[], exponent=1.0), (type="y", arguments=Union{Symbol,Dates.Period,Real,Matrix{ComplexF64}}[], targets=[1], controls=Pair{Int,Int}[], exponent=1.0)]
-        gate_visitor = Quasar.QasmGateDefVisitor(visitor, String[], Quasar.QasmExpression(:empty), String[])
-        push!(gate_visitor, [(type="x", arguments=Union{Symbol,Dates.Period,Real,Matrix{ComplexF64}}[], targets=[0], controls=Pair{Int,Int}[], exponent=1.0), (type="y", arguments=Union{Symbol,Dates.Period,Real,Matrix{ComplexF64}}[], targets=[1], controls=Pair{Int,Int}[], exponent=1.0)])
-        @test gate_visitor.instructions == [(type="x", arguments=Union{Symbol,Dates.Period,Real,Matrix{ComplexF64}}[], targets=[0], controls=Pair{Int,Int}[], exponent=1.0), (type="y", arguments=Union{Symbol,Dates.Period,Real,Matrix{ComplexF64}}[], targets=[1], controls=Pair{Int,Int}[], exponent=1.0)]
-        function_visitor = Quasar.QasmFunctionVisitor(visitor, Quasar.QasmExpression[], Quasar.QasmExpression[])
-        push!(function_visitor, [(type="x", arguments=Union{Symbol,Dates.Period,Real,Matrix{ComplexF64}}[], targets=[0], controls=Pair{Int,Int}[], exponent=1.0), (type="y", arguments=Union{Symbol,Dates.Period,Real,Matrix{ComplexF64}}[], targets=[1], controls=Pair{Int,Int}[], exponent=1.0)])
-        @test function_visitor.instructions == [(type="x", arguments=Union{Symbol,Dates.Period,Real,Matrix{ComplexF64}}[], targets=[0], controls=Pair{Int,Int}[], exponent=1.0), (type="y", arguments=Union{Symbol,Dates.Period,Real,Matrix{ComplexF64}}[], targets=[1], controls=Pair{Int,Int}[], exponent=1.0)]
-    end
-    @testset "Sized types" begin
-        for (t_string, T) in (("SizedBitVector", Quasar.SizedBitVector),
-                              ("SizedInt", Quasar.SizedInt), 
-                              ("SizedUInt", Quasar.SizedUInt),
-                              ("SizedFloat", Quasar.SizedFloat),
-                              ("SizedAngle", Quasar.SizedAngle),
-                              ("SizedComplex", Quasar.SizedComplex))
-            object = T(Quasar.QasmExpression(:integer_literal, 4))
-            @test sprint(show, object) == t_string * "{4}"
-            array_object = Quasar.SizedArray(object, (10,))
-            @test sprint(show, array_object) == "SizedArray{" * t_string * "{4}, 1}"
-            @test_throws BoundsError size(array_object, 1)
-            @test size(array_object, 0) == 10
-            new_object = T(object)
-            @test sprint(show, new_object) == t_string * "{4}"
-        end
-        bitvector = Quasar.SizedBitVector(Quasar.QasmExpression(:integer_literal, 10))
-        @test length(bitvector) == Quasar.QasmExpression(:integer_literal, 10)
-        @test size(bitvector)   == (Quasar.QasmExpression(:integer_literal, 10),)
-    end
     @testset "Adder" begin
         sv_adder_qasm = """
         OPENQASM 3;
@@ -134,11 +46,7 @@ get_tol(shots::Int) = return (
         #pragma braket result probability cout
         #pragma braket result probability b
         """
-        parsed = parse_qasm(sv_adder_qasm)
-        visitor = QasmProgramVisitor(Dict("a_in"=>3, "b_in"=>7))
-        visitor(parsed)
-        circ = BraketSimulator.to_circuit(visitor)
-        @test visitor.qubit_count == 10
+        circ = BraketSimulator.to_circuit(sv_adder_qasm, Dict("a_in"=>3, "b_in"=>7))
         correct_instructions = [ 
             BraketSimulator.Instruction(BraketSimulator.X(), BraketSimulator.QubitSet(6))
             BraketSimulator.Instruction(BraketSimulator.X(), BraketSimulator.QubitSet(3))
@@ -177,41 +85,6 @@ get_tol(shots::Int) = return (
         @test circ.result_types == BraketSimulator.Result[BraketSimulator.Probability(BraketSimulator.QubitSet(9, 5, 6, 7, 8)),
                                                           BraketSimulator.Probability(BraketSimulator.QubitSet(9)),
                                                           BraketSimulator.Probability(BraketSimulator.QubitSet(5, 6, 7, 8))]
-    end
-    @testset "Randomized Benchmarking" begin
-        qasm = """
-        qubit[2] q;
-        bit[2] c;
-
-        h q[0];
-        cz q[0], q[1];
-        s q[0];
-        cz q[0], q[1];
-        s q[0];
-        z q[0];
-        h q[0];
-        measure q -> c;
-        """
-        circuit    = BraketSimulator.to_circuit(qasm)
-        @test circuit.instructions == [BraketSimulator.Instruction(BraketSimulator.H(), 0),
-                                       BraketSimulator.Instruction(BraketSimulator.CZ(), [0, 1]),
-                                       BraketSimulator.Instruction(BraketSimulator.S(), 0),
-                                       BraketSimulator.Instruction(BraketSimulator.CZ(), [0, 1]),
-                                       BraketSimulator.Instruction(BraketSimulator.S(), 0),
-                                       BraketSimulator.Instruction(BraketSimulator.Z(), 0),
-                                       BraketSimulator.Instruction(BraketSimulator.H(), 0),
-                                       BraketSimulator.Instruction(BraketSimulator.Measure(), 0),
-                                       BraketSimulator.Instruction(BraketSimulator.Measure(), 1)]
-    end
-    @testset "Bare measure" begin
-        qasm = """
-        qubit[2] q;
-        measure q;
-        """
-        circuit    = BraketSimulator.to_circuit(qasm)
-        @test circuit.instructions == [BraketSimulator.Instruction(BraketSimulator.Measure(), 0),
-                                       BraketSimulator.Instruction(BraketSimulator.Measure(), 1)]
-        @test [qubit_count(ix.operator) for ix in circuit.instructions] == [1, 1]
     end
     @testset "Measure with density matrix" begin
         qasm = """
@@ -261,106 +134,6 @@ get_tol(shots::Int) = return (
         @test simulation.state_vector ≈ sv 
         @test circuit.result_types == [BraketSimulator.Amplitude(["00", "01", "10", "11"])]
     end
-    @testset "Casting" begin
-        @testset "Casting to $to_type from $from_type" for (to_type, to_value) in (("bool", true),), (from_type, from_value) in (("int[32]", "32",),
-                                                                                                                              ("uint[16]", "1",),
-                                                                                                                              ("float", "2.5",),
-                                                                                                                              ("bool", "true",),
-                                                                                                                              ("bit", "\"1\"",),
-                                                                                                                             )
-            qasm = """
-            $from_type a = $from_value;
-            $to_type b = $to_type(a);
-            """
-            parsed  = parse_qasm(qasm)
-            visitor = QasmProgramVisitor()
-            visitor(parsed)
-            @test visitor.classical_defs["b"].val == to_value
-        end
-        @testset "Casting to $to_type from $from_type" for (to_type, to_value) in (("uint[32]", 32), ("int[16]", 32), ("float", 32.0)), (from_type, from_value) in (("int[32]", "32",),
-                                                                                                                                                   ("uint[16]", "32",),
-                                                                                                                                                   ("float", "32.0",),
-                                                                                                                                                   ("bit[6]", "\"100000\"",),
-                                                                                                                                                  )
-            qasm = """
-            $from_type a = $from_value;
-            $to_type b = $to_type(a);
-            """
-            parsed  = parse_qasm(qasm)
-            visitor = QasmProgramVisitor()
-            visitor(parsed)
-            @test visitor.classical_defs["b"].val == to_value
-        end
-        @testset "Casting to $to_type from $from_type" for (to_type, to_value) in (("bit[6]", BitVector([1,0,0,0,0,0])),), (from_type, from_value) in (("int[32]", "32",),
-                                                                                                                                                   ("uint[16]", "32",),
-                                                                                                                                                   ("bit[6]", "\"100000\"",),
-                                                                                                                                                  )
-            qasm = """
-            $from_type a = $from_value;
-            $to_type b = $to_type(a);
-            """
-            parsed  = parse_qasm(qasm)
-            visitor = QasmProgramVisitor()
-            visitor(parsed)
-            @test visitor.classical_defs["b"].val == to_value
-        end
-    end
-    @testset "Numbers $qasm_str" for (qasm_str, var_name, output_val) in (("float[32] a = 1.24e-3;", "a", 1.24e-3),
-                                                                          ("complex[float] b = 1-0.23im;", "b", 1-0.23im),
-                                                                          ("const bit c = \"0\";", "c", falses(1)),
-                                                                          ("bool d = false;", "d", false),
-                                                                          ("complex[float] e = -0.23+2im;", "e", -0.23+2im),
-                                                                          ("uint f = 0x123456789abcdef;", "f", 0x123456789abcdef),
-                                                                          ("int g = 0o010;", "g", 0o010),
-                                                                          ("float[64] h = 2*π;", "h", 2π),
-                                                                          ("float[64] i = τ/2;", "i", Float64(π)),
-                                                                         )
-
-
-        qasm = """
-        $qasm_str
-        """
-        parsed  = parse_qasm(qasm)
-        visitor = QasmProgramVisitor()
-        visitor(parsed)
-        @test visitor.classical_defs[var_name].val == output_val
-    end
-    @testset "Qubit identifiers" begin
-        qasm = """
-        qubit[2] q;
-        """
-        parsed  = parse_qasm(qasm)
-        visitor = QasmProgramVisitor()
-        visitor(parsed)
-        @test visitor(Quasar.QasmExpression(:identifier, "q")) == [0, 1]
-        @test visitor(Quasar.QasmExpression(:indexed_identifier, Quasar.QasmExpression(:identifier, "q"), Quasar.QasmExpression(:integer_literal, 1))) == [1]
-        @test_throws Quasar.QasmVisitorError("no identifier p defined.") visitor(Quasar.QasmExpression(:identifier, "p"))
-        @test_throws Quasar.QasmVisitorError("no identifier p defined.") visitor(Quasar.QasmExpression(:indexed_identifier, Quasar.QasmExpression(:identifier, "p"), Quasar.QasmExpression(:integer_literal, 1)))
-    end
-    @testset "Forbidden keywords" begin
-        qasm = """
-        extern b;
-        """
-        @test_throws Quasar.QasmParseError parse_qasm(qasm)
-        try
-            parse_qasm(qasm)
-        catch e
-            msg = sprint(showerror, e)
-            @test startswith(msg, "QasmParseError: keyword extern not supported.")
-        end
-    end
-    @testset "Integers next to irrationals" begin
-        qasm = """
-        float[64] h = 2π;
-        """
-        @test_throws Quasar.QasmParseError parse_qasm(qasm)
-        try
-            parse_qasm(qasm)
-        catch e
-            msg = sprint(showerror, e)
-            @test startswith(msg, "QasmParseError: expressions of form 2π are not supported -- you must separate the terms with a * operator.")
-        end
-    end
     @testset "Gate def with argument manipulation" begin
         qasm = """
         qubit[2] __qubits__;
@@ -373,12 +146,6 @@ get_tol(shots::Int) = return (
         circ = BraketSimulator.to_circuit(qasm)
         canonical_ixs = [BraketSimulator.Instruction(BraketSimulator.GPhase{1}(-(0.2 + 0.3)/2), 0), BraketSimulator.Instruction(BraketSimulator.U(0.1, 0.2, 0.3), 0)]
         @test circ.instructions == canonical_ixs 
-    end
-    @testset "Bad classical type" begin
-        qasm = """
-        angle[64] h = 2π;
-        """
-        @test_throws Quasar.QasmParseError parse_qasm(qasm)
     end
     @testset "Physical qubits" begin
         qasm = """
@@ -414,8 +181,7 @@ get_tol(shots::Int) = return (
         __bit_0__[2] = measure __qubits__[2];
         __bit_0__[3] = measure __qubits__[3];
         """
-        inputs = Dict("theta"=>0.2)
-        parsed_circ = BraketSimulator.to_circuit(qasm_str, inputs)
+        parsed_circ = BraketSimulator.to_circuit(qasm_str, Dict("theta"=>0.2))
         deleteat!(parsed_circ.instructions, length(parsed_circ.instructions)-3:length(parsed_circ.instructions))
         @test parsed_circ.instructions == [BraketSimulator.Instruction(BraketSimulator.H(), 0),
                                            BraketSimulator.Instruction(BraketSimulator.CNot(), [0, 1]),
@@ -431,159 +197,7 @@ get_tol(shots::Int) = return (
                                            BraketSimulator.Instruction(BraketSimulator.CNot(), [2, 3])
                                           ]
     end
-    @testset "For Loop" begin
-        qasm_with_scope = """
-        int[8] x = 0;
-        int[8] y = -100;
-        int[8] ten = 10;
-
-        for uint[8] i in [0:2:ten - 3] {
-            x += i;
-        }
-
-        for int[8] i in {2, 4, 6} {
-            y += i;
-        }
-        """
-        qasm_no_scope = """
-        int[8] x = 0;
-        int[8] y = -100;
-        int[8] ten = 10;
-
-        for uint[8] i in [0:2:ten - 3] x += i;
-        for int[8] i in {2, 4, 6} y += i;
-        """
-        @testset "$label" for (label, qasm) in (("With scoping {}", qasm_with_scope), ("Without scoping {}", qasm_no_scope))
-            parsed  = parse_qasm(qasm)
-            visitor = QasmProgramVisitor()
-            visitor(parsed)
-            @test visitor.classical_defs["x"].val == sum((0, 2, 4, 6))
-            @test visitor.classical_defs["y"].val == sum((-100, 2, 4, 6))
-        end
-    end
-    @testset "While Loop" begin
-        qasm_with_scope = """
-        int[8] x = 0;
-        int[8] i = 0;
-
-        while (i < 7) {
-            x += i;
-            i += 1;
-        }
-        """
-        qasm_no_scope = """
-        int[8] x = 0;
-
-        while (x < 7) x += 1;
-        """
-        @testset "$label" for (label, qasm, val) in (("With scoping {}", qasm_with_scope, sum(0:6)), ("Without scoping {}", qasm_no_scope, 7))
-            parsed  = parse_qasm(qasm)
-            visitor = QasmProgramVisitor()
-            visitor(parsed)
-            @test visitor.classical_defs["x"].val == val
-        end
-    end
-    @testset "Break and continue" begin
-        @testset for str in ("continue;", "{ continue; }")
-            qasm = """
-            int[8] x = 0;
-            for int[8] i in [0: 3] {
-                if (mod(i, 2) == 0) $str
-                x += i;
-            }
-            """
-            parsed  = parse_qasm(qasm)
-            visitor = QasmProgramVisitor()
-            visitor(parsed)
-            @test visitor.classical_defs["x"].val == 4
-            qasm = """
-            int[8] x = 0;
-            int[8] i = 0;
-
-            while (i < 7) {
-                i += 1;
-                if (i == 5) $str
-                x += i;
-            }
-            """
-            parsed  = parse_qasm(qasm)
-            visitor = QasmProgramVisitor()
-            visitor(parsed)
-            @test visitor.classical_defs["x"].val == sum(0:7) - 5
-        end
-        @testset for str in ("break;", "{ break; }")
-            qasm = """
-            int[8] x = 0;
-            for int[8] i in [0: 3] {
-                x += i;
-                if (mod(i, 2) == 1) $str
-            }
-            """
-            parsed  = parse_qasm(qasm)
-            visitor = QasmProgramVisitor()
-            visitor(parsed)
-            @test visitor.classical_defs["x"].val == 1
-            qasm = """
-            int[8] x = 0;
-            int[8] i = 0;
-
-            while (i < 7) {
-                x += i;
-                i += 1;
-                if (i == 5) $str
-            }
-            """
-            parsed  = parse_qasm(qasm)
-            visitor = QasmProgramVisitor()
-            visitor(parsed)
-            @test visitor.classical_defs["x"].val == sum(0:4)
-        end
-        @testset for str in ("continue", "break")
-            qasm = """
-            int[8] x = 0;
-            int[8] i = 0;
-            $str;
-            """
-            parsed  = parse_qasm(qasm)
-            visitor = QasmProgramVisitor()
-            @test_throws Quasar.QasmVisitorError("$str statement encountered outside a loop.") visitor(parsed)
-        end
-    end
-    @testset "Builtin functions $fn" for (fn, type, arg, result) in (("arccos", "float[64]", 1, acos(1)),
-                                                                     ("arcsin", "float[64]", 1, asin(1)),
-                                                                     ("arctan", "float[64]", 1, atan(1)),
-                                                                     ("ceiling", "int[64]", "π", 4),
-                                                                     ("floor", "int[64]", "π", 3),
-                                                                     ("mod", "int[64]", "4, 3", 1),
-                                                                     ("mod", "float[64]", "5.2, 2.5", mod(5.2, 2.5)),
-                                                                     ("cos", "float[64]", 1, cos(1)),
-                                                                     ("sin", "float[64]", 1, sin(1)),
-                                                                     ("tan", "float[64]", 1, tan(1)),
-                                                                     ("sqrt", "float[64]", 2, sqrt(2)),
-                                                                     ("exp", "float[64]", 2, exp(2)),
-                                                                     ("log", "float[64]", "ℇ", log(ℯ)),
-                                                                     ("popcount", "int[64]", "true", 1),
-                                                                     ("popcount", "int[64]", "\"1001110\"", 4),
-                                                                     ("popcount", "int[64]", "78", 4),
-                                                                     ("popcount", "int[64]", "0x78", 4),
-                                                                    )
-        qasm = """
-            const $type $(fn)_result = $fn($arg);
-            """
-        parsed  = parse_qasm(qasm)
-        visitor = QasmProgramVisitor()
-        visitor(parsed)
-        @test visitor.classical_defs["$(fn)_result"].val == result
-    end
     @testset "Builtin functions" begin
-        qasm = """
-            bit[2] bitvec = "11";
-            const int[64] popcount_bitvec_result = popcount(bitvec);
-            """
-        parsed  = parse_qasm(qasm)
-        visitor = QasmProgramVisitor()
-        visitor(parsed)
-        @test visitor.classical_defs["popcount_bitvec_result"].val == 2
         @testset "Symbolic" begin
             qasm = """
                 input float x;
@@ -624,11 +238,6 @@ get_tol(shots::Int) = return (
                 BraketSimulator.add_instruction!(c, ix)
             end
             @test parsed_circ.instructions == c.instructions
-        end
-        @testset "popcount!" begin
-            @test Quasar.popcount() == 0
-            @test Quasar.popcount(vcat(trues(3), falses(2))) == 3
-            @test Quasar.popcount("01010101") == 4 
         end
     end
     @testset "Bad pragma" begin
@@ -690,22 +299,6 @@ get_tol(shots::Int) = return (
         BraketSimulator.evolve!(ref_sim, ref_circ.instructions)
         @test simulation.state_vector ≈ ref_sim.state_vector
     end
-    @testset "Stretch" begin
-        qasm = """
-        stretch a;
-        """
-        @test_warn "stretch expression encountered -- currently `stretch` is a no-op" parse_qasm(qasm)
-        visitor = Quasar.QasmProgramVisitor()
-        @test visitor(Quasar.QasmExpression(:stretch)) === visitor
-    end
-    @testset "Duration" begin
-        qasm = """
-        duration a = 10μs;
-        """
-        @test_warn "duration expression encountered -- currently `duration` is a no-op" parse_qasm(qasm)
-        visitor = Quasar.QasmProgramVisitor()
-        @test visitor(Quasar.QasmExpression(:duration)) === visitor
-    end
     @testset "Reset" begin
         qasm = """
         qubit[4] q;
@@ -744,22 +337,6 @@ get_tol(shots::Int) = return (
             @test_throws ErrorException("cannot apply instruction to measured qubits.") BraketSimulator.to_circuit(bad_qasm)
         end
     end
-    @testset "Gate call missing/extra args" begin
-        qasm = """
-        qubit[4] q;
-        rx q[0];
-        """
-        parsed  = parse_qasm(qasm)
-        visitor = QasmProgramVisitor()
-        @test_throws Quasar.QasmVisitorError("gate rx requires arguments but none were provided.") visitor(parsed)
-        qasm = """
-        qubit[4] q;
-        x(0.1) q[0];
-        """
-        parsed  = parse_qasm(qasm)
-        visitor = QasmProgramVisitor()
-        @test_throws Quasar.QasmVisitorError("gate x does not accept arguments but arguments were provided.") visitor(parsed)
-    end
     @testset "Adjoint Gradient pragma" begin
         qasm = """
         input float theta;
@@ -776,104 +353,6 @@ get_tol(shots::Int) = return (
         @test circuit.result_types[1].observable == obs
         @test circuit.result_types[1].targets == [QubitSet([0, 1]), QubitSet([2, 3])]
         @test circuit.result_types[1].parameters == ["theta"]=#
-    end
-    @testset "Assignment operators" begin
-        @testset "Op: $op" for (op, initial, arg, final) in (("+", 0, 1, 1), ("*", 1, 2, 2), ("/", 2, 2, 1), ("-", 1, 5, -4))
-            qasm = """
-            int[16] x;
-            x = $initial;
-            x $op= $arg;
-            """
-            parsed  = parse_qasm(qasm)
-            visitor = QasmProgramVisitor()
-            visitor(parsed)
-            @test visitor.classical_defs["x"].val == final 
-        end
-        @testset "Op: $op" for (op, initial, arg, final) in (("|", "0000", "11", BitVector([0,0,1,1])),
-                                                             ("&", "0010", "11", BitVector([0,0,1,0])),
-                                                             ("^", "0001", "10", BitVector([0,0,1,1])),
-                                                            )
-            qasm = """
-            bit[4] xs = \"$initial\";
-            xs[2:] $op= \"$arg\";
-            """
-            parsed  = parse_qasm(qasm)
-            visitor = QasmProgramVisitor()
-            visitor(parsed)
-            @test visitor.classical_defs["xs"].val == final
-        end
-    end
-    @testset "Binary bit operators $op" for (op, result) in (("&", BitVector([0,1,0,0])),
-                                                             ("|", BitVector([1,1,0,1])),
-                                                             ("^", BitVector([1,0,0,1])),
-                                                             (">", false),
-                                                             ("<", true),
-                                                             (">=", false),
-                                                             ("<=", true),
-                                                             ("==", false),
-                                                             ("!=", true),
-                                                            )
-
-        qasm = """
-        bit[4] x = "0101";
-        bit[4] y = "1100";
-
-        bit[4] result = x $op y;
-        """
-        parsed  = parse_qasm(qasm)
-        visitor = QasmProgramVisitor()
-        visitor(parsed)
-        @test visitor.classical_defs["x"].val == BitVector([0,1,0,1])
-        @test visitor.classical_defs["y"].val == BitVector([1,1,0,0])
-        @test visitor.classical_defs["result"].val == result 
-    end
-    @testset "Binary bit operators $op" for (op, arg1, arg2, result) in (("<<", "x", 2, BitVector([0,1,0,0])),
-                                                                         (">>", "y", 2, BitVector([0,0,1,1])),
-                                                                        )
-        qasm = """
-        bit[4] x = "0101";
-        bit[4] y = "1100";
-
-        bit[4] result = $arg1 $op $arg2;
-        """
-        parsed  = parse_qasm(qasm)
-        visitor = QasmProgramVisitor()
-        visitor(parsed)
-        @test visitor.classical_defs["result"].val == result
-    end
-    @testset "Unary bit operators $op" for (op, typ, arg, result) in (("~", "bit[4]", "x", BitVector([1,0,1,0])),
-                                                                      ("!", "bit", "x", false),
-                                                                      ("!", "bit", "x << 4", true)
-                                                                     )
-
-        qasm = """
-        bit not;
-        bit not_zero;
-
-        bit[4] x = "0101";
-        $typ result = $(op)$(arg);
-        """
-        parsed  = parse_qasm(qasm)
-        visitor = QasmProgramVisitor()
-        visitor(parsed)
-        @test visitor.classical_defs["x"].val == BitVector([0,1,0,1])
-        @test visitor.classical_defs["result"].val == result
-    end
-    @testset "End statement" begin
-        qasm = """
-        z \$0;
-        x \$1;
-        h \$2;
-        y \$3;
-        end;
-        y \$2;
-        h \$3;
-        """
-        circ = BraketSimulator.to_circuit(qasm)
-        @test circ.instructions == [BraketSimulator.Instruction(BraketSimulator.Z(), 0),
-                                    BraketSimulator.Instruction(BraketSimulator.X(), 1),
-                                    BraketSimulator.Instruction(BraketSimulator.H(), 2),
-                                    BraketSimulator.Instruction(BraketSimulator.Y(), 3)]
     end
     @testset "Switch/case" begin
         qasm = """
@@ -912,60 +391,6 @@ get_tol(shots::Int) = return (
         switch (x) { case 0 { z \$0; } true {} }
         """
         @test_throws Quasar.QasmParseError BraketSimulator.to_circuit(qasm, Dict("x"=>0))
-    end
-    @testset "If/Else" begin
-        qasm = """
-        int[8] two = 2;
-        bit[3] m = "000";
-
-        if (two + 1) {
-            m[0] = 1;
-        } else {
-            m[1] = 1;
-        }
-
-        if (!bool(two - 2)) {
-            m[2] = 1;
-        }
-        """
-        parsed  = parse_qasm(qasm)
-        visitor = QasmProgramVisitor()
-        visitor(parsed)
-        bit_vec = BitVector([1,0,1])
-        @test visitor.classical_defs["m"].val == bit_vec
-        qasm = """
-        int[8] two = -2;
-        bit[3] m = "000";
-
-        if (two + 1) {
-            m[0] = 1;
-        } else {
-            m[1] = 1;
-        }
-
-        if (!bool(two - 2)) {
-            m[2] = 1;
-        }
-        """
-        parsed  = parse_qasm(qasm)
-        visitor = QasmProgramVisitor()
-        visitor(parsed)
-        bit_vec = BitVector([0,1,1])
-        @test visitor.classical_defs["m"].val == bit_vec
-        qasm = """
-        input bool which_gate;
-        qubit q;
-
-        if (which_gate) {
-            x q;
-        } else {
-            y q;
-        }
-        """
-        for (flag, which_gate) in ((true, BraketSimulator.X()), (false, BraketSimulator.Y()))
-            circuit = BraketSimulator.to_circuit(qasm, Dict("which_gate"=>flag))
-            @test circuit.instructions == [BraketSimulator.Instruction(which_gate, 0)]
-        end
     end
     @testset "Global gate control" begin
         qasm = """
@@ -1397,14 +822,6 @@ get_tol(shots::Int) = return (
         BraketSimulator.evolve!(ref_sim, ref_circuit.instructions)
         @test simulation.state_vector ≈ ref_sim.state_vector
     end
-    @testset "Output" begin
-        qasm = """
-               output int[8] out_int;
-               """
-        parsed  = parse_qasm(qasm)
-        visitor = Quasar.QasmProgramVisitor()
-        @test_throws Quasar.QasmVisitorError("Output not supported.") visitor(parsed)
-    end
     @testset "Input" begin
         qasm = """
         input int[8] in_int;
@@ -1422,27 +839,6 @@ get_tol(shots::Int) = return (
             @test visitor.classical_defs["doubled"].val == in_int * 2
             @test visitor.classical_defs["in_bit"].val  == in_bit
         end
-    end
-    @testset "Gate on qubit registers" begin 
-        qasm = """
-        qubit[3] qs;
-        qubit q;
-
-        x qs[{0, 2}];
-        h q;
-        cphaseshift(1) qs, q;
-        phaseshift(-2) q;
-        ccnot qs;
-        """
-        circuit    = BraketSimulator.to_circuit(qasm)
-        @test circuit.instructions[1] == BraketSimulator.Instruction(BraketSimulator.X(), 0)
-        @test circuit.instructions[2] == BraketSimulator.Instruction(BraketSimulator.X(), 2)
-        @test circuit.instructions[3] == BraketSimulator.Instruction(BraketSimulator.H(), 3)
-        @test circuit.instructions[4] == BraketSimulator.Instruction(BraketSimulator.CPhaseShift(1), [0, 3])
-        @test circuit.instructions[5] == BraketSimulator.Instruction(BraketSimulator.CPhaseShift(1), [1, 3])
-        @test circuit.instructions[6] == BraketSimulator.Instruction(BraketSimulator.CPhaseShift(1), [2, 3])
-        @test circuit.instructions[7] == BraketSimulator.Instruction(BraketSimulator.PhaseShift(-2), 3)
-        @test circuit.instructions[8] == BraketSimulator.Instruction(BraketSimulator.CCNot(), [0, 1, 2])
     end
     @testset "Gate on qubit registers" begin 
         qasm = """
@@ -1495,25 +891,6 @@ get_tol(shots::Int) = return (
 
         @test sim_w_verbatim.state_vector ≈ sim_wo_verbatim.state_vector
     end
-    @testset "Subroutine" begin
-        qasm = """
-        const int[8] n = 4;
-        def parity(bit[n] cin) -> bit {
-          bit c = false;
-          for int[8] i in [0: n - 1] {
-            c ^= cin[i];
-          }
-          return c;
-        }
-
-        bit[n] c = "1011";
-        bit p = parity(c);
-        """
-        parsed  = parse_qasm(qasm)
-        visitor = QasmProgramVisitor()
-        visitor(parsed)
-        @test visitor.classical_defs["p"].val == true
-    end
     @testset "Void subroutine" begin
         qasm = """
                def flip(qubit q) {
@@ -1526,80 +903,6 @@ get_tol(shots::Int) = return (
         simulation = BraketSimulator.StateVectorSimulator(2, 0)
         BraketSimulator.evolve!(simulation, circuit.instructions)
         @test simulation.state_vector ≈ [0, 0, 1, 0]
-    end
-    @testset "Array ref subroutine" begin
-        qasm = """
-        int[16] total_1;
-        int[16] total_2;
-
-        def sum(readonly array[int[8], #dim = 1] arr) -> int[16] {
-            int[16] size = sizeof(arr);
-            int[16] x = 0;
-            for int[8] i in [0:size - 1] {
-                x += arr[i];
-            }
-            return x;
-        }
-
-        array[int[8], 5] array_1 = {1, 2, 3, 4, 5};
-        array[int[8], 10] array_2 = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-
-        total_1 = sum(array_1);
-        total_2 = sum(array_2);
-        """
-        parsed = parse_qasm(qasm)
-        visitor = QasmProgramVisitor()
-        visitor(parsed)
-        @test visitor.classical_defs["total_1"].val == 15
-        @test visitor.classical_defs["total_2"].val == 55
-        @test visitor.classical_defs["array_1"].val == [1, 2, 3, 4, 5]
-        @test visitor.classical_defs["array_2"].val == collect(1:10)
-    end
-    @testset "Const array argument" begin
-        qasm_string = """
-        qubit q;
-
-        def sum(const array[int[8], #dim = 1] arr) -> int {
-            int size = sizeof(arr);
-            int x = 0;
-            for int i in [0:size - 1] {
-                x += arr[i];
-            }
-            return x;
-        }
-
-        array[int, 10] arr = {9, 3, 6, 2, 2, 4, 3, 1, 12, 7};
-        int s = sum(arr);
-        rx(s*π/4) q;
-        """
-        parsed = parse_qasm(qasm_string)
-        visitor = QasmProgramVisitor()
-        visitor(parsed)
-        @test visitor.classical_defs["s"].val == sum([ 9, 3, 6, 2, 2, 4, 3, 1, 12, 7 ])
-    end
-    @testset "Array ref subroutine with mutation" begin
-        qasm = """
-        def mutate_array(mutable array[int[8], #dim = 1] arr) {
-            int[16] size = sizeof(arr);
-            for int[8] i in [0:size - 1] {
-                arr[i] = 0;
-            }
-        }
-
-        array[int[8], 5] array_1 = {1, 2, 3, 4, 5};
-        array[int[8], 10] array_2 = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-        array[int[8], 10] array_3 = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-
-        mutate_array(array_1);
-        mutate_array(array_2);
-        mutate_array(array_3[4:2:-1]);
-        """
-        parsed = parse_qasm(qasm)
-        visitor = QasmProgramVisitor()
-        visitor(parsed)
-        @test visitor.classical_defs["array_1"].val == zeros(Int, 5) 
-        @test visitor.classical_defs["array_2"].val == zeros(Int, 10) 
-        @test visitor.classical_defs["array_3"].val == [1, 2, 3, 4, 0, 6, 0, 8, 0, 10]
     end
     @testset "Rotation parameter expressions" begin
         @testset  "Operation: $operation" for (operation, state_vector) in
@@ -1681,82 +984,11 @@ get_tol(shots::Int) = return (
         err_msg = "Invalid observable specified: [[[-6.0, 0.0], [2.0, 1.0], [-3.0, 0.0], [-5.0, 2.0]], [[2.0, -1.0], [0.0, 0.0], [2.0, -1.0], [-5.0, 4.0]], [[-3.0, 0.0], [2.0, 1.0], [0.0, 0.0], [-4.0, 3.0]], [[-5.0, -2.0], [-5.0, -4.0], [-4.0, -3.0], [-6.0, 0.0]]], targets: [0]" 
         @test_throws Quasar.QasmVisitorError(err_msg, "ValueError") visitor(parsed)
     end
-    @testset "Qubits with variable as size" begin
-        qasm_string = """
-        OPENQASM 3.0;
-
-        def ghz(int[32] n) {
-            h q[0];
-            for int i in [0:n - 1] {
-                cnot q[i], q[i + 1];
-            }
-        }
-
-        int[32] n = 5;
-        bit[n + 1] c;
-        qubit[n + 1] q;
-
-        ghz(n);
-
-        c = measure q;
-        """
-        parsed = parse_qasm(qasm_string)
-        visitor = Quasar.QasmProgramVisitor()
-        visitor(parsed)
-        @test Quasar.qubit_count(visitor) == 6
-    end
-    @testset "String inputs" begin
-        qasm_string = """
-        const int[8] n = 4;
-        input bit[n] x;
-
-        qubit q;
-
-        def parity(bit[n] cin) -> bit {
-          bit c = false;
-          for int[8] i in [0: n - 1] {
-            c ^= cin[i];
-          }
-          return c;
-        }
-
-        if(parity(x)) {
-            x q;
-        } else {
-            i q;
-        }
-        """
-        circ = BraketSimulator.to_circuit(qasm_string, Dict("x"=>"1011"))
-    end
     @testset "GRCS 16" begin
         simulator = BraketSimulator.StateVectorSimulator(16, 0)
         circuit   = BraketSimulator.to_circuit(joinpath(@__DIR__, "grcs_16.qasm")) 
         BraketSimulator.evolve!(simulator, circuit.instructions)
         probs     = BraketSimulator.probabilities(simulator)        
         @test first(probs) ≈ 0.0000062 atol=1e-7
-    end
-    @testset "Include" begin
-        mktempdir() do dir_path
-            inc_path = joinpath(dir_path, "new_gate.inc")
-            write(inc_path, """\ngate u3(θ, ϕ, λ) q { gphase(-(ϕ+λ)/2); U(θ, ϕ, λ) q; }\n""")
-            qasm = """
-            OPENQASM 3;
-            include "$inc_path";
-            """
-            parsed  = parse_qasm(qasm)
-            visitor = QasmProgramVisitor()
-            visitor(parsed)
-            @test haskey(visitor.gate_defs, "u3")
-        end
-        @testset "stdgates.inc" begin
-            qasm = """
-            OPENQASM 3.0;
-            include "stdgates.inc";
-            """
-            parsed  = parse_qasm(qasm)
-            visitor = QasmProgramVisitor()
-            visitor(parsed)
-            @test haskey(visitor.gate_defs, "tdg")
-        end
     end
 end
