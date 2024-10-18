@@ -1,3 +1,6 @@
+Quasar.qubit_count(o::String) = length(o)
+Quasar.qubit_count(o::Matrix) = Int(log2(size(o, 1))) 
+
 function _observable_targets_error(observable::Matrix{ComplexF64}, targets)
     mat = Vector{Vector{Vector{Float64}}}(undef, size(observable, 1))
     for row in 1:size(observable, 1)
@@ -91,6 +94,31 @@ function Quasar.visit_pragma(v, program_expr)
     return v
 end
 
+function parse_matrix(tokens::Vector{Tuple{Int64, Int32, Quasar.Token}}, stack, start, qasm)
+    inner = Quasar.extract_braced_block(tokens, stack, start, qasm)
+    n_rows = count(triplet->triplet[end] == Quasar.lbracket, inner)
+    matrix = Matrix{Quasar.QasmExpression}(undef, n_rows, n_rows)
+    row = 1
+    while !isempty(inner)
+        row_tokens = Quasar.extract_braced_block(inner, stack, start, qasm)
+        push!(row_tokens, (-1, Int32(-1), Quasar.semicolon))
+        col = 1
+        while !isempty(row_tokens)
+            matrix[row, col] = Quasar.parse_expression(row_tokens, stack, start, qasm)
+            col += 1
+            next_token = first(row_tokens)
+            next_token[end] == Quasar.comma && popfirst!(row_tokens)
+            next_token[end] == Quasar.semicolon && break
+        end
+        row += 1
+        next_token = first(inner)
+        next_token[end] == Quasar.comma && popfirst!(inner)
+        next_token[end] == Quasar.semicolon && break
+    end
+    return matrix
+end
+
+
 function parse_pragma_observables(tokens::Vector{Tuple{Int64, Int32, Quasar.Token}}, stack, start, qasm)
     observables_list = Quasar.QasmExpression[]
     obs_targets      = Quasar.QasmExpression[]
@@ -100,7 +128,7 @@ function parse_pragma_observables(tokens::Vector{Tuple{Int64, Int32, Quasar.Toke
         if observable_id.args[1] == "hermitian"
             matrix_tokens = Quasar.extract_parensed(tokens, stack, start, qasm)
             # next token is targets
-            h_mat = Quasar.parse_matrix(matrix_tokens, stack, start, qasm)
+            h_mat = parse_matrix(matrix_tokens, stack, start, qasm)
             # next token is targets
             next_at = findfirst(triplet->triplet[end] == Quasar.at, tokens)
             final_token = isnothing(next_at) ? length(tokens) : next_at-1
@@ -177,7 +205,7 @@ function Quasar.parse_pragma(tokens, stack, start, qasm)
     elseif pragma_type == "unitary"
         push!(expr, :unitary)
         matrix_tokens  = Quasar.extract_parensed(tokens, stack, start, qasm)
-        unitary_matrix = Quasar.parse_matrix(matrix_tokens, stack, start, qasm)
+        unitary_matrix = parse_matrix(matrix_tokens, stack, start, qasm)
         push!(expr, unitary_matrix)
         target_expr = parse_pragma_targets(tokens, stack, start, qasm)
         push!(expr, target_expr)
@@ -189,7 +217,7 @@ function Quasar.parse_pragma(tokens, stack, start, qasm)
             all(triplet->triplet[end] == Quasar.lbracket, matrix_tokens[1:3]) && (matrix_tokens = Quasar.extract_braced_block(matrix_tokens, stack, start, qasm))
             mats = Matrix{Quasar.QasmExpression}[]
             while !isempty(matrix_tokens)
-                push!(mats, Quasar.parse_matrix(matrix_tokens, stack, start, qasm))
+                push!(mats, parse_matrix(matrix_tokens, stack, start, qasm))
                 isempty(matrix_tokens) && break
                 next_token = first(matrix_tokens)
                 next_token[end] == Quasar.comma && popfirst!(matrix_tokens)
