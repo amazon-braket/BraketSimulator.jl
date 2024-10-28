@@ -154,6 +154,8 @@ function matrix_rep_raw(::DoubleExcitationMinus, ϕ) # nosemgrep
     return SMatrix{16, 16, ComplexF64}(mat)
 end
 
+qubit_count(::Type{T}) where {T<:Union{DoubleExcitation, DoubleExcitationMinus, DoubleExcitationPlus}} = 4
+
 """
     SingleExcitation(ϕ)
 
@@ -188,7 +190,6 @@ mutable struct SingleExcitation <: AngledGate{1}
     SingleExcitation(angle::T, pow_exponent=1.0) where {T<:NTuple{1,Union{Real,FreeParameter}}} =
         new(angle, Float64(pow_exponent))
 end
-qubit_count(::Type{SingleExcitation}) = 2
 matrix_rep_raw(::SingleExcitation, ϕ) = ((sθ, cθ) = sincos(ϕ/2.0); return SMatrix{4,4,ComplexF64}(complex(1.0), 0, 0, 0, 0, cθ, -sθ, 0, 0, sθ, cθ, 0, 0, 0, 0, complex(1.0)))
 """
     SingleExcitationPlus(ϕ)
@@ -224,7 +225,6 @@ struct SingleExcitationPlus <: AngledGate{1}
     SingleExcitationPlus(angle::T, pow_exponent=1.0) where {T<:NTuple{1,Union{Real,FreeParameter}}} =
         new(angle, Float64(pow_exponent))
 end
-qubit_count(::Type{SingleExcitationPlus}) = 2
 function matrix_rep_raw(::SingleExcitationPlus, ϕ) # nosemgrep
     sϕ, cϕ = sincos(ϕ / 2.0)
     eiϕ2   = exp(im * ϕ / 2.0)
@@ -265,7 +265,6 @@ struct SingleExcitationMinus <: AngledGate{1}
     SingleExcitationMinus(angle::T, pow_exponent=1.0) where {T<:NTuple{1,Union{Real,FreeParameter}}} =
         new(angle, Float64(pow_exponent))
 end
-qubit_count(::Type{SingleExcitationMinus}) = 2
 function matrix_rep_raw(::SingleExcitationMinus, ϕ) # nosemgrep
     sϕ, cϕ = sincos(ϕ / 2.0)
     eiϕ2   = exp(-im * ϕ / 2.0)
@@ -321,7 +320,6 @@ struct FermionicSWAP <: AngledGate{1}
     FermionicSWAP(angle::T, pow_exponent=1.0) where {T<:NTuple{1,Union{Real,FreeParameter}}} =
         new(angle, Float64(pow_exponent))
 end
-qubit_count(::Type{FermionicSWAP}) = 2
 function matrix_rep_raw(::FermionicSWAP, ϕ) # nosemgrep
     sϕ, cϕ = sincos(ϕ / 2.0)
     eiϕ2   = exp(im * ϕ / 2.0)
@@ -329,6 +327,8 @@ function matrix_rep_raw(::FermionicSWAP, ϕ) # nosemgrep
     ieiϕ2  = im * eiϕ2
     return SMatrix{4,4,ComplexF64}(1, 0, 0, 0, 0, eiϕ2 * cϕ, -ieiϕ2 * sϕ, 0, 0, -ieiϕ2*sϕ, eiϕ2*cϕ, 0, 0, 0, 0, eiϕ)
 end
+
+qubit_count(::Type{T}) where {T<:Union{FermionicSWAP, SingleExcitation, SingleExcitationMinus, SingleExcitationPlus}} = 2
 
 """
     MultiRz(angle)
