@@ -21,6 +21,8 @@ StructTypes.StructType(::Type{QuantumOperator}) = StructTypes.AbstractType()
 StructTypes.subtypes(::Type{QuantumOperator}) = (h=H, i=I, x=X, y=Y, z=Z, s=S, si=Si, t=T, ti=Ti, v=V, vi=Vi, cnot=CNot, swap=Swap, iswap=ISwap, cv=CV, cy=CY, cz=CZ, ecr=ECR, ccnot=CCNot, cswap=CSwap, unitary=Unitary, rx=Rx, ry=Ry, rz=Rz, phaseshift=PhaseShift, pswap=PSwap, xy=XY, cphaseshift=CPhaseShift, cphaseshift00=CPhaseShift00, cphaseshift01=CPhaseShift01, cphaseshift10=CPhaseShift10, xx=XX, yy=YY, zz=ZZ, gpi=GPi, gpi2=GPi2, ms=MS, prx=PRx, u=U, gphase=GPhase, kraus=Kraus, bit_flip=BitFlip, phase_flip=PhaseFlip, pauli_channel=PauliChannel, amplitude_damping=AmplitudeDamping, phase_damping=PhaseDamping, depolarizing=Depolarizing, two_qubit_dephasing=TwoQubitDephasing, two_qubit_depolarizing=TwoQubitDepolarizing, generalized_amplitude_damping=GeneralizedAmplitudeDamping, multi_qubit_pauli_channel=MultiQubitPauliChannel, measure=Measure, reset=Reset, barrier=Barrier, delay=Delay)
 parameters(::QuantumOperator) = FreeParameter[]
 
+qubit_count(o::Matrix) = Int(log2(size(o, 1))) 
+
 struct PauliEigenvalues{N}
     coeff::Float64
     PauliEigenvalues{N}(coeff::Float64=1.0) where {N} = new(coeff)

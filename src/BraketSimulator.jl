@@ -78,6 +78,8 @@ include("noise_kernels.jl")
 
 function __init__()
     Quasar.builtin_gates[] = builtin_gates
+    Quasar.parse_pragma[]  = parse_pragma
+    Quasar.visit_pragma[]  = visit_pragma
 end
 
 const LOG2_CHUNK_SIZE = 10
@@ -782,6 +784,8 @@ include("dm_simulator.jl")
     @compile_workload begin
         using BraketSimulator, Quasar
         Quasar.builtin_gates[] = BraketSimulator.builtin_gates
+        Quasar.parse_pragma[]  = BraketSimulator.parse_pragma
+        Quasar.visit_pragma[]  = BraketSimulator.visit_pragma
         simulator = StateVectorSimulator(5, 0)
         oq3_program = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), custom_qasm, nothing)
         simulate(simulator, oq3_program, 100)

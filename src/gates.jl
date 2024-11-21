@@ -112,7 +112,7 @@ mutable struct Unitary <: Gate
     Unitary(matrix::Matrix{<:Number}, pow_exponent=1.0) = new(ComplexF64.(matrix), Float64(pow_exponent))
 end
 Base.:(==)(u1::Unitary, u2::Unitary) = u1.matrix == u2.matrix && u1.pow_exponent == u2.pow_exponent
-qubit_count(g::Unitary) = convert(Int, log2(size(g.matrix, 1)))
+qubit_count(g::Unitary) = qubit_count(g.matrix)
 StructTypes.constructfrom(::Type{Unitary}, nt::Quasar.CircuitInstruction) = Unitary(only(nt.arguments), nt.exponent)
 
 Parametrizable(g::AngledGate) = Parametrized()
