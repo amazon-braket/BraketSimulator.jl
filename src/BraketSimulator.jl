@@ -82,7 +82,7 @@ function __init__()
     Quasar.visit_pragma[]  = visit_pragma
 end
 
-const LOG2_CHUNK_SIZE = 10
+const LOG2_CHUNK_SIZE = 16
 const CHUNK_SIZE      = 2^LOG2_CHUNK_SIZE
 
 function _index_to_endian_bits(ix::Int, qubit_count::Int)
@@ -205,7 +205,7 @@ basis rotation instructions if running with non-zero shots. Return the `Program`
 parsing and the qubit count of the circuit.
 """
 function _prepare_program(circuit_ir::OpenQasmProgram, inputs::Dict{String, <:Any}, shots::Int)
-    ir_inputs = isnothing(circuit_ir.inputs) ? Dict{String, Float64}() : circuit_ir.inputs 
+    ir_inputs     = isnothing(circuit_ir.inputs) ? Dict{String, Float64}() : circuit_ir.inputs
     merged_inputs = merge(ir_inputs, inputs)
     src           = circuit_ir.source::String
     circuit       = to_circuit(src, merged_inputs)
@@ -706,11 +706,14 @@ include("dm_simulator.jl")
         bit[3] b;
         qubit[3] q;
         rx(0.1) q[0];
+        rx(1) q[0];
         prx(0.1, 0.2) q[0];
         x q[0];
         ry(0.1) q[0];
+        ry(1) q[0];
         y q[0];
         rz(0.1) q[0];
+        rz(1) q[0];
         z q[0];
         h q[0];
         i q[0];
@@ -760,6 +763,11 @@ include("dm_simulator.jl")
         #pragma braket result density_matrix
         #pragma braket result probability
         #pragma braket result expectation x(q[0])
+        #pragma braket result expectation x(q[0]) @ x(q[1])
+        #pragma braket result expectation z(q[0]) @ z(q[1])
+        #pragma braket result expectation y(q[0]) @ y(q[1])
+        #pragma braket result expectation h(q[0]) @ h(q[1])
+        #pragma braket result expectation i(q[0]) @ i(q[1])
         #pragma braket result variance x(q[0]) @ y(q[1])
         """
     dm_exact_results_qasm = """
@@ -774,12 +782,16 @@ include("dm_simulator.jl")
         """
     shots_results_qasm = """
         OPENQASM 3.0;
-        qubit[2] q;
+        qubit[10] q;
         h q;
         #pragma braket result probability
         #pragma braket result expectation x(q[0])
         #pragma braket result variance x(q[0]) @ y(q[1])
         #pragma braket result sample x(q[0]) @ y(q[1])
+        #pragma braket result expectation z(q[2]) @ z(q[3])
+        #pragma braket result expectation x(q[4]) @ x(q[5])
+        #pragma braket result expectation y(q[6]) @ y(q[7])
+        #pragma braket result expectation h(q[8]) @ h(q[9])
         """
     @compile_workload begin
         using BraketSimulator, Quasar

@@ -164,6 +164,7 @@ function _check_observable(observable_map, observable, qubits)
     observable_map[qubits] = observable
     return observable_map
 end
+_check_observable(observable_map, observable, qubits::Int) = _check_observable(observable_map, observable, [qubits])
 
 function _combine_obs_and_targets(observable::Observables.HermitianObservable, result_targets::Vector{Int})
     obs_qc = qubit_count(observable)
@@ -175,12 +176,14 @@ _combine_obs_and_targets(observable::Observables.TensorProduct, result_targets::
 _combine_obs_and_targets(observable, result_targets::Vector{Int}) = length(result_targets) == 1 ? [(observable, result_targets)] : [(copy(observable), t) for t in result_targets]
 
 function _verify_openqasm_shots_observables(circuit::Circuit, n_qubits::Int)
-    observable_map = Dict()
+    observable_map = LittleDict{Vector{Int}, Observables.Observable}()
     for result in filter(rt->rt isa ObservableResult, circuit.result_types)
         result.observable isa Observables.I && continue
         result_targets = isempty(result.targets) ? collect(0:n_qubits-1) : collect(result.targets)
         for obs_and_target in _combine_obs_and_targets(result.observable, result_targets)
-            observable_map = _check_observable(observable_map, obs_and_target...)
+            obs  = obs_and_target[1]
+            targ = obs_and_target[2]
+            observable_map = _check_observable(observable_map, obs, targ)
         end
     end
     return

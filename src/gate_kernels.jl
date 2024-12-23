@@ -96,13 +96,14 @@ function matrix_rep(g::PRx)
 end
 
 for G in (:Rx, :Ry, :Rz, :PhaseShift)
-    @eval function matrix_rep(g::$G)
+    @eval function matrix_rep(g::$G)::SMatrix{2,2,ComplexF64}
         n = g.pow_exponent::Float64
         θ = @inbounds g.angle[1]
-        iszero(n)    && return matrix_rep_raw(I())::SMatrix{2,2,ComplexF64}
-        isone(n)     && return matrix_rep_raw(g, θ)::SMatrix{2,2,ComplexF64}
-        isinteger(n) && return matrix_rep_raw(g, θ*n)::SMatrix{2,2,ComplexF64}
-        return SMatrix{2,2,ComplexF64}(matrix_rep_raw(g, θ) ^ n)
+        one_mat = matrix_rep_raw(g, θ)
+        iszero(n)    && return matrix_rep_raw(I())
+        isone(n)     && return one_mat
+        isinteger(n) && return matrix_rep_raw(g, θ*n)
+        return SMatrix{2,2,ComplexF64}(one_mat ^ n)
     end
 end
 
@@ -211,9 +212,9 @@ matrix_rep_raw(g::PRx) = SMatrix{2,2}(
         -im*exp(im*g.angle[2])*sin(g.angle[1]/2.0) cos(g.angle[1] / 2.0)
     ],
 )
-matrix_rep_raw(g::Rz, ϕ) = (θ = ϕ/2.0; return SMatrix{2,2}(exp(-im*θ), 0.0, 0.0, exp(im*θ)))
-matrix_rep_raw(g::Rx, ϕ) = ((sθ, cθ) = sincos(ϕ/2.0); return SMatrix{2,2}(cθ, -im*sθ, -im*sθ, cθ))
-matrix_rep_raw(g::Ry, ϕ) = ((sθ, cθ) = sincos(ϕ/2.0); return SMatrix{2,2}(complex(cθ), complex(sθ), -complex(sθ), complex(cθ)))
+matrix_rep_raw(g::Rz, ϕ)::SMatrix{2,2,ComplexF64} = ((sθ, cθ) = sincos(ϕ/2.0); return SMatrix{2,2}(cθ - im*sθ, 0.0, 0.0, cθ + im*sθ))
+matrix_rep_raw(g::Rx, ϕ)::SMatrix{2,2,ComplexF64} = ((sθ, cθ) = sincos(ϕ/2.0); return SMatrix{2,2}(cθ, -im*sθ, -im*sθ, cθ))
+matrix_rep_raw(g::Ry, ϕ)::SMatrix{2,2,ComplexF64} = ((sθ, cθ) = sincos(ϕ/2.0); return SMatrix{2,2}(complex(cθ), complex(sθ), -complex(sθ), complex(cθ)))
 matrix_rep_raw(g::GPi) =
     SMatrix{2,2}(complex([0 exp(-im * g.angle[1]); exp(im * g.angle[1]) 0]))
 
@@ -311,14 +312,11 @@ function apply_gate!(
     g_00, g_10, g_01, g_11 = g_matrix
     Threads.@threads for chunk_index = 0:n_chunks-1
         # my_amps is the group of amplitude generators which this `Task` will process
-        my_amps = if n_chunks > 1
-            chunk_index*CHUNK_SIZE:((chunk_index+1)*CHUNK_SIZE-1)
-        else
-            0:n_tasks-1
-        end
-        lower_ix  = pad_bit(my_amps[1], endian_qubit) + 1
+        first_amp = n_chunks > 1 ? chunk_index*CHUNK_SIZE : 0
+        amp_block = n_chunks > 1 ? CHUNK_SIZE : n_tasks
+        lower_ix  = pad_bit(first_amp, endian_qubit) + 1
         higher_ix = lower_ix + flipper
-        for task_amp = 0:length(my_amps)-1
+        for task_amp = 0:amp_block-1
             if is_small_target && div(task_amp, flipper) > 0 && mod(task_amp, flipper) == 0
                 lower_ix  = higher_ix
                 higher_ix = lower_ix + flipper

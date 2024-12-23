@@ -169,11 +169,12 @@ function basis_rotation_instructions!(c::Circuit)
         c.basis_rotation_instructions = reduce(vcat, _observable_to_instruction(all_qubit_observable, target) for target in qubits(c))
         return c
     end
-    unsorted = collect(Set(values(c.qubit_observable_target_mapping)))
-    target_lists = sort(unsorted)
+    mapping_vals = collect(values(c.qubit_observable_target_mapping))
+    target_lists = unique(mapping_vals)
     for target_list in target_lists
-        observable = c.qubit_observable_mapping[first(target_list)]
-        append!(basis_rotation_instructions, _observable_to_instruction(observable, target_list))
+        observable    = c.qubit_observable_mapping[first(target_list)]
+        observable_ix = _observable_to_instruction(observable, target_list)
+        append!(basis_rotation_instructions, observable_ix)
     end
     c.basis_rotation_instructions = basis_rotation_instructions
     return c
