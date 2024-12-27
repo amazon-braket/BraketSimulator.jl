@@ -762,9 +762,7 @@ get_tol(shots::Int) = return (
             qubit[3] q;
             i q;
             #pragma braket result expectation x(q[2])
-            // # noqa: E501
             #pragma braket result expectation hermitian([[-6+0im, 2+1im, -3+0im, -5+2im], [2-1im, 0im, 2-1im, -5+4im], [-3+0im, 2+1im, 0im, -4+3im], [-5-2im, -5-4im, -4-3im, -6+0im]]) q[0:1]
-            // # noqa: E501
             #pragma braket result expectation x(q[2]) @ hermitian([[-6+0im, 2+1im, -3+0im, -5+2im], [2-1im, 0im, 2-1im, -5+4im], [-3+0im, 2+1im, 0im, -4+3im], [-5-2im, -5-4im, -4-3im, -6+0im]]) q[0:1]
             """
             circuit = BraketSimulator.to_circuit(qasm) 
@@ -773,7 +771,8 @@ get_tol(shots::Int) = return (
                     2-1im 0 2-1im -5+4im;
                    -3 2+1im 0 -4+3im;
                    -5-2im -5-4im -4-3im -6]
-            h = BraketSimulator.Observables.HermitianObservable(arr)
+            h    = BraketSimulator.Observables.HermitianObservable(arr)
+            @test circuit.result_types[2].observable.matrix == arr
             bris = vcat(BraketSimulator.diagonalizing_gates(h, [0, 1]), BraketSimulator.Instruction(BraketSimulator.H(), [2]))
             for (ix, bix) in zip(circuit.basis_rotation_instructions, bris)
                 @test Matrix(BraketSimulator.matrix_rep(ix.operator)) ≈ adjoint(BraketSimulator.fix_endianness(Matrix(BraketSimulator.matrix_rep(bix.operator))))

@@ -71,7 +71,7 @@ HermitianObservable(v::Vector{Vector{Vector{T}}}) where {T<:Number} = HermitianO
 Base.copy(o::HermitianObservable) = HermitianObservable(copy(o.matrix))
 StructTypes.lower(x::HermitianObservable) = Union{String, Vector{Vector{Vector{Float64}}}}[complex_matrix_to_ir(ComplexF64.(x.matrix))]
 Base.:(==)(h1::HermitianObservable, h2::HermitianObservable) = (size(h1.matrix) == size(h2.matrix) && h1.matrix ≈ h2.matrix)
-qubit_count(o::HermitianObservable) = convert(Int, log2(size(o.matrix, 1)))
+qubit_count(o::HermitianObservable) = qubit_count(o.matrix) 
 LinearAlgebra.eigvals(o::HermitianObservable) = eigvals(Hermitian(o.matrix))
 unscaled(o::HermitianObservable) = o
 Base.:(*)(o::HermitianObservable, n::Real) = HermitianObservable(Float64(n) .* o.matrix)

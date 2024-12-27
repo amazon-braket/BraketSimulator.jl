@@ -1,6 +1,6 @@
 using Test, Aqua, Documenter, BraketSimulator
 
-Aqua.test_all(BraketSimulator, ambiguities=false, piracies=false)
+Aqua.test_all(BraketSimulator, ambiguities=false)
 Aqua.test_ambiguities(BraketSimulator)
 dir_list = filter(x-> startswith(x, "test_") && endswith(x, ".jl"), readdir(@__DIR__))
 
