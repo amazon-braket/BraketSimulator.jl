@@ -323,3 +323,285 @@ function partial_trace(
     return final_ρ
 end
 partial_trace(sim::DensityMatrixSimulator, output_qubits = collect(0:qubit_count(sim)-1)) = partial_trace(density_matrix(sim), output_qubits)
+
+##################################
+# Measurement Related Operations #
+##################################
+
+
+"""
+    get_measurement_probabilities(state::AbstractMatrix{<:Complex}, qubit::Int)
+
+Calculate measurement probabilities for a qubit in a density matrix.
+Returns [P(0), P(1)] for the given qubit.
+"""
+function get_measurement_probabilities(state::AbstractMatrix{<:Complex}, qubit::Int)
+    n_qubits = Int(log2(size(state, 1)))
+    endian_qubit = n_qubits - qubit - 1
+    
+    # Calculate probabilities for 0 and 1 outcomes
+    prob_0 = 0.0
+    prob_1 = 0.0
+    
+    # For density matrix, we need to use the diagonal elements
+    for i in 0:(size(state, 1)-1)
+        # Check if the qubit is 0 or 1 in this basis state
+        qubit_val = (i >> endian_qubit) & 1
+        prob = real(state[i+1, i+1])  # Probability from diagonal element
+        
+        if qubit_val == 0
+            prob_0 += prob
+        else
+            prob_1 += prob
+        end
+    end
+    
+    return [prob_0, prob_1]
+end
+
+"""
+    get_measurement_probabilities(simulator::DensityMatrixSimulator, qubit::Int)
+
+Calculate measurement probabilities for a qubit in a density matrix simulator.
+Returns [P(0), P(1)] for the given qubit.
+"""
+function get_measurement_probabilities(simulator::DensityMatrixSimulator, qubit::Int)
+    return get_measurement_probabilities(simulator.density_matrix, qubit)
+end
+
+"""
+    apply_projection(state::AbstractMatrix{<:Complex}, qubit::Int, outcome::Int)
+
+Apply measurement projection to a density matrix.
+This collapses the state to the subspace corresponding to the measurement outcome
+and returns the reduced density matrix. If all qubits have been measured, the returned matrix is empty.
+Throws an error if the qubit outcome isn't possible
+"""
+function apply_projection(state::AbstractMatrix{<:Complex}, qubit::Int, outcome::Int)
+    n_qubits = Int(log2(size(state, 1)))
+    endian_qubit = n_qubits - qubit - 1
+    dim = size(state, 1)
+
+    # If the state is empty, then there is nothing to measure!
+    if dim == 0
+        throw("There are no qubits to be measured in the density matrix")
+    end
+
+    # If there is only one qubit present in the state, then it must be measured and the projection
+    # removes the qubit from the state, so you are just left with an empty state vector
+    if n_qubits == 1
+        return Matrix{ComplexF64}(undef, 0, 0)
+    end
+    
+    # Calculate normalization factor (trace of projected state)
+    trace_val = get_measurement_probabilities(state, qubit)[outcome+1]
+    
+    # This means that the qubit outcome is impossible
+    if trace_val <= 0
+        throw("Qubit measurement outcome not possible, please check measurement probability before applying the projection!")
+    end
+    
+    # Create reduced density matrix (half the size)
+    reduced_dim = dim ÷ 2
+    reduced_state = zeros(ComplexF64, reduced_dim, reduced_dim)
+    
+    # Fill the reduced density matrix
+    for i in 0:(dim-1)
+        i_qubit_val = (i >> endian_qubit) & 1
+        if i_qubit_val != outcome
+            continue  # Skip elements that don't match the outcome
+        end
+        
+        # Remove the measured qubit from index i
+        reduced_i = remove_bit(i, endian_qubit)
+        
+        for j in 0:(dim-1)
+            j_qubit_val = (j >> endian_qubit) & 1
+            if j_qubit_val != outcome
+                continue  # Skip elements that don't match the outcome
+            end
+            
+            # Remove the measured qubit from index j
+            reduced_j = remove_bit(j, endian_qubit)
+            
+            # Copy and normalize the element
+            reduced_state[reduced_i+1, reduced_j+1] = state[i+1, j+1] / trace_val
+        end
+    end
+    
+    return reduced_state
+end
+
+"""
+    remove_bit(index::Int, position::Int) -> Int
+
+Remove a bit at the specified position in the binary representation of index.
+Used for density matrix index manipulation during reduction.
+"""
+function remove_bit(index::Int, position::Int)
+    # Extract bits before the position
+    mask_before = (1 << position) - 1
+    bits_before = index & mask_before
+    
+    # Extract bits after the position, shifted right
+    bits_after = (index >> (position + 1)) << position
+    
+    # Combine parts
+    return bits_before | bits_after
+end
+
+"""
+    _apply_reset(state::AbstractMatrix{<:Complex}, target::Int)
+
+Reset a qubit to |0⟩ state in a density matrix.
+This projects the state to the |0⟩ state of the target qubit.
+"""
+function _apply_reset(state::AbstractMatrix{<:Complex}, target::Int)
+    # First measure the qubit (project to either |0⟩ or |1⟩)
+    probs = get_measurement_probabilities(state, target)
+    outcome = rand() < probs[1] ? 0 : 1
+    apply_projection!(state, target, outcome)
+    
+    # If outcome was |1⟩, apply X gate to make it |0⟩
+    if outcome == 1
+        n_qubits = Int(log2(size(state, 1)))
+        endian_target = n_qubits - target - 1
+        dim = size(state, 1)
+        
+        # Create X gate matrix for the target qubit
+        x_matrix = zeros(ComplexF64, dim, dim)
+        for i in 0:(dim-1)
+            bit_val = (i >> endian_target) & 1
+            flipped_i = i ⊻ (1 << endian_target)
+            x_matrix[flipped_i+1, i+1] = 1.0
+        end
+        
+        # Apply X gate: ρ -> X ρ X†
+        state .= x_matrix * state * adjoint(x_matrix)
+    end
+    
+    return state
+end
+
+"""
+    _apply_reset!(simulator::DensityMatrixSimulator, target::Int)
+
+Reset a qubit to |0⟩ state in a density matrix simulator.
+This projects the state to the |0⟩ state of the target qubit.
+"""
+function _apply_reset(simulator::DensityMatrixSimulator, target::Int)
+    return _apply_reset(simulator.density_matrix, target)
+end
+
+
+"""
+    expand_state(state::AbstractMatrix{<:Complex}, qubit::Int, outcome::Int)
+
+Expand the density matrix to reincorporate a previously measured qubit.
+This is needed when an operation is applied to a qubit that was previously measured, qubit reuse.
+Returns the expanded density matrix
+"""
+function expand_state(state::AbstractMatrix{<:Complex}, qubit::Int, outcome::Int)
+    n_qubits = Int(log2(size(state, 1)))
+    
+    # Create a new density matrix with expanded size
+    new_dim = 2^(n_qubits + 1)
+    new_state = zeros(ComplexF64, new_dim, new_dim)
+    
+    # Determine where to insert the qubit in the new density matrix
+    endian_qubit = n_qubits - qubit
+    
+    # Map from original indices to expanded indices with the measured qubit inserted
+    for i in 0:(size(state, 1)-1)
+        for j in 0:(size(state, 1)-1)
+            # Calculate new indices with the qubit inserted
+            new_i = insert_bit(i, endian_qubit, outcome)
+            new_j = insert_bit(j, endian_qubit, outcome)
+            
+            # Copy the matrix element
+            new_state[new_i+1, new_j+1] = state[i+1, j+1]
+        end
+    end
+    
+    return new_state
+end
+
+"""
+    insert_bit(index::Int, position::Int, bit::Int) -> Int
+
+Insert a bit at the specified position in the binary representation of index.
+Used for density matrix index manipulation during expansion/reduction.
+"""
+function insert_bit(index::Int, position::Int, bit::Int)
+    # Create mask for bits before the position
+    mask_before = (1 << position) - 1
+    
+    # Create mask for bits after the position
+    mask_after = ~mask_before
+    
+    # Extract bits before and after the position
+    bits_before = index & mask_before
+    bits_after = index & mask_after
+    
+    # Shift bits after the position to make room for the new bit
+    bits_after = bits_after << 1
+    
+    # Insert the new bit
+    bit_mask = bit << position
+    
+    # Combine all parts
+    return bits_before | bit_mask | bits_after
+end
+
+"""
+    add_qubits(dms::AbstractMatrix{<:Complex}, num_qubits::Int) -> DensityMatrixSimulator
+
+Add `num_qubits` qubits to the density matrix simulator, initializing them in the |0⟩ state.
+Returns a new simulator with the expanded state.
+
+# Arguments
+- `dms`: The density matrix simulator to expand
+- `num_qubits`: The number of qubits to add
+
+# Returns
+- A new density matrix with the expanded state
+"""
+function add_qubits(matrix::AbstractMatrix{<:Complex}, num_qubits::Int)
+    # Validate input
+    num_qubits >= 0 || throw(ArgumentError("Number of qubits to add must be non-negative"))
+    
+    # If no qubits to add, just return a copy
+    if num_qubits == 0
+        return copy(matrix)
+    end
+    
+    # Handle empty density matrix case - initialize with |0⟩⟨0| state
+    if isempty(matrix) || size(matrix, 1) == 0
+        # Create a density matrix with 2^num_qubits x 2^num_qubits elements
+        T = eltype(matrix)
+        new_size = 2^num_qubits
+        new_matrix = zeros(T, new_size, new_size)
+        new_matrix[1, 1] = one(T)  # Set |0⟩⟨0| state
+        return new_matrix
+    end
+    
+    # Calculate new dimensions
+    old_size = size(matrix, 1)
+    new_size = old_size * (2^num_qubits)
+    
+    # Create new density matrix
+    T = eltype(matrix)
+    new_matrix = similar(matrix, new_size, new_size)
+    fill!(new_matrix, zero(T))
+    
+    # Copy the old density matrix into the new one
+    # Only the basis states where the new qubits are all |0⟩ get the original values
+    for i in 0:(old_size-1)
+        for j in 0:(old_size-1)
+            new_matrix[i+1, j+1] = matrix[i+1, j+1]
+        end
+    end
+    
+    # Create new simulator with expanded state
+    return new_matrix
+end

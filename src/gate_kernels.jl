@@ -481,7 +481,36 @@ apply_gate!(::Val{false}, g::I, state_vec::AbstractStateVector{T}, qubits::Int..
     return
 apply_gate!(::Val{true}, g::I, state_vec::AbstractStateVector{T}, qubits::Int...) where {T<:Complex} =
     return
-apply_gate!(::Measure, state_vec, args...) = return
+    
+# Apply the measurement gate to the state_vector as a projector into the measured subspace
+function apply_gate!(measure_op::Measure, state_vec::AbstractStateVector{T}, qubit::Int) where {T<:Complex}
+    # If result is not set (default -1), just return without doing anything
+    measure_op.result == -1 && return
+    
+    n_amps, endian_qubit = get_amps_and_qubits(state_vec, qubit)
+    
+    # Create a mask for the qubit we're measuring
+    mask = 1 << endian_qubit
+    
+    # Iterate through all amplitudes
+    for i in 0:n_amps-1
+        # Check if the qubit is in state 0 or 1
+        qubit_value = (i & mask) >> endian_qubit
+        
+        # If the qubit value doesn't match the measurement result, set amplitude to 0
+        if qubit_value != measure_op.result
+            state_vec[i+1] = zero(T)
+        end
+    end
+    
+    # Normalize the state vector
+    norm_factor = 1.0 / sqrt(sum(abs2.(state_vec)))
+    if !isinf(norm_factor)
+        state_vec .*= norm_factor
+    end
+    
+    return
+end
 apply_gate!(::Reset, state_vec, args...) = return
 apply_gate!(::Barrier, state_vec, args...) = return
 apply_gate!(::Delay, state_vec, args...) = return

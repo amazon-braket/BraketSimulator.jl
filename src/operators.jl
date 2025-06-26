@@ -56,14 +56,18 @@ end
 Base.getindex(p::PauliEigenvalues{N}, ix::Vector{Int}) where {N} = [p[i] for i in ix]
 
 """
-    Measure(index) <: QuantumOperator
+    Measure(index, result) <: QuantumOperator
 
 Represents a measurement operation on targeted qubit, stored in the classical register at `index`.
+The `result` field represents the measurement outcome (0 or 1) and allows the operator to act as a projector
+into the measured subspace.
 """
 struct Measure <: QuantumOperator
     index::Int
+    result::Int
 end
-Measure() = Measure(-1)
+Measure() = Measure(-1, -1)
+Measure(index::Int) = Measure(index, -1)
 StructTypes.constructfrom(::Type{Measure}, nt) = Measure()
 
 """
