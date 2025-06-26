@@ -1,6 +1,9 @@
 using Quasar: QasmExpression, head, ClassicalVariable, GateDefinition, FunctionDefinition, SizedBitVector
 
 # Define a type to represent measurement values for each simulation path
+# path_outcomes takes path indices as keys with the measurement results
+# as dictionaries where the key is the qubit name and value is the qubit
+# measurement
 struct MeasurementValues
 	path_outcomes::Dict{Int, Dict{String, Int}}
 end
@@ -13,24 +16,22 @@ end
 	evaluate_qubits(sim::BranchedSimulatorOperators, qubit_expr::QasmExpression) -> Vector{Int}
 
 Evaluate qubit expressions to get qubit indices. This replaces the visitor's evaluate_qubits function.
-Returns a list of qubit indices in the state vector.
-The same indices are used for all active simulations.
+Returns a list of qubit indices in the state.
+The same indices are used for all active simulations since we can't define qubits in a local scope.
+
+As of now, this only works with registers and classical bits. Functionality for any classical variable
+still needs to be implemented.
 """
 function evaluate_qubits(sim::BranchedSimulatorOperators, qubit_expr::QasmExpression)
-	expr_type = head(qubit_expr)
+	# TODO: Update function to include functionality for any classical variable
+	all_qubits = Int[]
 
 	# Only process for active paths
 	if isempty(sim.active_paths)
-		return Int[]
+		return all_qubits
 	end
 
 	# Process the expression to get qubit indices
-	return evaluate_qubits_single_path(sim, qubit_expr)
-end
-
-
-function evaluate_qubits_single_path(sim::BranchedSimulatorOperators, qubit_expr::QasmExpression)
-	all_qubits = Int[]
 	expr_type = head(qubit_expr)
 
 	if expr_type == :identifier
@@ -78,7 +79,7 @@ function evaluate_qubits_single_path(sim::BranchedSimulatorOperators, qubit_expr
 	elseif expr_type == :array_literal
 		# For array literals, recursively evaluate each element
 		for element in qubit_expr.args
-			append!(all_qubits, evaluate_qubits_single_path(sim, element))
+			append!(all_qubits, evaluate_qubits(sim, element))
 		end
 	elseif expr_type == :hw_qubit
 		# Hardware qubit reference (e.g., $0, $1)
@@ -89,53 +90,13 @@ function evaluate_qubits_single_path(sim::BranchedSimulatorOperators, qubit_expr
 	return all_qubits
 end
 
-
-"""
-	evaluate_binary_op(op::Symbol, lhs, rhs)
-
-Evaluate binary operations. This is a direct copy of the visitor's function.
-
-function evaluate_binary_op(op::Symbol, lhs, rhs)
-	op == :< && return lhs < rhs
-	op == :> && return lhs > rhs
-	op == :<= && return lhs <= rhs
-	op == :>= && return lhs >= rhs
-	op == Symbol("=") && return rhs
-	op == Symbol("!=") && return lhs != rhs
-	op == Symbol("==") && return lhs == rhs
-	op == :+ && return lhs + rhs
-	op == :- && return lhs - rhs
-	op == :* && return lhs * rhs
-	op == :/ && return lhs / rhs
-	op == :% && return lhs % rhs
-	op == Symbol("<<") && return lhs << rhs
-	op == Symbol(">>") && return lhs >> rhs
-	op == Symbol("**") && return lhs ^ rhs
-	op == Symbol("&&") && return lhs && rhs
-	op == Symbol("||") && return lhs || rhs
-	op == :| && return lhs .| rhs
-	op == :& && return lhs .& rhs
-	op == :^ && return lhs .⊻ rhs
-	error("Unknown binary operator: op")
-end
-
-	evaluate_unary_op(op::Symbol, arg)
-
-Evaluate unary operations. This is a direct copy of the visitor's function.
-function evaluate_unary_op(op::Symbol, arg)
-	op == :! && return !arg
-	op == :~ && return .!arg
-	op == :- && return -arg
-	error("Unknown unary operator: op")
-end
-"""
-
 """
 	evaluate_modifiers(sim::BranchedSimulatorOperators, expr::QasmExpression)
 
-Evaluate gate modifiers. This replaces the visitor's evaluate_modifiers function.
+Evaluates gate modifiers.
 """
 function evaluate_modifiers(sim::BranchedSimulatorOperators, expr::QasmExpression)
+	# TODO: Review and edit this function
 	if head(expr) == :power_mod
 		pow_expr = QasmExpression(:pow, _evolve_branched_ast_operators(sim, expr.args[1]))
 		return (pow_expr, expr.args[2])
@@ -170,6 +131,9 @@ end
 	evolve_branched_operators(simulator::AbstractSimulator, program::QasmExpression, inputs::Dict{String, <:Any}) -> BranchedSimulatorOperators
 
 Evolve a quantum program using a branched approach that handles measurements and control flow.
+
+Takes in an AbstractSimulator object and generates a branched simulator object to wrap around it in order
+to perform the MCM. Allows it to be generalizable if you have any simulator as long as it is a subtype of AbstractSimulator.
 """
 function evolve_branched_operators(simulator::AbstractSimulator, program::QasmExpression, inputs::Dict{String, <:Any})
 	# Create a branched simulator with integrated visitor functionality
@@ -187,13 +151,19 @@ _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, i::String) = i
 _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, i::BitVector) = i
 _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, i::NTuple{N, <:Number}) where {N} = i
 _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, i::Vector{<:Number}) = i
+
 """
 	_evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::QasmExpression)
 
-Process an AST node in the branched simulation model.
+Process an AST node in the branched simulation model. AST taken from Quasar.jl
+parse function.
 """
 function _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::QasmExpression)
 	expr_type = head(expr)
+
+	######################################
+	# Organizational/Unimplemented nodes #
+	######################################
 
 	# Program node - process each child node in sequence
 	if expr_type == :program
@@ -214,11 +184,11 @@ function _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::Q
 			isempty(sim.active_paths) && return  # No active paths left
 		end
 
-		# Simple operations that don't affect quantum state
 	elseif expr_type == :version
 		# Version node - ignore
 		return
 
+		# TODO: Have not looked at this code, need to check it and see if it is implemented
 	elseif expr_type == :reset
 		# Reset operation - reset qubit to |0⟩ state
 		qubit_indices = evaluate_qubits(sim, expr.args[1])
@@ -229,17 +199,19 @@ function _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::Q
 			end
 		end
 
-	elseif expr_type == :barrier || expr_type == :delay
-		# Barrier/delay operation - no effect on simulation
+	elseif expr_type == :barrier || expr_type == :delay || expr_type == :pragma
+		# Barrier/delay/pragma operation - no effect on simulation
 		return
 
 	elseif expr_type in [:stretch, :duration, :box, :output]
 		# Unsupported operations
 		error("Simulator doesn't support $expr_type operations")
 
-		# Variable declarations and control flow
+		################################################
+		# Variable declarations and control flow nodes #
+		################################################
 	elseif expr_type == :input
-		# Input parameter declaration
+		# Input parameter declaration for parameterized functions
 		var_name = Quasar.name(expr)
 		var_type = expr.args[1].args[1]
 		haskey(sim.inputs, var_name) || error("Missing input variable '$var_name'.")
@@ -252,15 +224,12 @@ function _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::Q
 		# Loop control statements
 		return
 
-		# For loop
 	elseif expr_type == :for
 		_handle_for_loop(sim, expr)
 
-		# Switch statement
 	elseif expr_type == :switch
 		_handle_switch_statement(sim, expr)
 
-		# Alias declaration
 	elseif expr_type == :alias
 		alias_name = Quasar.name(expr)
 		right_hand_side = expr.args[1].args[1].args[end]
@@ -460,70 +429,50 @@ function _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::Q
 		# Then check qubit_mapping
 		return evaluate_qubits(sim, expr)
 
-		# Conditional statement
 	elseif expr_type == :if
 		_handle_conditional(sim, expr)
 
-		# While loop
 	elseif expr_type == :while
 		_handle_while_loop(sim, expr)
 
-		# Classical variable assignment
 	elseif expr_type == :classical_assignment
 		_handle_classical_assignment(sim, expr)
 
-		# Classical variable declaration
 	elseif expr_type == :classical_declaration
 		_handle_classical_declaration(sim, expr)
 
-		# Constant declaration
 	elseif expr_type == :const_declaration
 		_handle_const_declaration(sim, expr)
 
-		# Qubit declaration
 	elseif expr_type == :qubit_declaration
 		_handle_qubit_declaration(sim, expr)
 
-		# Gate modifiers (power, inverse, control, negctrl)
 	elseif expr_type ∈ [:power_mod, :inverse_mod, :control_mod, :negctrl_mod]
 		_handle_gate_modifiers(sim, expr)
 
-		# Gate call
 	elseif expr_type == :gate_call
 		_handle_gate_call(sim, expr)
 
-		# Gate definition
 	elseif expr_type == :gate_definition
 		_handle_gate_definition(sim, expr)
 
-		# Measurement operation - key part that creates path branching
 	elseif expr_type == :measure
 		return _handle_measurement(sim, expr)
 
-		# Function call
 	elseif expr_type == :function_call
 		_handle_function_call(sim, expr)
 
-		# Function definition
 	elseif expr_type == :function_definition
 		_handle_function_definition(sim, expr)
 
-		# Pragma directive
-	elseif expr_type == :pragma
-		# For simplicity, ignore pragmas
-		return
-
-		# Literal values
 	elseif expr_type ∈ [:integer_literal, :float_literal, :string_literal, :complex_literal, :irrational_literal, :boolean_literal, :duration_literal]
 		# Return the literal value
 		return expr.args[1]
 
-		# Array literal
 	elseif expr_type == :array_literal
 		# Evaluate array elements
 		return [_evolve_branched_ast_operators(sim, element) for element in expr.args]
 
-		# Range expression
 	elseif expr_type == :range
 		# Evaluate range parameters
 		start = _evolve_branched_ast_operators(sim, expr.args[1])
@@ -531,7 +480,6 @@ function _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::Q
 		step = length(expr.args) > 2 ? _evolve_branched_ast_operators(sim, expr.args[3]) : 1
 		return collect(start:step:stop)
 
-		# Expression evaluation
 	elseif expr_type == :binary_op
 		# Binary operation
 		op = expr.args[1]
@@ -549,7 +497,6 @@ function _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::Q
 		# Evaluate using existing function
 		return evaluate_unary_op(op, arg)
 
-		# Type cast
 	elseif expr_type == :cast
 		casting_to = expr.args[1].args[1]
 		value = _evolve_branched_ast_operators(sim, expr.args[2])
@@ -581,12 +528,14 @@ end
 Handle a measurement operation, creating branches for different outcomes.
 Keeps the full state size and sets probabilities to 0 for states that don't match the measurement outcome.
 Returns a MeasurementValues object containing the measurement outcomes for each path.
+
+We assume that the qubit indices to measure is identical among all of the paths because
+of openqasm restrictions regarding scope.
 """
 function _handle_measurement(sim::BranchedSimulatorOperators, expr::QasmExpression)
 	# Get qubit indices to measure
 	qubit_indices = evaluate_qubits(sim, expr.args[1])
 
-	# Now measure all qubits for all paths
 	new_active_paths = Int[]
 
 	# Structure to store measurement outcomes for each path
@@ -596,11 +545,10 @@ function _handle_measurement(sim::BranchedSimulatorOperators, expr::QasmExpressi
 		# Everytime a measurement occurs, the resulting path indices are added to the following list
 		paths_to_measure = [path_idx]
 
-		# Initialize path_outcomes for the initial path
 		path_outcomes[path_idx] = Dict{String, Int}()
 
+		# For every active path, measure each qubit in the qubit indices
 		for qubit_idx in qubit_indices
-			# Get the qubit name from the mapping
 			qubit_name = ""
 			for (name, idx) in sim.qubit_mapping
 				if idx == qubit_idx
@@ -612,22 +560,15 @@ function _handle_measurement(sim::BranchedSimulatorOperators, expr::QasmExpressi
 			# This inner for loop iterates through all sub paths created by a given path undergoing a measurement
 			current_paths = copy(paths_to_measure)
 			for idx in current_paths
-				# Measure the qubit on this path
+				# Check if measurement caused a new path (both measurement outcome posible)
 				path_split = measure_qubit(sim, idx, qubit_idx, qubit_name)
 
-				# Get the measurement outcome for this path and qubit
 				outcome = sim.measurements[idx][qubit_name][end]
-
-				# Store the outcome in the path_outcomes dictionary
 				path_outcomes[idx][qubit_name] = outcome
 
-				# Create a measure operator with the result
-				measure_op = Measure(-1, outcome)
-
-				# Create an instruction with the measurement operator and target qubit
+				# Create and store a measure operator with the result
+				measure_op = Measure(outcome)
 				instruction = Instruction(measure_op, [qubit_idx])
-
-				# Add the instruction to the sequence for this path
 				push!(sim.instruction_sequences[idx], instruction)
 
 				if path_split
@@ -638,20 +579,13 @@ function _handle_measurement(sim::BranchedSimulatorOperators, expr::QasmExpressi
 					# Copy all previous outcomes to the new path
 					path_outcomes[added_idx] = copy(path_outcomes[idx])
 
-					# Get the measurement outcome for the new path and qubit
-					# For a path split, the new path has the opposite outcome of the original path
+					# Get and update the measurement outcome for the new path and qubit
 					new_outcome = 1 - outcome
-
-					# Update the outcome for this qubit in the new path
 					path_outcomes[added_idx][qubit_name] = new_outcome
 
-					# Create a measure operator with the result for the new path
-					new_measure_op = Measure(-1, new_outcome)
-
-					# Create an instruction with the measurement operator and target qubit
+					# Create and store a measure operator with the result for the new path
+					new_measure_op = Measure(new_outcome)
 					new_instruction = Instruction(new_measure_op, [qubit_idx])
-
-					# Add measurement projector operation to the instruction list
 					push!(sim.instruction_sequences[added_idx], new_instruction)
 				end
 			end
@@ -664,7 +598,6 @@ function _handle_measurement(sim::BranchedSimulatorOperators, expr::QasmExpressi
 	# Update active paths all at once
 	sim.active_paths = new_active_paths
 
-	# Return a MeasurementValues object with the measurement outcomes for each path
 	return MeasurementValues(path_outcomes)
 end
 
@@ -683,7 +616,6 @@ function _handle_conditional(sim::BranchedSimulatorOperators, expr::QasmExpressi
 	false_paths = Int[]
 
 	for path_idx in sim.active_paths
-		# Evaluate condition in this path's context
 		condition_value = _evaluate_condition(sim, path_idx, expr.args[1])
 
 		if condition_value
@@ -695,16 +627,13 @@ function _handle_conditional(sim::BranchedSimulatorOperators, expr::QasmExpressi
 
 	# Process if branch for true paths
 	if !isempty(true_paths)
-		# Save original active paths
 		original_active_paths = copy(sim.active_paths)
-
-		# Set active paths to only those where condition is true
 		sim.active_paths = true_paths
 
 		# Process if branch
 		for child_expr in expr.args[2:last_expr]
 			_evolve_branched_ast_operators(sim, child_expr)
-			isempty(sim.active_paths) && break  # No active paths left
+			isempty(sim.active_paths) && break
 		end
 
 		# Restore active paths that were not processed in if branch
@@ -713,16 +642,13 @@ function _handle_conditional(sim::BranchedSimulatorOperators, expr::QasmExpressi
 
 	# Process else branch for false paths
 	if !isnothing(has_else) && !isempty(false_paths)
-		# Save original active paths
 		original_active_paths = copy(sim.active_paths)
-
-		# Set active paths to only those where condition is false
 		sim.active_paths = false_paths
 
 		# Process else branch
 		for child_expr in expr.args[has_else].args
 			_evolve_branched_ast_operators(sim, child_expr)
-			isempty(sim.active_paths) && break  # No active paths left
+			isempty(sim.active_paths) && break
 		end
 
 		# Restore active paths that were not processed in else branch
@@ -740,16 +666,12 @@ function _evaluate_condition(sim::BranchedSimulatorOperators, path_idx::Int, con
 	# Save the current active paths
 	original_active_paths = copy(sim.active_paths)
 
-	# Set active paths to only the current path
 	sim.active_paths = [path_idx]
-
-	# Evaluate the condition expression using the AST processor
 	result = _evolve_branched_ast_operators(sim, condition_expr)
 
 	# Restore active paths
 	sim.active_paths = original_active_paths
 
-	# Convert to boolean
 	return result isa Bool ? result : result > 0
 end
 
@@ -759,6 +681,7 @@ end
 Handle a for loop in the branched simulation model.
 """
 function _handle_for_loop(sim::BranchedSimulatorOperators, expr::QasmExpression)
+	# TODO: Check for loop implementation
 	for_loop = convert(Vector{QasmExpression}, expr.args)
 	loop_variable_type = for_loop[1].args[1]
 	loop_variable_name = for_loop[2].args[1]::String
@@ -795,6 +718,7 @@ end
 Handle a switch statement in the branched simulation model.
 """
 function _handle_switch_statement(sim::BranchedSimulatorOperators, expr::QasmExpression)
+	# TODO: Check switch statement implementation
 	all_cases = convert(Vector{QasmExpression}, expr.args[2:end])
 	default_idx = findfirst(expr->head(expr) == :default, all_cases)
 
@@ -896,6 +820,7 @@ end
 Handle a while loop in the branched simulation model.
 """
 function _handle_while_loop(sim::BranchedSimulatorOperators, expr::QasmExpression)
+	# TODO: Check while loop implementation
 	loop_body = expr.args[2]
 
 	# Keep track of paths that should continue looping
@@ -945,6 +870,7 @@ end
 Handle a classical variable assignment in the branched simulation model.
 """
 function _handle_classical_assignment(sim::BranchedSimulatorOperators, expr::QasmExpression)
+	# TODO: Update this to include all classical variable types
 	op = expr.args[1].args[1]
 	lhs = expr.args[1].args[2]
 	rhs = expr.args[1].args[3]
@@ -970,12 +896,12 @@ function _handle_classical_assignment(sim::BranchedSimulatorOperators, expr::Qas
 					var = get(sim.variables[path_idx], var_name, nothing)
 
 					if !isnothing(var) && !isempty(outcomes)
-				# Sort outcomes by qubit name for consistent ordering
-				sorted_outcomes = sort(collect(outcomes))
+						# Sort outcomes by qubit name for consistent ordering
+						sorted_outcomes = sort(collect(outcomes))
 
-				# Extract bit values and reverse them to use little endian notation
-				# This matches the array access pattern which is little endian
-				bit_values = reverse([outcome for (_, outcome) in sorted_outcomes])
+						# Extract bit values and reverse them to use little endian notation
+						# This matches the array access pattern which is little endian
+						bit_values = reverse([outcome for (_, outcome) in sorted_outcomes])
 
 						# The register size should already be set during initialization
 						# We're just updating the boolean array with the measurement values
@@ -1055,6 +981,7 @@ end
 Handle a classical variable declaration in the branched simulation model.
 """
 function _handle_classical_declaration(sim::BranchedSimulatorOperators, expr::QasmExpression)
+	# TODO: Update this to include all classical variable types
 	# This is for a register/bit
 	if head(expr.args[2]) == :identifier
 		var_name = Quasar.name(expr.args[2])
@@ -1085,7 +1012,7 @@ function _handle_classical_declaration(sim::BranchedSimulatorOperators, expr::Qa
 				set_variable!(sim, path_idx, var_name, ClassicalVariable(var_name, var_type, nothing, false))
 			end
 		end
-	# This for all other classical variables
+		# This for all other classical variables
 	elseif head(expr.args[2]) == :classical_assignment
 		var_name = Quasar.name(expr.args[2].args[1].args[2])
 
@@ -1104,6 +1031,7 @@ end
 Handle a constant declaration in the branched simulation model.
 """
 function _handle_const_declaration(sim::BranchedSimulatorOperators, expr::QasmExpression)
+	# TODO: Update this to include all classical variable types
 	if head(expr.args[2]) == :classical_assignment
 		var_name = Quasar.name(expr.args[2].args[1].args[2])
 		var_type = expr.args[1].args[1]
@@ -1134,27 +1062,23 @@ Handle a qubit declaration in the branched simulation model.
 Maps qubit names to their indices in the state vector.
 """
 function _handle_qubit_declaration(sim::BranchedSimulatorOperators, expr::QasmExpression)
+	# TODO: Update this to include qubit declaration with -1 index (individual qubit)
 	qubit_name = Quasar.name(expr)
 	qubit_size = _evolve_branched_ast_operators(sim, expr.args[2])
-
-	# Calculate the current qubit count for the first active path
 	current_qubit_count = sim.n_qubits
 
 	# Map qubit indices
 	for i in 0:(qubit_size-1)
 		qubit_idx = current_qubit_count + i
 		indexed_name = "$qubit_name[$i]"
-
-		# Store the qubit index in the mapping
 		sim.qubit_mapping[indexed_name] = qubit_idx
 	end
 
 	# Store the base name as well if it's a single qubit
-	if qubit_size == 1
+	if qubit_size == -1
 		sim.qubit_mapping[qubit_name] = current_qubit_count
 	end
 
-	# Update qubit count
 	sim.n_qubits = current_qubit_count + qubit_size
 end
 
@@ -1164,6 +1088,7 @@ end
 Handle gate modifiers in the branched simulation model.
 """
 function _handle_gate_modifiers(sim::BranchedSimulatorOperators, expr::QasmExpression)
+	# TODO: Check this function
 	# Process gate modifiers
 	mods = QasmExpression(:modifiers)
 	mod_expr, inner = evaluate_modifiers(sim, expr)
@@ -1198,11 +1123,8 @@ function _handle_gate_call(sim::BranchedSimulatorOperators, expr::QasmExpression
 	# Extract target qubit indices
 	target_indices = []
 	if length(expr.args) > 2 && !isnothing(expr.args[3])
-		# Check if the argument is a :qubit_targets expression
 		if head(expr.args[3]) == :qubit_targets
-			# Extract the target qubits from the :qubit_targets expression
 			for target in expr.args[3].args
-				# Evaluate each target and add to the list
 				qubit_indices = evaluate_qubits(sim, target)
 				append!(target_indices, qubit_indices)
 			end
@@ -1215,13 +1137,8 @@ function _handle_gate_call(sim::BranchedSimulatorOperators, expr::QasmExpression
 	# Get gate operator
 	gate_op = nothing
 	if haskey(sim.gate_defs, gate_name)
-		# Get the gate definition
 		gate_def = sim.gate_defs[gate_name]
-
-		# Create a circuit instruction from the gate definition
 		instruction = gate_def.body
-
-		# Use StructTypes.constructfrom to create a gate operator
 		gate_op = StructTypes.constructfrom(QuantumOperator, instruction)
 	else
 		error("Gate $gate_name not defined!")
@@ -1229,7 +1146,6 @@ function _handle_gate_call(sim::BranchedSimulatorOperators, expr::QasmExpression
 
 	# Store gate instruction for each active path
 	for path_idx in sim.active_paths
-		# Create an instruction and add it to the sequence
 		instruction = Instruction(gate_op, target_indices)
 		push!(sim.instruction_sequences[path_idx], instruction)
 	end
@@ -1243,6 +1159,7 @@ end
 Handle a gate definition in the branched simulation model.
 """
 function _handle_gate_definition(sim::BranchedSimulatorOperators, expr::QasmExpression)
+	# TODO: Check this function implementation
 	# Register gate definition directly
 	gate_name = Quasar.name(expr)
 	gate_args = expr.args[2]
@@ -1263,6 +1180,7 @@ end
 Handle a function call in the branched simulation model.
 """
 function _handle_function_call(sim::BranchedSimulatorOperators, expr::QasmExpression)
+	# TODO: Check this function implementation
 	function_name = Quasar.name(expr)
 
 	# Check if it's a built-in function
@@ -1287,6 +1205,7 @@ end
 Handle a function definition in the branched simulation model.
 """
 function _handle_function_definition(sim::BranchedSimulatorOperators, expr::QasmExpression)
+	# TODO: Check this function implementation
 	# Register function definition directly
 	function_name = expr.args[1].args[1]
 	function_args = expr.args[2]
