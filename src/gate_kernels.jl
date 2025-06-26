@@ -482,7 +482,14 @@ apply_gate!(::Val{false}, g::I, state_vec::AbstractStateVector{T}, qubits::Int..
 apply_gate!(::Val{true}, g::I, state_vec::AbstractStateVector{T}, qubits::Int...) where {T<:Complex} =
     return
     
-# Apply the measurement gate to the state_vector as a projector into the measured subspace
+"""
+    apply_gate!(measure_op::Measure, state_vec::AbstractStateVector{T}, qubit::Int) 
+                            where {T<:Complex}
+
+Applies a measurement projector into the subspace defined by the measurement outcome
+and target stored in the measure_op. Specifically applies the operation on a statevector.
+"""    
+
 function apply_gate!(measure_op::Measure, state_vec::AbstractStateVector{T}, qubit::Int) where {T<:Complex}
     # If result is not set (default -1), just return without doing anything
     measure_op.result == -1 && return
@@ -511,6 +518,7 @@ function apply_gate!(measure_op::Measure, state_vec::AbstractStateVector{T}, qub
     
     return
 end
+
 apply_gate!(::Reset, state_vec, args...) = return
 apply_gate!(::Barrier, state_vec, args...) = return
 apply_gate!(::Delay, state_vec, args...) = return
