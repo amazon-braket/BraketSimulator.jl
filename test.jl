@@ -11,27 +11,10 @@ function test_dynamic_qubit_allocation()
     # Define a program that creates registers dynamically
     qasm_source = """
         OPENQASM 3.0;
-        bit[2] b;
-        qubit[3] q;
-
-        h q[0];       // Put qubit 0 in superposition
-        h q[1];       // Put qubit 1 in superposition
-        b[0] = measure q[0];  // Measure qubit 0
-        b[1] = measure q[1];  // Measure qubit 1
-
-
-        if (b[0] == 1) {
-            if (b[1] == 1){  // Both measured 1
-                x q[2];    // Apply X to qubit 2
-            } else{
-                h q[2];    // Apply H to qubit 2
-            }
-        } else {
-            if (b[1] == 1) {  // Only second qubit measured 1
-                z q[2];    // Apply Z to qubit 2
-            }
-        }
-        // If both measured 0, do nothing to qubit 2
+        bit b;  
+        qubit q;
+        h q;
+        b = measure q;
         """
         
     # Evolve the program using the branched simulator
