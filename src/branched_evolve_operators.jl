@@ -715,7 +715,8 @@ end
 """
 	_handle_switch_statement(sim::BranchedSimulatorOperators, expr::QasmExpression)
 
-Handle a switch statement in the branched simulation model.
+Handle a switch statement in the branched simulation model. For more information, visit
+https://openqasm.com/language/classical.html#the-switch-statement
 """
 function _handle_switch_statement(sim::BranchedSimulatorOperators, expr::QasmExpression)
 	# TODO: Check switch statement implementation
@@ -802,7 +803,8 @@ function _handle_switch_statement(sim::BranchedSimulatorOperators, expr::QasmExp
 		# Add surviving paths to the collection
 		append!(surviving_paths, sim.active_paths)
 	elseif !isempty(default_paths) && isnothing(default_idx)
-		error("No case matched for some paths and no default defined.")
+		# Just do a no operation, and add the default paths onto the active paths
+		append!(surviving_paths, default_paths)
 	end
 
 	# Update active paths to include all paths that survived their respective cases
@@ -875,104 +877,113 @@ function _handle_classical_assignment(sim::BranchedSimulatorOperators, expr::Qas
 	lhs = expr.args[1].args[2]
 	rhs = expr.args[1].args[3]
 
-	# Evaluate the right-hand side first
-	# This will handle any measurements or complex expressions
-	rhs_value = _evolve_branched_ast_operators(sim, rhs)
-
 	var_name = Quasar.name(lhs)
 
-	# Check if the right-hand side is a measurement result
-	is_measurement = rhs_value isa MeasurementValues
+	new_active_paths = []
 
-	# This is for assigning to a bit register
-	if head(lhs) == :identifier
-		if is_measurement
-			# For each active path, assign the corresponding measurement outcomes to the bit register
-			for path_idx in sim.active_paths
-				if haskey(rhs_value.path_outcomes, path_idx)
-					outcomes = rhs_value.path_outcomes[path_idx]
+	# Iterate through each active path
+	for path_idx in copy(sim.active_paths)
+		# Set this path as the only active one temporarily for evaluation
+		sim.active_paths = [path_idx]
 
-					# Get the existing variable
-					var = get(sim.variables[path_idx], var_name, nothing)
+		# Evaluate the right-hand side for this specific path
+		# This will handle any measurements or complex expressions
+		rhs_value = _evolve_branched_ast_operators(sim, rhs)
 
-					if !isnothing(var) && !isempty(outcomes)
-						# Sort outcomes by qubit name for consistent ordering
-						sorted_outcomes = sort(collect(outcomes))
+		# Check if the right-hand side is a measurement result
+		is_measurement = rhs_value isa MeasurementValues
 
-						# Extract bit values and reverse them to use little endian notation
-						# This matches the array access pattern which is little endian
-						bit_values = reverse([outcome for (_, outcome) in sorted_outcomes])
+		# Get all paths that were created during RHS evaluation
+		current_paths = copy(sim.active_paths)
 
-						# The register size should already be set during initialization
-						# We're just updating the boolean array with the measurement values
-						bit_array = var.val
-						if bit_array isa Vector{Int} && length(bit_array) == length(bit_values)
-							# Update the boolean array directly
-							var.val = bit_values
-						else
-							error("Assignment must be to a register of the right size")
+		# Process each path (original and any new ones created during RHS evaluation)
+		for current_path_idx in current_paths
+			# This is for assigning to a bit register or any classical variable
+			if head(lhs) == :identifier
+				if is_measurement
+					# Process measurement outcomes for this path
+					if haskey(rhs_value.path_outcomes, current_path_idx)
+						outcomes = rhs_value.path_outcomes[current_path_idx]
+
+						# Get the existing variable
+						var = get(sim.variables[current_path_idx], var_name, nothing)
+
+						if !isnothing(var) && !isempty(outcomes)
+							# Sort outcomes by qubit name for consistent ordering
+							sorted_outcomes = sort(collect(outcomes))
+
+							# Extract bit values and reverse them to use little endian notation
+							# This matches the array access pattern which is little endian
+							bit_values = reverse([outcome for (_, outcome) in sorted_outcomes])
+
+							# The register size should already be set during initialization
+							# We're just updating the boolean array with the measurement values
+							bit_array = var.val
+							if bit_array isa Vector{Int} && length(bit_array) == length(bit_values)
+								# Update the boolean array directly
+								var.val = bit_values
+							else
+								error("Assignment must be to a register of the right size")
+							end
 						end
 					end
+				else
+					# Standard variable assignment
+					# Get the existing variable
+					var = get(sim.variables[current_path_idx], var_name, nothing)
+
+					if !isnothing(var)
+						# Update the existing variable's value, preserving its type
+						var.val = rhs_value
+					end
 				end
-			end
-		else
-			# Standard variable assignment
-			for path_idx in sim.active_paths
-				# Get the existing variable
-				var = get(sim.variables[path_idx], var_name, nothing)
+			# This is for assigning to a specific bit in a register
+			elseif head(lhs) == :indexed_identifier
+				# Handle indexed assignment
+				index = _evolve_branched_ast_operators(sim, lhs.args[2])  # Get the 0-based index
 
-				if !isnothing(var)
-					# Update the existing variable's value, preserving its type
-					var.val = rhs_value
-				end
-			end
-		end
-		# This is for assigning to a specific bit in a register
-	elseif head(lhs) == :indexed_identifier
-		# Handle indexed assignment
-		index = _evolve_branched_ast_operators(sim, lhs.args[2])  # Get the 0-based index
+				if is_measurement
+					# Process measurement for this path
+					if haskey(rhs_value.path_outcomes, current_path_idx)
+						outcomes = rhs_value.path_outcomes[current_path_idx]
 
-		if is_measurement
-			# For each active path, update the bit at the specified index
-			for path_idx in sim.active_paths
-				if haskey(rhs_value.path_outcomes, path_idx)
-					outcomes = rhs_value.path_outcomes[path_idx]
+						# Get the existing register variable
+						register_var = get(sim.variables[current_path_idx], var_name, nothing)
 
-					# Get the existing register variable
-					register_var = get(sim.variables[path_idx], var_name, nothing)
+						if !isnothing(register_var) && !isempty(outcomes)
+							# Use the first measurement outcome for the specified index
+							_, outcome = first(outcomes)
 
-					if !isnothing(register_var) && !isempty(outcomes)
-						# Use the first measurement outcome for the specified index
-						_, outcome = first(outcomes)
+							# Update the bit directly in the boolean array
+							bit_array = register_var.val
+							if bit_array isa Vector{Int} && index + 1 <= length(bit_array)
+								# Convert to 1-based indexing for Julia arrays
+								julia_index = index + 1
+								bit_array[julia_index] = outcome
+							end
+						end
+					end
+				else
+					# Standard indexed assignment
+					# Update the bit directly in the boolean array
+					# Get the register variable
+					register_var = get(sim.variables[current_path_idx], var_name, nothing)
 
-						# Update the bit directly in the boolean array
+					if !isnothing(register_var)
 						bit_array = register_var.val
 						if bit_array isa Vector{Int} && index + 1 <= length(bit_array)
 							# Convert to 1-based indexing for Julia arrays
 							julia_index = index + 1
-							bit_array[julia_index] = outcome
+							bit_array[julia_index] = rhs_value
 						end
 					end
 				end
 			end
-		else
-			# Standard indexed assignment
-			# For each active path, update the bit directly in the boolean array
-			for path_idx in sim.active_paths
-				# Get the register variable
-				register_var = get(sim.variables[path_idx], var_name, nothing)
-
-				if !isnothing(register_var)
-					bit_array = register_var.val
-					if bit_array isa Vector{Int} && index + 1 <= length(bit_array)
-						# Convert to 1-based indexing for Julia arrays
-						julia_index = index + 1
-						bit_array[julia_index] = rhs_value
-					end
-				end
-			end
 		end
+		# Add all the active paths generated in the new_active_paths variable
+		append!(new_active_paths, sim.active_paths)
 	end
+	sim.active_paths = copy(new_active_paths)
 end
 
 """
@@ -1015,10 +1026,11 @@ function _handle_classical_declaration(sim::BranchedSimulatorOperators, expr::Qa
 		# This for all other classical variables
 	elseif head(expr.args[2]) == :classical_assignment
 		var_name = Quasar.name(expr.args[2].args[1].args[2])
+		var_type = expr.args[1].args[1]
 
 		# Initialize variable for each active path and then handle the assignment
 		for path_idx in sim.active_paths
-			set_variable!(sim, path_idx, var_name, ClassicalVariable(var_name, nothing, nothing, false))
+			set_variable!(sim, path_idx, var_name, ClassicalVariable(var_name, var_type, nothing, false))
 		end
 
 		_handle_classical_assignment(sim, expr.args[2])

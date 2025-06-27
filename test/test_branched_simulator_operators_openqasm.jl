@@ -433,10 +433,10 @@ using BraketSimulator
 			@test !isnothing(path_11)
 
 			# Verify the count variable for each path
-			@test BraketSimulator.get_variable(branched_sim, path_00, "count") == 0
-			@test BraketSimulator.get_variable(branched_sim, path_01, "count") == 1
-			@test BraketSimulator.get_variable(branched_sim, path_10, "count") == 1
-			@test BraketSimulator.get_variable(branched_sim, path_11, "count") == 2
+			@test BraketSimulator.get_variable(branched_sim, path_00, "count").val == 0
+			@test BraketSimulator.get_variable(branched_sim, path_01, "count").val == 1
+			@test BraketSimulator.get_variable(branched_sim, path_10, "count").val == 1
+			@test BraketSimulator.get_variable(branched_sim, path_11, "count").val == 2
 
 			# Calculate the final states for all paths
 			state_00 = BraketSimulator.calculate_current_state(branched_sim, path_00)
@@ -449,12 +449,12 @@ using BraketSimulator
 			@test abs(state_00[1]) ≈ 1.0 atol=1e-10
 
 			# Path 01: count=1, H operation, should be (|0⟩ + |1⟩)/√2
-			@test abs(state_01[1]) ≈ 1/sqrt(2) atol=1e-10
-			@test abs(state_01[5]) ≈ 1/sqrt(2) atol=1e-10
+			@test abs(state_01[3]) ≈ 1/sqrt(2) atol=1e-10
+			@test abs(state_01[4]) ≈ 1/sqrt(2) atol=1e-10
 
 			# Path 10: count=1, H operation, should be (|0⟩ + |1⟩)/√2
-			@test abs(state_10[1]) ≈ 1/sqrt(2) atol=1e-10
 			@test abs(state_10[5]) ≈ 1/sqrt(2) atol=1e-10
+			@test abs(state_10[6]) ≈ 1/sqrt(2) atol=1e-10
 
 			# Path 11: count=2, X operation, should be |1⟩
 			@test abs(state_11[8]) ≈ 1.0 atol=1e-10
@@ -533,25 +533,25 @@ using BraketSimulator
 
 			# Verify the counts array for each path
 			# Path 00: counts = [0, 0, 0]
-			counts_00 = BraketSimulator.get_variable(branched_sim, path_00, "counts")
+			counts_00 = BraketSimulator.get_variable(branched_sim, path_00, "counts").val
 			@test counts_00[1] == 0
 			@test counts_00[2] == 0
 			@test counts_00[3] == 0
 
 			# Path 01: counts = [0, 1, 1]
-			counts_01 = BraketSimulator.get_variable(branched_sim, path_01, "counts")
+			counts_01 = BraketSimulator.get_variable(branched_sim, path_01, "counts").val
 			@test counts_01[1] == 0
 			@test counts_01[2] == 1
 			@test counts_01[3] == 1
 
 			# Path 10: counts = [1, 0, 1]
-			counts_10 = BraketSimulator.get_variable(branched_sim, path_10, "counts")
+			counts_10 = BraketSimulator.get_variable(branched_sim, path_10, "counts").val
 			@test counts_10[1] == 1
 			@test counts_10[2] == 0
 			@test counts_10[3] == 1
 
 			# Path 11: counts = [1, 1, 2]
-			counts_11 = BraketSimulator.get_variable(branched_sim, path_11, "counts")
+			counts_11 = BraketSimulator.get_variable(branched_sim, path_11, "counts").val
 			@test counts_11[1] == 1
 			@test counts_11[2] == 1
 			@test counts_11[3] == 2
@@ -651,15 +651,15 @@ using BraketSimulator
 			# Verify the casted values
 			for path_idx in branched_sim.active_paths
 				# Check truncated_float
-				truncated_float = BraketSimulator.get_variable(branched_sim, path_idx, "truncated_float")
+				truncated_float = BraketSimulator.get_variable(branched_sim, path_idx, "truncated_float").val
 				@test truncated_float == 2
 
 				# Check float_from_int
-				float_from_int = BraketSimulator.get_variable(branched_sim, path_idx, "float_from_int")
+				float_from_int = BraketSimulator.get_variable(branched_sim, path_idx, "float_from_int").val
 				@test float_from_int ≈ 3.0 atol=1e-10
 
 				# Check int_from_bits
-				int_from_bits = BraketSimulator.get_variable(branched_sim, path_idx, "int_from_bits")
+				int_from_bits = BraketSimulator.get_variable(branched_sim, path_idx, "int_from_bits").val
 				@test int_from_bits == 3
 			end
 
@@ -713,9 +713,9 @@ using BraketSimulator
 			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Verify classical variable computations
-			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "z") == 13
-			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "w") ≈ 1.25
-			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "bit_ops") == 13
+			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "z").val == 13
+			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "w").val ≈ 1.25
+			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "bit_ops").val == 13
 		end
 	end
 
@@ -760,7 +760,7 @@ using BraketSimulator
 			paths_by_count = Dict{Int, Vector{Int}}()
 
 			for path_idx in branched_sim.active_paths
-				count = BraketSimulator.get_variable(branched_sim, path_idx, "count")
+				count = BraketSimulator.get_variable(branched_sim, path_idx, "count").val
 				if !haskey(paths_by_count, count)
 					paths_by_count[count] = Int[]
 				end
@@ -775,7 +775,7 @@ using BraketSimulator
 			# For paths with count < 3, b should be 1 and qubit 1 should be in state |1⟩
 			for count in [1, 2]
 				for path_idx in paths_by_count[count]
-					b = BraketSimulator.get_variable(branched_sim, path_idx, "b")
+					b = BraketSimulator.get_variable(branched_sim, path_idx, "b").val
 					@test b == 1
 
 					# Calculate the final state for this path
@@ -788,7 +788,7 @@ using BraketSimulator
 
 			# For paths with count = 3, check each path individually
 			for path_idx in paths_by_count[3]
-				b = BraketSimulator.get_variable(branched_sim, path_idx, "b")
+				b = BraketSimulator.get_variable(branched_sim, path_idx, "b").val
 
 				# Calculate the final state for this path
 				state = BraketSimulator.calculate_current_state(branched_sim, path_idx)
@@ -861,7 +861,7 @@ using BraketSimulator
 			paths_by_sum = Dict{Int, Vector{Int}}()
 
 			for path_idx in branched_sim.active_paths
-				sum_val = BraketSimulator.get_variable(branched_sim, path_idx, "sum")
+				sum_val = BraketSimulator.get_variable(branched_sim, path_idx, "sum").val
 				if !haskey(paths_by_sum, sum_val)
 					paths_by_sum[sum_val] = Int[]
 				end
@@ -1149,7 +1149,7 @@ using BraketSimulator
 
 			# Verify different angle values in different paths
 			for path_idx in branched_sim.active_paths
-				angle = BraketSimulator.get_variable(branched_sim, path_idx, "angle")
+				angle = BraketSimulator.get_variable(branched_sim, path_idx, "angle").val
 				b0 = branched_sim.measurements[path_idx]["q[0]"][1]
 				if b0 == 1
 					@test angle ≈ pi/2 atol=1e-10
