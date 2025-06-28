@@ -160,7 +160,6 @@ parse function.
 """
 function _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::QasmExpression)
 	expr_type = head(expr)
-
 	######################################
 	# Organizational/Unimplemented nodes #
 	######################################
@@ -416,8 +415,8 @@ function _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::Q
 					# Access the bit directly from the boolean array
 					return var.val[julia_index]
 				end
-			elseif var.type isa Vector
-				# For other vector types
+			elseif var.type <: Quasar.SizedArray
+				# For other array types
 				# Convert to 1-based indexing for Julia arrays
 				flat_ix = (index isa Vector) ? index : [index]
 				flat_ix = flat_ix .+ 1
@@ -1020,13 +1019,13 @@ function _handle_classical_declaration(sim::BranchedSimulatorOperators, expr::Qa
 		else
 			# Initialize variable for each active path
 			for path_idx in sim.active_paths
-				set_variable!(sim, path_idx, var_name, ClassicalVariable(var_name, var_type, nothing, false))
+				set_variable!(sim, path_idx, var_name, ClassicalVariable(var_name, typeof(var_type), nothing, false))
 			end
 		end
 		# This for all other classical variables
 	elseif head(expr.args[2]) == :classical_assignment
 		var_name = Quasar.name(expr.args[2].args[1].args[2])
-		var_type = expr.args[1].args[1]
+		var_type = typeof(expr.args[1].args[1])
 
 		# Initialize variable for each active path and then handle the assignment
 		for path_idx in sim.active_paths

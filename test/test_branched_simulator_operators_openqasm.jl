@@ -468,7 +468,7 @@ using BraketSimulator
 			bit[2] b;
 
 			// Float data type
-			float[64] angle = 0.5;
+			float[64] rotate = 0.5;
 
 			// Array data type
 			array[int[32], 3] counts = {0, 0, 0};
@@ -493,7 +493,7 @@ using BraketSimulator
 			// Use float value to control rotation
 			if (counts[2] > 0) {
 				// Apply rotation based on angle
-				u3(angle * pi, 0.0, 0.0) q[0];
+				U(rotate * pi, 0.0, 0.0) q[0];
 			}
 			"""
 
@@ -692,10 +692,10 @@ using BraketSimulator
 			float[64] y = 2.5;
 
 			// Arithmetic operations
-			int[32] z = x * 2 + 3;
 			float[64] w = y / 2.0;
 
 			// Bitwise operations
+			int[32] z = x * 2 + 3;
 			int[32] bit_ops = (x << 1) | 3;
 
 			h q[0];
@@ -715,7 +715,7 @@ using BraketSimulator
 			# Verify classical variable computations
 			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "z").val == 13
 			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "w").val ≈ 1.25
-			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "bit_ops").val == 13
+			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "bit_ops").val == 11
 		end
 	end
 
