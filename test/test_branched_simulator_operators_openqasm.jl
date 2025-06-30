@@ -1262,7 +1262,7 @@ using BraketSimulator
 
 			// Inverse QFT
 			for uint i in [2:-1:0] {
-				for uint j in [i-1:-1:0] {
+				for uint j in [(i-1):-1:0] {
 					ctrl @ gphase(-pi/float(2^(i-j))) q[j], q[i];
 				}
 				h q[i];
@@ -1383,7 +1383,7 @@ using BraketSimulator
 			"""
 			
 			qft_sim = StateVectorSimulator(3, 1)
-			qft_sim = BraketSimulator.evolve!(qft_sim, BraketSimulator.new_to_circuit(qft_source))
+			qft_sim = BraketSimulator.evolve!(qft_sim, BraketSimulator.to_circuit(qft_source).instructions)
 			expected_state = BraketSimulator.state_vector(qft_sim)
 			
 			# Now evolve the original circuit with measurements

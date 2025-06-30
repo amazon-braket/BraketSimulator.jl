@@ -160,6 +160,7 @@ parse function.
 """
 function _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::QasmExpression)
 	expr_type = head(expr)
+	println(expr)
 	######################################
 	# Organizational/Unimplemented nodes #
 	######################################
@@ -513,10 +514,21 @@ function _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::Q
 		# Handle basic type conversions
 		if casting_to == Bool
 			return value > 0
-		elseif casting_to == Int
+		elseif casting_to isa Quasar.SizedInt
+			if typeof(value) <: AbstractFloat
+				return floor(value)
+			elseif value isa Vector
+				return parse(Int, join(value), base=2)
+			end
 			return Int(value)
-		elseif casting_to == Float64
+		elseif casting_to isa Quasar.SizedFloat
 			return Float64(value)
+		elseif casting_to isa Quasar.SizedBitVector
+			if typeof(value) <: AbstractFloat
+				error("Unsupported conversion")
+			elseif typeof(value) <: Int
+				return digits(value, base=2)
+			end
 		else
 			error("Unsupported cast type: $casting_to")
 		end
