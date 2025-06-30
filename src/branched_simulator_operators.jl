@@ -53,6 +53,9 @@ mutable struct BranchedSimulatorOperators <: AbstractSimulator
 	# Maps gate names to GateDefinition objects
 	gate_defs::Dict{String, AbstractGateDefinition}
 
+	# Maps OpenQASM gate names to Julia gate types
+	gate_name_mapping::Dict{String, Symbol}
+
 	# Input parameters for the circuit
 	inputs::Dict{String, Any}
 
@@ -70,7 +73,31 @@ mutable struct BranchedSimulatorOperators <: AbstractSimulator
 		# Initialize with built-in gates
 		if @isdefined(builtin_gates)
 			gate_defs = builtin_gates()
+			gate_defs["gphase"] = gate_defs["phaseshift"]
 		end
+
+		# Create gate name mapping
+		gate_name_mapping = Dict{String, Symbol}(
+			# Standard gates with first letter capitalized
+			"x" => :X, "y" => :Y, "z" => :Z, "h" => :H,
+			"s" => :S, "si" => :Si, "t" => :T, "ti" => :Ti,
+			"v" => :V, "vi" => :Vi, "i" => :I,
+			"rx" => :Rx, "ry" => :Ry, "rz" => :Rz,
+			"cnot" => :CNot, "cy" => :CY, "cz" => :CZ, "cv" => :CV,
+			"swap" => :Swap, "iswap" => :ISwap, "pswap" => :PSwap,
+			"cswap" => :CSwap, "ccnot" => :CCNot,
+			"xx" => :XX, "xy" => :XY, "yy" => :YY, "zz" => :ZZ,
+			"ecr" => :ECR, "ms" => :MS,
+			"gpi" => :GPi, "gpi2" => :GPi2, "prx" => :PRx,
+			"U" => :U,
+			# Special cases
+			"phaseshift" => :PhaseShift,
+			"cphaseshift" => :CPhaseShift,
+			"cphaseshift00" => :CPhaseShift00,
+			"cphaseshift01" => :CPhaseShift01,
+			"cphaseshift10" => :CPhaseShift10,
+			"gphase" => :PhaseShift
+		)
 
 		# Initialize with empty instruction sequence
 		instructions = Vector{Instruction}()
@@ -86,6 +113,7 @@ mutable struct BranchedSimulatorOperators <: AbstractSimulator
 			[simulator.shots],
 			function_defs,
 			gate_defs,
+			gate_name_mapping,
 			inputs,
 		)
 	end

@@ -1165,9 +1165,39 @@ function _handle_gate_call(sim::BranchedSimulatorOperators, expr::QasmExpression
 	# Get gate operator
 	gate_op = nothing
 	if haskey(sim.gate_defs, gate_name)
-		gate_def = sim.gate_defs[gate_name]
-		instruction = gate_def.body
-		gate_op = StructTypes.constructfrom(QuantumOperator, instruction)
+		# Check if the gate is parametric
+		if !isempty(params)
+			params = params[1]
+			# Check if it's a built-in gate (in the mapping) or a user-defined gate
+			if haskey(sim.gate_name_mapping, gate_name)
+				# Built-in gate - use the mapping to get the gate type
+				gate_type = getfield(BraketSimulator, sim.gate_name_mapping[gate_name])
+				try
+					# Try with tuple
+					gate_op = gate_type(tuple(params...))
+				catch e1
+					try
+						# Try with splat
+						gate_op = gate_type(params...)
+					catch e2
+						# If both fail, fall back to the original method
+						gate_def = sim.gate_defs[gate_name]
+						instruction = gate_def.body
+						gate_op = StructTypes.constructfrom(QuantumOperator, instruction)
+					end
+				end
+			else
+				# User-defined gate - use the original method
+				gate_def = sim.gate_defs[gate_name]
+				instruction = gate_def.body
+				gate_op = StructTypes.constructfrom(QuantumOperator, instruction)
+			end
+		else
+			# Use the original method for gates without parameters
+			gate_def = sim.gate_defs[gate_name]
+			instruction = gate_def.body
+			gate_op = StructTypes.constructfrom(QuantumOperator, instruction)
+		end
 	else
 		error("Gate $gate_name not defined!")
 	end

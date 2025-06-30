@@ -1256,14 +1256,14 @@ using BraketSimulator
 			}
 
 			// Controlled phase rotations
-			ctrl @ phase(pi/2) q[0], q[3];
-			ctrl @ phase(pi/4) q[1], q[3];
-			ctrl @ phase(pi/8) q[2], q[3];
+			ctrl @ gphase(pi/2) q[0], q[3];
+			ctrl @ gphase(pi/4) q[1], q[3];
+			ctrl @ gphase(pi/8) q[2], q[3];
 
 			// Inverse QFT
 			for uint i in [2:-1:0] {
 				for uint j in [i-1:-1:0] {
-					ctrl @ phase(-pi/float(2^(i-j))) q[j], q[i];
+					ctrl @ gphase(-pi/float(2^(i-j))) q[j], q[i];
 				}
 				h q[i];
 			}
@@ -1313,7 +1313,7 @@ using BraketSimulator
 
 			# Verify different angle values in different paths
 			for path_idx in branched_sim.active_paths
-				angle = BraketSimulator.get_variable(branched_sim, path_idx, "angle").val
+				angle = BraketSimulator.get_variable(branched_sim, path_idx, "ang").val
 				b0 = branched_sim.measurements[path_idx]["q[0]"][1]
 				if b0 == 1
 					@test angle ≈ pi/2 atol=1e-10
@@ -1335,12 +1335,12 @@ using BraketSimulator
 			// Apply QFT
 			// Qubit 0
 			h q[0];
-			ctrl @ phase(pi/2) q[1], q[0];
-			ctrl @ phase(pi/4) q[2], q[0];
+			ctrl @ gphase(pi/2) q[1], q[0];
+			ctrl @ gphase(pi/4) q[2], q[0];
 			
 			// Qubit 1
 			h q[1];
-			ctrl @ phase(pi/2) q[2], q[1];
+			ctrl @ gphase(pi/2) q[2], q[1];
 			
 			// Qubit 2
 			h q[2];
@@ -1368,12 +1368,12 @@ using BraketSimulator
 			// Apply QFT
 			// Qubit 0
 			h q[0];
-			ctrl @ phase(pi/2) q[1], q[0];
-			ctrl @ phase(pi/4) q[2], q[0];
+			ctrl @ gphase(pi/2) q[1], q[0];
+			ctrl @ gphase(pi/4) q[2], q[0];
 			
 			// Qubit 1
 			h q[1];
-			ctrl @ phase(pi/2) q[2], q[1];
+			ctrl @ gphase(pi/2) q[2], q[1];
 			
 			// Qubit 2
 			h q[2];
@@ -1430,7 +1430,7 @@ using BraketSimulator
 			bit[2] b;
 
 			// Define custom gate
-			def custom_gate(qubit q) {
+			gate custom_gate(qubit q) {
 				h q;
 				t q;
 				h q;
@@ -1464,7 +1464,7 @@ using BraketSimulator
 			qubit[1] q;
 			
 			// Define custom gate
-			def custom_gate(qubit q) {
+			gate custom_gate(qubit q) {
 				h q;
 				t q;
 				h q;
