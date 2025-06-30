@@ -718,7 +718,6 @@ Handle a switch statement in the branched simulation model. For more information
 https://openqasm.com/language/classical.html#the-switch-statement
 """
 function _handle_switch_statement(sim::BranchedSimulatorOperators, expr::QasmExpression)
-	# TODO: Check switch statement implementation
 	all_cases = convert(Vector{QasmExpression}, expr.args[2:end])
 	default_idx = findfirst(expr->head(expr) == :default, all_cases)
 
@@ -916,11 +915,14 @@ function _handle_classical_assignment(sim::BranchedSimulatorOperators, expr::Qas
 							bit_values = reverse([outcome for (_, outcome) in sorted_outcomes])
 
 							# The register size should already be set during initialization
-							# We're just updating the boolean array with the measurement values
+							# We're just updating the array with the measurement values
 							bit_array = var.val
 							if bit_array isa Vector{Int} && length(bit_array) == length(bit_values)
-								# Update the boolean array directly
+								# Update the  array directly
 								var.val = bit_values
+							elseif bit_array isa Int && length(bit_values) == 1
+								# For when you are just assigning qubit to a bit, not a register
+								var.val = bit_values[1]
 							else
 								error("Assignment must be to a register of the right size")
 							end

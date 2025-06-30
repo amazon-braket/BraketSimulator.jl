@@ -8,14 +8,26 @@ function test_dynamic_qubit_allocation()
     # The 2 initial qubits is irrelevant as the branched simulator assigns qubits dynamically
     simulator = StateVectorSimulator(2, 100)
     
-    # Define a program that creates registers dynamically
     qasm_source = """
-        OPENQASM 3.0;
-        bit b;  
-        qubit q;
-        h q;
-        b = measure q;
-        """
+			OPENQASM 3.0;
+			bit b;
+			qubit[2] q;
+			int[32] count = 0;
+
+			// Initialize qubit 0 to |0⟩
+			// Keep measuring and flipping until we get a 1
+			b = 0;
+			while (b == 0 && count < 3) {
+				h q[0];       // Put qubit 0 in superposition
+				b = measure q[0];  // Measure qubit 0
+				count = count + 1;
+			}
+
+			// Apply X to qubit 1 if we got a 1 within 3 attempts
+			if (b == 1) {
+				x q[1];
+			}
+			"""
         
     # Evolve the program using the branched simulator
     branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())

@@ -114,12 +114,16 @@ function measure_qubit(sim::BranchedSimulatorOperators, path_idx::Int, qubit_idx
 	current_state = calculate_current_state(sim, path_idx)
 	probs = get_measurement_probabilities(current_state, qubit_idx)
 
+	path_shots = sim.shots[path_idx]
+	shots_for_outcome_1 = round(Int, path_shots * probs[2])
+	shots_for_outcome_0 = path_shots - shots_for_outcome_1
+
 	# We branch only if there is a non zero probability of measuring both outcomes
-	if probs[1] > 0 && probs[2] > 0
-		handle_branching_measurement!(sim, path_idx, qubit_name, probs)
+	if shots_for_outcome_1 > 0 && shots_for_outcome_0 > 0
+		handle_branching_measurement!(sim, path_idx, qubit_name, shots_for_outcome_0, shots_for_outcome_1)
 		return true
 	else
-		handle_deterministic_measurement!(sim, path_idx, qubit_name, probs)
+		handle_deterministic_measurement!(sim, path_idx, qubit_name, shots_for_outcome_0 > 0 ? 0 : 1)
 		return false
 	end
 end
@@ -146,12 +150,8 @@ end
 Handle the case where measurement can result in multiple outcomes, creating a new branch.
 Keep the full state size and set probabilities to 0 for the states that don't match the measurement outcome.
 """
-function handle_branching_measurement!(sim::BranchedSimulatorOperators, path_idx::Int, qubit_name::String, probs::Vector{Float64})
+function handle_branching_measurement!(sim::BranchedSimulatorOperators, path_idx::Int, qubit_name::String, shots_for_outcome_0::Int, shots_for_outcome_1::Int)
 
-	# Calculate shots for each path based on probabilities
-	path_shots = sim.shots[path_idx]
-	shots_for_outcome_1 = round(Int, path_shots * probs[2])
-	shots_for_outcome_0 = path_shots - shots_for_outcome_1
 	sim.shots[path_idx] = shots_for_outcome_0
 
 	# Create new path for outcome 1
@@ -184,10 +184,7 @@ end
 Handle the case where measurement has only one possible outcome. No need for branching or anything, just store
 the value of the classical variables.
 """
-function handle_deterministic_measurement!(sim::BranchedSimulatorOperators, path_idx::Int, qubit_name::String, probs::Vector{Float64})
-	# Determine the only possible outcome
-	outcome = probs[2] > 0.5 ? 1 : 0
-
+function handle_deterministic_measurement!(sim::BranchedSimulatorOperators, path_idx::Int, qubit_name::String, outcome::Int)
 	# Store the measurement outcome
 	store_measurement_outcome!(sim, path_idx, qubit_name, outcome)
 end
