@@ -177,6 +177,11 @@ function _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::Q
 		for child_expr in expr.args
 			child_head = head(child_expr)
 			if child_head in (:end, :continue, :break)
+				if child_head == :break
+					# For break statements, clear all active paths to stop the simulation
+					# from continuing through the loop
+					empty!(sim.active_paths)
+				end
 				return
 			end
 			_evolve_branched_ast_operators(sim, child_expr)
@@ -221,6 +226,11 @@ function _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::Q
 
 	elseif expr_type ∈ (:continue, :break)
 		# Loop control statements
+		if expr_type == :break
+			# For break statements, clear all active paths to stop the simulation
+			# from continuing through the loop
+			empty!(sim.active_paths)
+		end
 		return
 
 	elseif expr_type == :for
@@ -475,8 +485,8 @@ function _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::Q
 	elseif expr_type == :range
 		# Evaluate range parameters
 		start = _evolve_branched_ast_operators(sim, expr.args[1])
-		stop = _evolve_branched_ast_operators(sim, expr.args[2])
-		step = length(expr.args) > 2 ? _evolve_branched_ast_operators(sim, expr.args[3]) : 1
+		step = length(expr.args) > 2 ? _evolve_branched_ast_operators(sim, expr.args[2]) : 1
+		stop = length(expr.args) > 2 ? _evolve_branched_ast_operators(sim, expr.args[3]) : _evolve_branched_ast_operators(sim, expr.args[2])
 		return collect(start:step:stop)
 
 	elseif expr_type == :binary_op
@@ -610,6 +620,8 @@ function _handle_conditional(sim::BranchedSimulatorOperators, expr::QasmExpressi
 	has_else = findfirst(e->head(e) == :else, convert(Vector{QasmExpression}, expr.args))
 	last_expr = !isnothing(has_else) ? length(expr.args) - 1 : length(expr.args)
 
+	new_paths = []
+
 	# Evaluate condition for each active path
 	true_paths = Int[]
 	false_paths = Int[]
@@ -626,7 +638,7 @@ function _handle_conditional(sim::BranchedSimulatorOperators, expr::QasmExpressi
 
 	# Process if branch for true paths
 	if !isempty(true_paths)
-		original_active_paths = copy(sim.active_paths)
+		# original_active_paths = copy(sim.active_paths)
 		sim.active_paths = true_paths
 
 		# Process if branch
@@ -635,8 +647,9 @@ function _handle_conditional(sim::BranchedSimulatorOperators, expr::QasmExpressi
 			isempty(sim.active_paths) && break
 		end
 
-		# Restore active paths that were not processed in if branch
-		append!(sim.active_paths, setdiff(original_active_paths, true_paths))
+		# Restore active paths
+		# append!(sim.active_paths, setdiff(original_active_paths, true_paths))
+		append!(new_paths, sim.active_paths)
 	end
 
 	# Process else branch for false paths
@@ -650,9 +663,12 @@ function _handle_conditional(sim::BranchedSimulatorOperators, expr::QasmExpressi
 			isempty(sim.active_paths) && break
 		end
 
-		# Restore active paths that were not processed in else branch
-		append!(sim.active_paths, setdiff(original_active_paths, false_paths))
+		# Restore active paths
+		append!(new_paths, setdiff(sim.active_paths, new_paths))
+	else
+		append!(new_paths, false_paths) # Restore active paths if there is no else
 	end
+	sim.active_paths = new_paths
 end
 
 """
@@ -689,6 +705,9 @@ function _handle_for_loop(sim::BranchedSimulatorOperators, expr::QasmExpression)
 	loop_variable_values = _evolve_branched_ast_operators(sim, for_loop[3])
 	loop_body = for_loop[4]::QasmExpression
 
+	# Calculate paths not to add
+	paths_not_to_add = setdiff(range(1, length(sim.instruction_sequences)), sim.active_paths)
+
 	# For each value in the range
 	for loop_value in loop_variable_values
 		# Set the variable for each active path
@@ -702,6 +721,8 @@ function _handle_for_loop(sim::BranchedSimulatorOperators, expr::QasmExpression)
 		# If no active paths left, break early
 		isempty(sim.active_paths) && break
 	end
+
+	sim.active_paths = setdiff(range(1, length(sim.instruction_sequences)), paths_not_to_add)
 
 	# Clean up from all paths
 	for path_idx in sim.active_paths
@@ -820,16 +841,15 @@ end
 Handle a while loop in the branched simulation model.
 """
 function _handle_while_loop(sim::BranchedSimulatorOperators, expr::QasmExpression)
-	# TODO: Check while loop implementation
 	loop_body = expr.args[2]
+
+	# Calculate paths not to add
+	paths_not_to_add = setdiff(range(1, length(sim.instruction_sequences)), sim.active_paths)
 
 	# Keep track of paths that should continue looping
 	continue_paths = copy(sim.active_paths)
 
 	while !isempty(continue_paths)
-		# Save original active paths
-		original_active_paths = copy(sim.active_paths)
-
 		# Set active paths to only those that should continue looping
 		sim.active_paths = continue_paths
 
@@ -850,18 +870,13 @@ function _handle_while_loop(sim::BranchedSimulatorOperators, expr::QasmExpressio
 		# If no paths should continue, break
 		isempty(new_continue_paths) && break
 
-		# Set active paths to only those that should continue
 		sim.active_paths = new_continue_paths
-
-		# Process loop body
 		_evolve_branched_ast_operators(sim, loop_body)
-
-		# Update continue_paths for next iteration
 		continue_paths = copy(sim.active_paths)
-
-		# Restore paths that didn't enter the loop
-		append!(sim.active_paths, setdiff(original_active_paths, new_continue_paths))
 	end
+
+	# Restore paths that didn't enter the loop
+	sim.active_paths = setdiff(range(1, length(sim.instruction_sequences)), paths_not_to_add)
 end
 
 """
@@ -938,7 +953,7 @@ function _handle_classical_assignment(sim::BranchedSimulatorOperators, expr::Qas
 						var.val = rhs_value
 					end
 				end
-			# This is for assigning to a specific bit in a register
+				# This is for assigning to a specific bit in a register
 			elseif head(lhs) == :indexed_identifier
 				# Handle indexed assignment
 				index = _evolve_branched_ast_operators(sim, lhs.args[2])  # Get the 0-based index

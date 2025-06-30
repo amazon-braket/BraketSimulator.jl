@@ -159,8 +159,11 @@ function handle_branching_measurement!(sim::BranchedSimulatorOperators, path_idx
 	new_path_idx = length(sim.instruction_sequences) + 1
 	push!(sim.shots, shots_for_outcome_1)
 
-	# Copy measurements and operations for the new path
-	new_measurements = copy(sim.measurements[path_idx])
+	# Deep copy measurements to avoid aliasing between paths
+	new_measurements = Dict{String, Vector{Int}}()
+	for (qubit_name, outcomes) in sim.measurements[path_idx]
+		new_measurements[qubit_name] = copy(outcomes)
+	end
 	push!(sim.measurements, new_measurements)
 	new_operations = copy(sim.instruction_sequences[path_idx])
 	push!(sim.instruction_sequences, new_operations)
