@@ -1,4 +1,3 @@
-
 """
 StateVectorSimulator{T, S<:AbstractVector{T}} <: AbstractSimulator
 
@@ -154,6 +153,13 @@ end
 state_vector(svs::StateVectorSimulator) = copy(svs.state_vector)
 density_matrix(svs::StateVectorSimulator) =
     kron(svs.state_vector, adjoint(svs.state_vector))
+
+"""
+    get_state(svs::StateVectorSimulator)
+
+Get the state vector from the simulator.
+"""
+get_state(svs::StateVectorSimulator) = svs.state_vector
 
 function apply_observable!(
     gate::G,
@@ -333,6 +339,12 @@ Returns [P(0), P(1)] for the given qubit.
 """
 function get_measurement_probabilities(state::AbstractVector{<:Complex}, qubit::Int)
     n_qubits = Int(log2(length(state)))
+    
+    # Check if qubit index is valid
+    if qubit < 0 || qubit >= n_qubits
+        error("Invalid qubit index: $qubit. Must be between 0 and $(n_qubits-1)")
+    end
+    
     endian_qubit = n_qubits - qubit - 1
     
     # Calculate probabilities for 0 and 1 outcomes

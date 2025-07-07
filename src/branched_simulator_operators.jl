@@ -38,8 +38,8 @@ mutable struct BranchedSimulatorOperators <: AbstractSimulator
 	variables::Vector{Dict{String, ClassicalVariable}}
 
 	# Maps qubit names to their indices in the state vector
-	# Maps path_idx => Dict(qubit_name => qubit_index)
-	qubit_mapping::Dict{String, Int}
+	# Maps qubit_name => qubit_index or qubit_name => Vector{Int} for registers
+	qubit_mapping::Dict{String, Union{Int, Vector{Int}}}
 
 	# Total number of defined qubits present
 	n_qubits::Int
@@ -108,7 +108,7 @@ mutable struct BranchedSimulatorOperators <: AbstractSimulator
 			[1],
 			[Dict{String, Vector{Int}}()],  # Initialize measurements with qubit names as keys
 			[Dict{String, ClassicalVariable}()],
-			Dict{String, Int}(),          # Initialize qubit mapping with qubit names as keys
+			Dict{String, Union{Int, Vector{Int}}}(),  # Initialize qubit mapping with qubit names as keys
 			0,
 			[simulator.shots],
 			function_defs,
@@ -262,14 +262,42 @@ function calculate_current_state(sim::BranchedSimulatorOperators, path_idx::Int)
 
 	# Set the qubit count to match the current path
 	n_qubits = sim.n_qubits
+	
+	# Make sure n_qubits is at least 1
+	if n_qubits <= 0
+		n_qubits = 1
+	end
 
-	# Initialize the simulator with the right number of qubits
-	reinit!(base_sim, n_qubits, 0)
+	# Initialize the simulator with the right number of qubits and shots
+	reinit!(base_sim, n_qubits, sim.shots[path_idx])
 
 	# Apply all instructions using the evolve! function
 	# TODO: Add parallelization here
 	evolve!(base_sim, sim.instruction_sequences[path_idx])
 
+	# Debug: Print the final state
+	final_state = get_state(base_sim)
+
 	# Return the resulting state
-	return get_state(base_sim)
+	return final_state
+end
+
+"""
+	calculate_current_state(sim::BranchedSimulatorOperators) -> Dict{Int, Any}
+
+Calculate the current state for all active paths by applying 
+all stored instructions to fresh initial states using the evolve! function.
+Returns a dictionary mapping path indices to their respective states.
+"""
+function calculate_current_state(sim::BranchedSimulatorOperators)
+	# Create a dictionary to store results for each path
+	results = Dict{Int, Any}()
+	
+	# Calculate state for each active path
+	for path_idx in sim.active_paths
+		path_state = calculate_current_state(sim, path_idx)
+		results[path_idx] = path_state
+	end
+	
+	return results
 end
