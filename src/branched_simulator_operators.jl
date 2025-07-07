@@ -1,6 +1,40 @@
 using Quasar: ClassicalVariable, FunctionDefinition, AbstractGateDefinition
 
 """
+    FramedVariable
+
+A variable type that includes a frame_number field to track the scope frame where the variable was declared.
+Similar to ClassicalVariable but with frame tracking.
+"""
+mutable struct FramedVariable
+    # Variable name
+    name::String
+    
+    # Variable type
+    type::Any
+    
+    # Variable value
+    val::Any
+    
+    # Whether the variable is constant
+    is_const::Bool
+    
+    # The frame number where this variable was declared
+    # 0 for global scope, 1 for first function call frame, etc.
+    frame_number::Int
+    
+    # Constructor
+    function FramedVariable(name::String, type::Any, val::Any, is_const::Bool, frame_number::Int)
+        new(name, type, val, is_const, frame_number)
+    end
+    
+    # Constructor from ClassicalVariable
+    function FramedVariable(var::ClassicalVariable, frame_number::Int)
+        new(var.name, var.type, var.val, var.is_const, frame_number)
+    end
+end
+
+"""
 	BranchedSimulatorOperators
 
 A simulator that supports multiple execution paths resulting from mid circuit measurements.
@@ -34,8 +68,12 @@ mutable struct BranchedSimulatorOperators <: AbstractSimulator
 	# Maps path_idx => Dict(qubit_name => measurement_outcomes)
 	measurements::Vector{Dict{String, Vector{Int}}}
 
+	# To denote the current frame that the simulation is working in
+	# For the global frame, we will let the frame value be 0.
+	curr_frame::Int
+
 	# Classical variable values for each path
-	variables::Vector{Dict{String, ClassicalVariable}}
+	variables::Vector{Dict{String, FramedVariable}}
 
 	# Maps qubit names to their indices in the state vector
 	# Maps qubit_name => qubit_index or qubit_name => Vector{Int} for registers
@@ -107,7 +145,8 @@ mutable struct BranchedSimulatorOperators <: AbstractSimulator
 			[instructions],
 			[1],
 			[Dict{String, Vector{Int}}()],  # Initialize measurements with qubit names as keys
-			[Dict{String, ClassicalVariable}()],
+			0,                              # Start with global frame (0)
+			[Dict{String, FramedVariable}()], # Initialize variables with framed variables
 			Dict{String, Union{Int, Vector{Int}}}(),  # Initialize qubit mapping with qubit names as keys
 			0,
 			[simulator.shots],
@@ -196,11 +235,11 @@ function handle_branching_measurement!(sim::BranchedSimulatorOperators, path_idx
 	new_operations = copy(sim.instruction_sequences[path_idx])
 	push!(sim.instruction_sequences, new_operations)
 
-	# Deep copy the classical variables to avoid aliasing between paths
-	new_variables = Dict{String, ClassicalVariable}()
+	# Deep copy the framed variables to avoid aliasing between paths
+	new_variables = Dict{String, FramedVariable}()
 	for (var_name, var) in sim.variables[path_idx]
 		new_val = var.val isa Vector ? copy(var.val) : var.val
-		new_variables[var_name] = ClassicalVariable(var.name, var.type, new_val, var.is_const)
+		new_variables[var_name] = FramedVariable(var.name, var.type, new_val, var.is_const, var.frame_number)
 	end
 	push!(sim.variables, new_variables)
 
@@ -237,7 +276,17 @@ end
 Set a classical variable value for a specific path.
 """
 function set_variable!(sim::BranchedSimulatorOperators, path_idx::Int, var_name::String, value::ClassicalVariable)
-	sim.variables[path_idx][var_name] = value
+	# Convert ClassicalVariable to FramedVariable with current frame number
+	sim.variables[path_idx][var_name] = FramedVariable(value, sim.curr_frame)
+end
+
+"""
+	set_variable!(sim::BranchedSimulatorOperators, path_idx::Int, var_name::String, type, val, is_const)
+
+Set a variable value for a specific path with individual components.
+"""
+function set_variable!(sim::BranchedSimulatorOperators, path_idx::Int, var_name::String, type::Any, val::Any, is_const::Bool)
+	sim.variables[path_idx][var_name] = FramedVariable(var_name, type, val, is_const, sim.curr_frame)
 end
 
 """

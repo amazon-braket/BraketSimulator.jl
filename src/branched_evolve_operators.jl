@@ -399,7 +399,7 @@ function _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::Q
 		haskey(sim.inputs, var_name) || error("Missing input variable '$var_name'.")
 		for path_idx in sim.active_paths
 			var = ClassicalVariable(var_name, var_type, sim.inputs[var_name], true)
-			sim.variables[path_idx][var_name] = var
+			set_variable!(sim, path_idx, var_name, var)
 		end
 
 	elseif expr_type ∈ (:continue, :break)
@@ -453,20 +453,14 @@ function _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::Q
 				end
 
 				# Concatenate the qubit indices
-				left_qs = left_qs_by_path[path_idx]
-				right_qs = right_qs_by_path[path_idx]
+				left_qs = sort(left_qs_by_path[path_idx])
+				right_qs = sort(right_qs_by_path[path_idx])
 				alias_qubits = vcat(left_qs, right_qs)
 
 				# Store the alias in variables
-				sim.variables[path_idx][alias_name] = ClassicalVariable(alias_name, :qubit_alias, alias_qubits, false)
-				
-				# Also store in qubit_mapping for direct access during gate application
-				if length(alias_qubits) == 1
-					sim.qubit_mapping[alias_name] = alias_qubits[1]
-				else
-					sim.qubit_mapping[alias_name] = alias_qubits
-				end
+				set_variable!(sim, path_idx, alias_name, ClassicalVariable(alias_name, :qubit_alias, alias_qubits, false))
 			end
+
 		elseif head(right_hand_side) == :identifier
 			referent_name = Quasar.name(right_hand_side)
 
@@ -488,14 +482,7 @@ function _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::Q
 				alias_qubits = qubits_by_path[path_idx]
 				
 				# Store the alias in variables
-				sim.variables[path_idx][alias_name] = ClassicalVariable(alias_name, :qubit_alias, alias_qubits, false)
-				
-				# Also store in qubit_mapping for direct access during gate application
-				if length(alias_qubits) == 1
-					sim.qubit_mapping[alias_name] = alias_qubits[1]
-				else
-					sim.qubit_mapping[alias_name] = alias_qubits
-				end
+				set_variable!(sim, path_idx, alias_name, ClassicalVariable(alias_name, :qubit_alias, alias_qubits, false))
 			end
 		elseif head(right_hand_side) == :indexed_identifier
 			referent_name = Quasar.name(right_hand_side)
@@ -513,14 +500,7 @@ function _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::Q
 				alias_qubits = qubits_by_path[path_idx]
 				
 				# Store the alias in variables
-				sim.variables[path_idx][alias_name] = ClassicalVariable(alias_name, :qubit_alias, alias_qubits, false)
-				
-				# Also store in qubit_mapping for direct access during gate application
-				if length(alias_qubits) == 1
-					sim.qubit_mapping[alias_name] = alias_qubits[1]
-				else
-					sim.qubit_mapping[alias_name] = alias_qubits
-				end
+				set_variable!(sim, path_idx, alias_name, ClassicalVariable(alias_name, :qubit_alias, alias_qubits, false))
 			end
 		elseif head(right_hand_side) == :hw_qubit
 			# Trying to alias a physical qubit
@@ -546,12 +526,14 @@ function _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::Q
 			# First check path-specific variables
 			var = get_variable(sim, path_idx, id_name)
 
-			# This is because we store the value of singular bits as a bit register with one bit
-			if var.type == Quasar.SizedBitVector && length(var.val) == 1
-				results[path_idx] = var.val[1]
-			elseif !isnothing(var.val)
-				results[path_idx] = var.val
-				# Then check qubit_mapping
+			if !isnothing(var)
+				# This is because we store the value of singular bits as a bit register with one bit
+				if var.type == Quasar.SizedBitVector && length(var.val) == 1
+					results[path_idx] = var.val[1]
+				elseif !isnothing(var.val)
+					results[path_idx] = var.val
+				end
+			# Then check qubit_mapping
 			elseif haskey(sim.qubit_mapping, id_name)
 				results[path_idx] = sim.qubit_mapping[id_name]
 			else
@@ -592,7 +574,7 @@ function _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::Q
 						# Access the bit directly from the boolean array
 						results[path_idx] = var.val[julia_index]
 					end
-				elseif var.type <: Quasar.SizedArray
+				elseif !isnothing(var.type) && var.type <: Quasar.SizedArray
 					# For other array types
 					# Convert to 1-based indexing for Julia arrays
 					flat_ix = (index isa Vector) ? index : [index]
@@ -603,8 +585,14 @@ function _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::Q
 			else
 				# Then check qubit_mapping
 				# Temporarily set this path as the only active one for qubit evaluation
+				original_active_paths = copy(sim.active_paths)
 				sim.active_paths = [path_idx]
-				results[path_idx] = evaluate_qubits(sim, expr)[path_idx] # since evaluate_qubits returns a dictionary of arrays
+				path_results = evaluate_qubits(sim, expr)
+				sim.active_paths = original_active_paths
+				
+				if haskey(path_results, path_idx)
+					results[path_idx] = path_results[path_idx]
+				end
 			end
 		end
 
@@ -869,9 +857,47 @@ function _handle_measurement(sim::BranchedSimulatorOperators, expr::QasmExpressi
 end
 
 """
+	_deep_copy_variables(variables::Dict{String, FramedVariable})
+
+Make a deep copy of a variables dictionary to avoid aliasing issues with mutable objects.
+"""
+function _deep_copy_variables(variables::Dict{String, FramedVariable})
+	result = Dict{String, FramedVariable}()
+	for (name, var) in variables
+		# Make a deep copy of the value if it's a collection
+		val_copy = var.val isa AbstractArray ? copy(var.val) : var.val
+		result[name] = FramedVariable(var.name, var.type, val_copy, var.is_const, var.frame_number)
+	end
+	return result
+end
+
+"""
+	_create_block_scope(sim::BranchedSimulatorOperators)
+
+Helper function to create a new scope for block statements (for loops, if/else, while loops).
+Unlike function and gate scopes, block scopes inherit all variables from the containing scope.
+Returns a dictionary mapping path indices to their original variable dictionaries.
+Increments the current frame number to indicate entering a new scope.
+"""
+function _create_block_scope(sim::BranchedSimulatorOperators)
+	original_variables = Dict{Int, Dict{String, FramedVariable}}()
+
+	# Increment the current frame as we're entering a new scope
+	sim.curr_frame += 1
+	
+	# Save current variables state for all active paths (dont deep copy to include aliasing)
+	for path_idx in sim.active_paths
+		original_variables[path_idx] = copy(sim.variables[path_idx])
+	end
+
+	return original_variables
+end
+
+"""
 	_handle_for_loop(sim::BranchedSimulatorOperators, expr::QasmExpression)
 
 Handle a for loop in the branched simulation model.
+Creates a new scope for the loop body and properly handles variable scoping.
 """
 function _handle_for_loop(sim::BranchedSimulatorOperators, expr::QasmExpression)
 	for_loop = convert(Vector{QasmExpression}, expr.args)
@@ -885,13 +911,16 @@ function _handle_for_loop(sim::BranchedSimulatorOperators, expr::QasmExpression)
 	# Calculate paths not to add
 	paths_not_to_add = setdiff(range(1, length(sim.instruction_sequences)), sim.active_paths)
 
+	# Create a new scope for the loop
+	original_variables = _create_block_scope(sim)
+
 	# For each value in the range
 	for (path_idx, loop_variable_vals) in loop_variable_values_dict
 		# Set active paths to only those that have this loop value
 		sim.active_paths = [path_idx]
 
 		for loop_value in loop_variable_vals
-			# Set the variable for each active path
+			# Set the loop variable for each active path
 			for path_idx in sim.active_paths
 				set_variable!(sim, path_idx, loop_variable_name, ClassicalVariable(loop_variable_name, loop_variable_type, loop_value, false))
 			end
@@ -904,19 +933,17 @@ function _handle_for_loop(sim::BranchedSimulatorOperators, expr::QasmExpression)
 		end
 	end
 
+	# Restore active paths
 	sim.active_paths = setdiff(range(1, length(sim.instruction_sequences)), paths_not_to_add)
 
-	# Clean up from all paths
-	for path_idx in sim.active_paths
-		if haskey(sim.variables[path_idx], loop_variable_name)
-			delete!(sim.variables[path_idx], loop_variable_name)
-		end
-	end
+	# Restore original scope
+	_restore_original_scope(sim, original_variables)
 end
 
 """
 	_handle_conditional(sim::BranchedSimulatorOperators, expr::QasmExpression)
 Handle a conditional statement, filtering paths based on the condition.
+Creates a new scope for both the if and else branches.
 """
 function _handle_conditional(sim::BranchedSimulatorOperators, expr::QasmExpression)
 	# Find if there's an else branch
@@ -931,7 +958,6 @@ function _handle_conditional(sim::BranchedSimulatorOperators, expr::QasmExpressi
 
 	condition_values = _evaluate_condition(sim, expr.args[1])
 
-
 	for (path_idx, condition_value) in condition_values
 		if condition_value || condition_value > 0
 			push!(true_paths, path_idx)
@@ -942,36 +968,47 @@ function _handle_conditional(sim::BranchedSimulatorOperators, expr::QasmExpressi
 
 	# Process if branch for true paths
 	if !isempty(true_paths)
-		# original_active_paths = copy(sim.active_paths)
 		sim.active_paths = true_paths
+		
+		# Create a new scope for the if branch
+		original_variables = _create_block_scope(sim)
 
 		# Process if branch
 		for child_expr in expr.args[2:last_expr]
 			_evolve_branched_ast_operators(sim, child_expr)
 			isempty(sim.active_paths) && break
 		end
+		
+		# Restore original scope
+		_restore_original_scope(sim, original_variables)
 
-		# Restore active paths
-		# append!(sim.active_paths, setdiff(original_active_paths, true_paths))
+		# Add surviving paths to new_paths
 		append!(new_paths, sim.active_paths)
 	end
 
 	# Process else branch for false paths
 	if !isnothing(has_else) && !isempty(false_paths)
-		original_active_paths = copy(sim.active_paths)
 		sim.active_paths = false_paths
+		
+		# Create a new scope for the else branch
+		original_variables = _create_block_scope(sim)
 
 		# Process else branch
 		for child_expr in expr.args[has_else].args
 			_evolve_branched_ast_operators(sim, child_expr)
 			isempty(sim.active_paths) && break
 		end
+		
+		# Restore original scope
+		_restore_original_scope(sim, original_variables)
 
-		# Restore active paths
-		append!(new_paths, setdiff(sim.active_paths, new_paths))
+		# Add surviving paths to new_paths
+		append!(new_paths, sim.active_paths)
 	else
-		append!(new_paths, false_paths) # Restore active paths if there is no else
+		append!(new_paths, false_paths) # Add false paths directly if no else branch
 	end
+	
+	# Update active paths
 	sim.active_paths = new_paths
 end
 
@@ -1107,12 +1144,16 @@ end
 	_handle_while_loop(sim::BranchedSimulatorOperators, expr::QasmExpression)
 
 Handle a while loop in the branched simulation model.
+Creates a new scope for the loop body and properly handles variable scoping.
 """
 function _handle_while_loop(sim::BranchedSimulatorOperators, expr::QasmExpression)
 	loop_body = expr.args[2]
 
 	# Calculate paths not to add
 	paths_not_to_add = setdiff(range(1, length(sim.instruction_sequences)), sim.active_paths)
+
+	# Create a new scope for the entire while loop
+	original_variables = _create_block_scope(sim)
 
 	# Keep track of paths that should continue looping
 	continue_paths = copy(sim.active_paths)
@@ -1138,17 +1179,22 @@ function _handle_while_loop(sim::BranchedSimulatorOperators, expr::QasmExpressio
 			end
 		end
 
-
 		# If no paths should continue, break
 		isempty(new_continue_paths) && break
 
+		# Execute the loop body
 		sim.active_paths = new_continue_paths
 		_evolve_branched_ast_operators(sim, loop_body)
+		
+		# Update continue_paths for next iteration
 		continue_paths = copy(sim.active_paths)
 	end
 
 	# Restore paths that didn't enter the loop
 	sim.active_paths = setdiff(range(1, length(sim.instruction_sequences)), paths_not_to_add)
+	
+	# Restore original scope
+	_restore_original_scope(sim, original_variables)
 end
 
 """
@@ -1166,7 +1212,8 @@ function _handle_classical_assignment(sim::BranchedSimulatorOperators, expr::Qas
 
 	new_active_paths = []
 
-	# Evaluate the right-hand side for all active paths
+	# Evaluate the LHS and RHS for all active paths
+	lhs_value = _evolve_branched_ast_operators(sim, lhs)
 	rhs_value = _evolve_branched_ast_operators(sim, rhs)
 
 	# Check if the right-hand side is a measurement result
@@ -1175,11 +1222,11 @@ function _handle_classical_assignment(sim::BranchedSimulatorOperators, expr::Qas
 	# Get all paths that were created during RHS evaluation
 	current_paths = copy(sim.active_paths)
 
-	# Process each path
-
 	# This is for assigning to a bit register or any classical variable
 	if head(lhs) == :identifier
 		for current_path_idx in current_paths
+			lhs_val = haskey(lhs_value, current_path_idx) ? lhs_value[current_path_idx] : nothing # Default to nothing because if no value then we are declaring the variable
+
 			if is_measurement
 				# Process measurement outcomes for this path
 				if haskey(rhs_value.path_outcomes, current_path_idx)
@@ -1214,9 +1261,10 @@ function _handle_classical_assignment(sim::BranchedSimulatorOperators, expr::Qas
 				# Standard variable assignment
 				# Get the existing variable
 				var = get(sim.variables[current_path_idx], var_name, nothing)
+				new_val = evaluate_binary_op(op, lhs_val, rhs_value[current_path_idx])
 
 				if !isnothing(var)
-					var.val = rhs_value[current_path_idx]
+					var.val = new_val
 				else
 					error("Variable doesn't exist")
 				end
@@ -1229,6 +1277,8 @@ function _handle_classical_assignment(sim::BranchedSimulatorOperators, expr::Qas
 		index_value = _evolve_branched_ast_operators(sim, lhs.args[2])
 
 		for current_path_idx in current_paths
+			lhs_val = haskey(lhs_value, current_path_idx) ? lhs_value[current_path_idx] : nothing # Default to nothing because if no value then we are declaring the variable
+
 			index = get(index_value, current_path_idx, 0)
 
 			if is_measurement
@@ -1248,7 +1298,7 @@ function _handle_classical_assignment(sim::BranchedSimulatorOperators, expr::Qas
 						if bit_array isa Vector && index + 1 <= length(bit_array)
 							# Convert to 1-based indexing for Julia arrays
 							julia_index = index + 1
-							bit_array[julia_index] = outcome
+							bit_array[julia_index] = evaluate_binary_op(op, lhs_val, outcome)
 						end
 					end
 				end
@@ -1256,13 +1306,14 @@ function _handle_classical_assignment(sim::BranchedSimulatorOperators, expr::Qas
 				# Standard indexed assignment
 				# Get the register variable
 				register_var = get(sim.variables[current_path_idx], var_name, nothing)
+				new_val = evaluate_binary_op(op, lhs_val, rhs_value[current_path_idx])
 
 				if !isnothing(register_var)
 					bit_array = register_var.val
 					if bit_array isa Vector && index + 1 <= length(bit_array)
 						# Convert to 1-based indexing for Julia arrays
 						julia_index = index + 1
-						bit_array[julia_index] = rhs_value[current_path_idx]
+						bit_array[julia_index] = new_val
 					end
 				end
 			end
@@ -1458,58 +1509,61 @@ function _handle_gate_call(sim::BranchedSimulatorOperators, expr::QasmExpression
 
 		# Get gate operator
 		if haskey(sim.gate_defs, gate_name)
-			# Check if the gate is parametric
-			if !isempty(evaluated_params)
-				# Extract parameters for this path
-				path_params = evaluated_params[path_idx]
+				# Check if the gate is parametric
+				if !isempty(evaluated_params)
+					# Extract parameters for this path
+					path_params = evaluated_params[path_idx]
 
-				# Check if it's a built-in gate (in the mapping) or a user-defined gate
-				if haskey(sim.gate_name_mapping, gate_name)
-					# Built-in gate - use the mapping to get the gate type
-					gate_type = getfield(BraketSimulator, sim.gate_name_mapping[gate_name])
+					# Check if it's a built-in gate (in the mapping) or a user-defined gate
+					if haskey(sim.gate_name_mapping, gate_name)
+						# Built-in gate - use the mapping to get the gate type
+						gate_type = getfield(BraketSimulator, sim.gate_name_mapping[gate_name])
 
-					# Create gate operator
-					gate_op = nothing
-					try
-						# Try with tuple
-						gate_op = gate_type(tuple(path_params...))
-					catch e
-						# If that fails, fall back to the original method
+						# Create gate operator
+						gate_op = nothing
+						try
+							# Try with tuple
+							gate_op = gate_type(tuple(path_params...))
+						catch e
+							# If that fails, fall back to the original method
+							gate_def = sim.gate_defs[gate_name]
+							instruction = gate_def.body
+							gate_op = StructTypes.constructfrom(QuantumOperator, instruction)
+						end
+						
+						# Store gate instruction for this path
+						instruction = Instruction(gate_op, target_indices)
+						push!(sim.instruction_sequences[path_idx], instruction)
+					else
+						# Gate is parametric and user defined, so create a gate scope and execute the body
 						gate_def = sim.gate_defs[gate_name]
-						instruction = gate_def.body
-						gate_op = StructTypes.constructfrom(QuantumOperator, instruction)
-					end
-					
-					# Store gate instruction for this path
-					instruction = Instruction(gate_op, target_indices)
-					push!(sim.instruction_sequences[path_idx], instruction)
-				else
-					# Gate is parametric and user defined, so create a gate scope and execute the body
-					gate_def = sim.gate_defs[gate_name]
 
-					# Save original active paths
-					original_active_paths = copy(sim.active_paths)
+						# Save original active paths
+						original_active_paths = copy(sim.active_paths)
 
-					# Set active paths to just this path
-					sim.active_paths = [path_idx]
+						# Set active paths to just this path
+						sim.active_paths = [path_idx]
 
-					# Create a new scope with only const variables
-					original_variables = _create_const_only_scope(sim)
+						# Create a new scope with only const variables
+						original_variables = _create_const_only_scope(sim)
 
-					# Bind parameters to the gate scope
-					if !isempty(path_params) && !isempty(gate_def.arguments)
-						for (i, param_name) in enumerate(gate_def.arguments)
-							if i <= length(path_params)
-								sim.variables[path_idx][param_name] = ClassicalVariable(param_name, Any, path_params[i], false)
+						# Bind parameters to the gate scope
+						if !isempty(path_params) && !isempty(gate_def.arguments)
+							for (i, param_name) in enumerate(gate_def.arguments)
+								if i <= length(path_params)
+									# Store parameters with their actual type, not just Any
+									param_value = path_params[i]
+									param_type = typeof(param_value)
+									set_variable!(sim, path_idx, param_name, ClassicalVariable(param_name, param_type, param_value, false))
+								end
 							end
 						end
-					end
 
 					# Bind qubit targets to the gate scope
 					if !isempty(target_indices) && !isempty(gate_def.qubit_targets)
 						for (i, target_name) in enumerate(gate_def.qubit_targets)
 							if i <= length(target_indices)
-								sim.variables[path_idx][target_name] = ClassicalVariable(target_name, :qubit_declaration, target_indices[i], false)
+								set_variable!(sim, path_idx, target_name, ClassicalVariable(target_name, :qubit_declaration, target_indices[i], false))
 							end
 						end
 					end
@@ -1546,7 +1600,7 @@ function _handle_gate_call(sim::BranchedSimulatorOperators, expr::QasmExpression
 					if !isempty(target_indices) && !isempty(gate_def.qubit_targets)
 						for (i, target_name) in enumerate(gate_def.qubit_targets)
 							if i <= length(target_indices)
-								sim.variables[path_idx][target_name] = ClassicalVariable(target_name, :qubit_declaration, target_indices[i], false)
+								set_variable!(sim, path_idx, target_name, ClassicalVariable(target_name, :qubit_declaration, target_indices[i], false))
 							end
 						end
 					end
@@ -1640,16 +1694,23 @@ end
 
 Helper function to create a new scope that only includes const variables from the current scope.
 Returns a dictionary mapping path indices to their original variable dictionaries.
+Increments the current frame number to indicate entering a new scope.
 """
 function _create_const_only_scope(sim::BranchedSimulatorOperators)
-	original_variables = Dict{Int, Dict{String, ClassicalVariable}}()
+	original_variables = Dict{Int, Dict{String, FramedVariable}}()
+
+	# Increment the current frame as we're entering a new scope
+	sim.curr_frame += 1
+	
+	# Current frame that variables in this scope will be assigned to
+	current_frame = sim.curr_frame
 
 	# Save current variables state and create new scopes with only const variables
 	for path_idx in sim.active_paths
 		original_variables[path_idx] = copy(sim.variables[path_idx])
 
 		# Create a new variable scope
-		new_scope = Dict{String, ClassicalVariable}()
+		new_scope = Dict{String, FramedVariable}()
 
 		# Copy only const variables to the new scope
 		for (var_name, var) in sim.variables[path_idx]
@@ -1666,44 +1727,93 @@ function _create_const_only_scope(sim::BranchedSimulatorOperators)
 end
 
 """
-	_restore_original_scope(sim::BranchedSimulatorOperators, original_variables::Dict{Int, Dict{String, ClassicalVariable}})
+	_restore_original_scope(sim::BranchedSimulatorOperators, original_variables::Dict{Int, Dict{String, FramedVariable}})
 
 Helper function to restore the original scope after executing in a temporary scope.
-For paths that existed before the function call, restore their original variables.
-For new paths created during the function call, remove all variables that were instantiated in the function scope.
+For paths that existed before the function call, restore the original scope with original values.
+For new paths created during the function call, remove all variables that were instantiated in the current frame.
+
+This implementation handles scoping for newly generated paths by tracking the frame where each variable was declared.
+It also properly handles variable shadowing by restoring the original variables when exiting a scope.
 """
-function _restore_original_scope(sim::BranchedSimulatorOperators, original_variables::Dict{Int, Dict{String, ClassicalVariable}})
+function _restore_original_scope(sim::BranchedSimulatorOperators, original_variables::Dict{Int, Dict{String, FramedVariable}})
 	# Get all paths that existed before the function call
 	original_paths = collect(keys(original_variables))
-
-	# For paths that existed before, restore their original variables
+	
+	# Store the current frame that we're exiting from
+	exiting_frame = sim.curr_frame
+	
+	# Decrement the current frame as we're exiting a scope
+	sim.curr_frame -= 1
+	
+	# For paths that existed before, restore the original scope
 	for path_idx in sim.active_paths
 		if haskey(original_variables, path_idx)
-			sim.variables[path_idx] = original_variables[path_idx]
-		else
-			# This is a new path created during function execution
-			# Find a parent path from which this path was derived
-			# We'll use the first original path as a reference for const variables
-			if !isempty(original_paths)
-				reference_path = original_paths[1]
-
-				# Create a new empty scope for this path
-				new_scope = Dict{String, ClassicalVariable}()
-
-				# Copy only const variables from the reference path
-				for (var_name, var) in original_variables[reference_path]
-					if var.is_const
-						new_scope[var_name] = var
-					end
-				end
-
-				# Update the path's variables to the new scope
-				sim.variables[path_idx] = new_scope
-			else
-				# If there are no original paths (unlikely), just clear all variables
-				sim.variables[path_idx] = Dict{String, ClassicalVariable}()
-				# I don't think this case should ever happen
+			# Create a new scope that combines original variables with updated values
+			new_scope = Dict{String, FramedVariable}()
+			
+			# First, copy all original variables to ensure we don't lose any
+			for (var_name, orig_var) in original_variables[path_idx]
+				new_scope[var_name] = orig_var
 			end
+			
+			# Then update any variables that were modified in outer scopes
+			for (var_name, current_var) in sim.variables[path_idx]
+				if current_var.frame_number < exiting_frame && haskey(new_scope, var_name)
+					# This is a variable from an outer scope that was modified
+					# Keep the original variable's frame number but use the updated value
+					orig_var = new_scope[var_name]
+					new_scope[var_name] = FramedVariable(
+						orig_var.name,
+						orig_var.type,
+						copy(current_var.val),  # Use the updated value
+						orig_var.is_const,
+						orig_var.frame_number  # Keep the original frame number
+					)
+				elseif current_var.frame_number < exiting_frame && !haskey(new_scope, var_name)
+					# This is a new variable declared in an outer scope
+					new_scope[var_name] = current_var
+				end
+				# Variables declared in the current frame (frame_number == exiting_frame) are discarded
+			end
+			
+			# Update the path's variables to the new scope
+			sim.variables[path_idx] = new_scope
+		else
+			# This is a new path created during function execution or measurement
+			# We need to keep variables from outer scopes but remove variables from the current frame
+			
+			# Create a new scope for this path
+			new_scope = Dict{String, FramedVariable}()
+			
+			# Find a reference path to copy variables from
+			reference_path = original_paths[1]
+			
+			# Copy all variables from the current path that were declared in outer frames
+			for (var_name, var) in sim.variables[path_idx]
+				if var.frame_number < exiting_frame
+					# This variable was declared in an outer scope, keep it
+					new_scope[var_name] = var
+				end
+			end
+			
+			# Also copy variables from the reference path that might not be in this path
+			# This ensures that all paths have the same variable names after exiting a scope
+			for (var_name, var) in original_variables[reference_path]
+				if !haskey(new_scope, var_name)
+					# Create a copy of the variable with the same frame number
+					new_scope[var_name] = FramedVariable(
+						var.name,
+						var.type,
+						copy(var.val),
+						var.is_const,
+						var.frame_number
+					)
+				end
+			end
+			
+			# Update the path's variables to the new scope
+			sim.variables[path_idx] = new_scope
 		end
 	end
 end
@@ -1829,7 +1939,7 @@ function _handle_function_call(sim::BranchedSimulatorOperators, expr::QasmExpres
 						if haskey(sim.qubit_mapping, indexed_name)
 							qubit_idx = sim.qubit_mapping[indexed_name]
 							# Store the qubit index directly
-							sim.variables[path_idx][param_name] = ClassicalVariable(param_name, :qubit_declaration, qubit_idx, false)
+							sim.variables[path_idx][param_name] = FramedVariable(param_name, :qubit_declaration, qubit_idx, false, sim.curr_frame+1)
 						else
 							error("Qubit $indexed_name not found in qubit mapping")
 						end
@@ -1839,7 +1949,7 @@ function _handle_function_call(sim::BranchedSimulatorOperators, expr::QasmExpres
 						if haskey(sim.qubit_mapping, qubit_name)
 							qubit_idx = sim.qubit_mapping[qubit_name]
 							# Store the qubit index directly
-							sim.variables[path_idx][param_name] = ClassicalVariable(param_name, :qubit_declaration, qubit_idx, false)
+							sim.variables[path_idx][param_name] = FramedVariable(param_name, :qubit_declaration, qubit_idx, false, sim.curr_frame+1)
 						else
 							error("Qubit $qubit_name not found in qubit mapping")
 						end
@@ -1851,25 +1961,25 @@ function _handle_function_call(sim::BranchedSimulatorOperators, expr::QasmExpres
 					if !(path_arg_value isa Vector) && var_type == Quasar.SizedBitVector
 						path_arg_value = [path_arg_value]
 					end
-					sim.variables[path_idx][param_name] = ClassicalVariable(param_name, var_type, path_arg_value, false)
+					sim.variables[path_idx][param_name] = FramedVariable(param_name, param_type, path_arg_value, false, sim.curr_frame+1)
 				else
 					# For other parameter types, use the evaluated value
-					sim.variables[path_idx][param_name] = ClassicalVariable(param_name, param_type, path_arg_value, false)
+					sim.variables[path_idx][param_name] = FramedVariable(param_name, param_type, path_arg_value, false, sim.curr_frame+1)
 				end
 			end
 		end
 
 		# Execute the function body by recursively calling _evolve_branched_ast_operators
-		local return_value = nothing
+		local return_value = Dict{Int, Any}()
 
 		# Make sure we're handling the function body correctly
 		if func_def.body isa Vector{QasmExpression}
 			# If it's a vector of expressions, process each one
 			for expr in func_def.body
-				return_value = _evolve_branched_ast_operators(sim, expr)
-				# If we encounter a return statement, break out of the loop
-				if return_value isa ClassicalVariable ||
-				   (return_value isa Dict && any(v -> v isa ClassicalVariable, values(return_value)))
+				result = _evolve_branched_ast_operators(sim, expr)
+				# If we encounter a return statement, store the result and break out of the loop
+				if !isnothing(result)
+					return_value = result
 					break
 				end
 			end

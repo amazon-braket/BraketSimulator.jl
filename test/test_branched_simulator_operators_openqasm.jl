@@ -1533,8 +1533,7 @@ using BraketSimulator
 				
 				# Verify that q[1] is in |0⟩ state (reset)
 				# Since q[0] had custom_gate applied, we need to check both |00⟩ and |10⟩ states
-				@test isapprox(abs(state[1]), 1/sqrt(2); atol = 1e-10) || 
-					  isapprox(abs(state[3]), 1/sqrt(2); atol = 1e-10)
+				@test isapprox(abs(state[1]), 1; atol = 1e-10)
 			end
 		end
 		
@@ -2099,7 +2098,95 @@ using BraketSimulator
 			@test length(branched_sim.active_paths) == 2
 		end
 		
-		@testset "9.10 Aliases in subroutines" begin
+		@testset "9.10 Shadowing in while loops" begin
+			# Test that variables in while loops can shadow outer scope variables
+			qasm_source = """
+			OPENQASM 3.0;
+			qubit[1] q;
+			bit[1] b;
+
+			// Global variable
+			int[32] counter = 5;
+
+			// While loop with shadowing
+			int[32] i = 0;
+			while (i < 3) {
+				// Shadow the global counter
+				int[32] counter = i;
+				
+				// Use the local counter
+				if (counter == 2) {
+					x q[0];
+				}
+				
+				i += 1;
+			}
+
+			// Back to global scope, counter should be unchanged
+			if (counter == 5) {
+				// Apply another gate if global counter is still 5
+				h q[0];
+			}
+			"""
+
+			simulator = StateVectorSimulator(1, 1000)
+						
+			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+
+			# Verify that the global counter is still 5 after the while loop
+			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "counter").val == 5
+			
+			# Verify that the X gate was applied (since counter remained 5)
+			# and H gate was applied in the last iteration (when i=2)
+			# This should result in the state |-> = (|0⟩ - |1⟩)/√2
+			state = BraketSimulator.calculate_current_state(branched_sim)[branched_sim.active_paths[1]]
+			@test isapprox(abs(state[1]), 1/sqrt(2), atol=1e-10)
+			@test isapprox(abs(state[2]), 1/sqrt(2), atol=1e-10)
+			@test isapprox(angle(state[2]) - angle(state[1]), π, atol=1e-10)
+		end
+
+@testset "9.11 Shadowing in for loops" begin
+			# Test that variables in for loops can shadow outer scope variables
+			qasm_source = """
+			OPENQASM 3.0;
+			qubit[1] q;
+			bit[1] b;
+
+			// Global variable
+			int[32] index = 10;
+
+			// For loop with shadowing
+			for int[32] index in [0, 1, 2] {
+				// Use the local index
+				if (index == 2) {
+					x q[0];
+				}
+			}
+
+			// Back to global scope, index should be unchanged
+			if (index == 10) {
+				// Apply another gate if global index is still 10
+				h q[0];
+			}
+			"""
+
+			simulator = StateVectorSimulator(1, 1000)
+			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+
+			# Verify that the global index is still 10 after the for loop
+			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "index").val == 10
+			
+			# Verify that the X gate was applied (since index remained 10)
+			# and H gate was applied in the last iteration (when index=2)
+			# This should result in the state |-> = (|0⟩ - |1⟩)/√2
+			state = BraketSimulator.calculate_current_state(branched_sim)[branched_sim.active_paths[1]]
+			@test isapprox(abs(state[1]), 1/sqrt(2), atol=1e-10)
+			@test isapprox(abs(state[2]), 1/sqrt(2), atol=1e-10)
+			@test isapprox(angle(state[2]) - angle(state[1]), π, atol=1e-10)
+		end
+
+
+@testset "9.12 Aliases in subroutines" begin
 			# Test that aliases can be declared within subroutine scopes
 			qasm_source = """
 			OPENQASM 3.0;
