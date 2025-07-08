@@ -217,32 +217,38 @@ end
 """
 	evaluate_modifiers(sim::BranchedSimulatorOperators, expr::QasmExpression)
 
-Evaluates gate modifiers.
+Evaluates gate modifiers. Always returns a dictionary mapping path indices to tuples of (modifier_expr, inner_expr).
 """
 function evaluate_modifiers(sim::BranchedSimulatorOperators, expr::QasmExpression)
-	# TODO: Review and edit this function
+	# Create a dictionary to store results for each path
+	results = Dict{Int, Tuple{QasmExpression, Any}}()
+	
 	if head(expr) == :power_mod
 		pow_val = _evolve_branched_ast_operators(sim, expr.args[1])
 
 		# Check if pow_val is a dictionary (path-specific values)
-		if isa(pow_value, Dict)
-			# Create a dictionary to store results for each path
-			results = Dict{Int, Tuple{QasmExpression, Any}}()
-
+		if isa(pow_val, Dict)
 			# For each path, evaluate with path-specific value
 			for (path_idx, path_val) in pow_val
 				pow_expr = QasmExpression(:pow, path_val)
 				results[path_idx] = (pow_expr, expr.args[2])
 			end
-
-			return results
 		else
-			# If not a dictionary, evaluate normally
+			# If not a dictionary, use the same value for all active paths
 			pow_expr = QasmExpression(:pow, pow_val)
-			return (pow_expr, expr.args[2])
+			for path_idx in sim.active_paths
+				results[path_idx] = (pow_expr, expr.args[2])
+			end
 		end
+		
+		return results
 	elseif head(expr) == :inverse_mod
-		return (QasmExpression(:inv), expr.args[1])
+		# Use the same inverse modifier for all active paths
+		for path_idx in sim.active_paths
+			results[path_idx] = (QasmExpression(:inv), expr.args[1])
+		end
+		
+		return results
 	elseif head(expr) ∈ (:control_mod, :negctrl_mod)
 		has_argument = length(expr.args) > 1
 		if has_argument
@@ -250,9 +256,6 @@ function evaluate_modifiers(sim::BranchedSimulatorOperators, expr::QasmExpressio
 
 			# Check if arg_val is a dictionary (path-specific values)
 			if isa(arg_val, Dict)
-				# Create a dictionary to store results for each path
-				results = Dict{Int, Tuple{QasmExpression, Any}}()
-
 				# For each path, evaluate with path-specific value
 				for (path_idx, path_val) in arg_val
 					isinteger(path_val) || error("Cannot apply non-integer ($path_val) number of controls or negcontrols.")
@@ -268,26 +271,127 @@ function evaluate_modifiers(sim::BranchedSimulatorOperators, expr::QasmExpressio
 					new_head = head(expr) == :control_mod ? :ctrl : :negctrl
 					results[path_idx] = (QasmExpression(new_head), inner)
 				end
-
-				return results
 			else
-				# If not a dictionary, evaluate normally
+				# If not a dictionary, use the same value for all active paths
 				isinteger(arg_val) || error("Cannot apply non-integer ($arg_val) number of controls or negcontrols.")
 				true_inner = expr.args[2]
 				inner = QasmExpression(head(expr), true_inner)
+				
 				while arg_val > 2
 					inner = QasmExpression(head(expr), inner)
 					arg_val -= 1
 				end
+				
+				new_head = head(expr) == :control_mod ? :ctrl : :negctrl
+				
+				for path_idx in sim.active_paths
+					results[path_idx] = (QasmExpression(new_head), inner)
+				end
 			end
 		else
 			inner = expr.args[1]
+			new_head = head(expr) == :control_mod ? :ctrl : :negctrl
+			
+			for path_idx in sim.active_paths
+				results[path_idx] = (QasmExpression(new_head), inner)
+			end
 		end
-		new_head = head(expr) == :control_mod ? :ctrl : :negctrl
-		return (QasmExpression(new_head), inner)
+		
+		return results
 	else
 		error("Unknown modifier type: $(head(expr))")
 	end
+end
+
+"""
+    _apply_modifiers(gate_op::QuantumOperator, modifiers::Vector, target_indices::Vector{Int}) -> QuantumOperator
+
+Apply gate modifiers to a gate operator. This function takes a gate operator and a list of modifiers,
+and returns a new gate operator with the modifiers applied.
+"""
+function _apply_modifiers(gate_op::QuantumOperator, modifiers::Vector, target_indices::Vector{Int})
+    # Process each modifier in order
+    for modifier in modifiers
+        modifier_type = head(modifier)
+        
+        if modifier_type == :ctrl
+            # Special handling for global phase gates
+            if isa(gate_op, PhaseShift)
+                # For PhaseShift (gphase), we only need one control qubit
+                if length(target_indices) < 1
+                    error("Control modifier requires at least 1 qubit for phase gates")
+                end
+                
+                # Create a controlled version of the gate
+                # For phase gates, the control is the only qubit
+                bitvals = tuple(1)
+                
+                # Create the controlled gate
+                gate_op = Control(gate_op, bitvals)
+            else
+                # For regular gates, we need at least 2 qubits (control + target)
+                if length(target_indices) < 2
+                    error("Control modifier requires at least 2 qubits")
+                end
+                
+                # Create a controlled version of the gate
+                # The first qubit is the control, the rest are targets for the gate
+                bitvals = tuple(1)
+                
+                # Create the controlled gate
+                gate_op = Control(gate_op, bitvals)
+            end
+            
+        elseif modifier_type == :negctrl
+            # Special handling for global phase gates
+            if isa(gate_op, PhaseShift)
+                # For PhaseShift (gphase), we only need one control qubit
+                if length(target_indices) < 1
+                    error("Negative control modifier requires at least 1 qubit for phase gates")
+                end
+                
+                # Create a controlled version of the gate with control on |0⟩ state
+                bitvals = tuple(0)
+                
+                # Create the negatively controlled gate
+                gate_op = Control(gate_op, bitvals)
+            else
+                # Apply negative control modifier (control on |0⟩ state)
+                if length(target_indices) < 2
+                    error("Negative control modifier requires at least 2 qubits")
+                end
+                
+                # Create a controlled version of the gate with control on |0⟩ state
+                bitvals = tuple(0)
+                
+                # Create the negatively controlled gate
+                gate_op = Control(gate_op, bitvals)
+            end
+            
+        elseif modifier_type == :pow
+            # Apply power modifier
+            if hasfield(typeof(gate_op), :pow_exponent)
+                # If the gate has a pow_exponent field, update it
+                power_value = modifier.args[1]
+                gate_op.pow_exponent = power_value
+            else
+                # If the gate doesn't have a pow_exponent field, we can't apply the power modifier
+                error("Power modifier not supported for gate type $(typeof(gate_op))")
+            end
+            
+        elseif modifier_type == :inv
+            # Apply inverse modifier
+            if hasfield(typeof(gate_op), :pow_exponent)
+                # If the gate has a pow_exponent field, negate it to invert
+                gate_op.pow_exponent = -gate_op.pow_exponent
+            else
+                # If the gate doesn't have a pow_exponent field, we can't apply the inverse modifier
+                error("Inverse modifier not supported for gate type $(typeof(gate_op))")
+            end
+        end
+    end
+    
+    return gate_op
 end
 
 #####################################
@@ -1212,8 +1316,8 @@ function _handle_classical_assignment(sim::BranchedSimulatorOperators, expr::Qas
 
 	new_active_paths = []
 
-	# Evaluate the LHS and RHS for all active paths
-	lhs_value = _evolve_branched_ast_operators(sim, lhs)
+	# Evaluate the LHS and RHS for all active paths (for assignment operation, we ignore the lhs value)
+	lhs_value = op == Symbol("=") ? nothing : _evolve_branched_ast_operators(sim, lhs)
 	rhs_value = _evolve_branched_ast_operators(sim, rhs)
 
 	# Check if the right-hand side is a measurement result
@@ -1225,7 +1329,7 @@ function _handle_classical_assignment(sim::BranchedSimulatorOperators, expr::Qas
 	# This is for assigning to a bit register or any classical variable
 	if head(lhs) == :identifier
 		for current_path_idx in current_paths
-			lhs_val = haskey(lhs_value, current_path_idx) ? lhs_value[current_path_idx] : nothing # Default to nothing because if no value then we are declaring the variable
+			lhs_val = !isnothing(lhs_value) && haskey(lhs_value, current_path_idx) ? lhs_value[current_path_idx] : nothing # Default to nothing because if no value then we are declaring the variable
 
 			if is_measurement
 				# Process measurement outcomes for this path
@@ -1277,7 +1381,7 @@ function _handle_classical_assignment(sim::BranchedSimulatorOperators, expr::Qas
 		index_value = _evolve_branched_ast_operators(sim, lhs.args[2])
 
 		for current_path_idx in current_paths
-			lhs_val = haskey(lhs_value, current_path_idx) ? lhs_value[current_path_idx] : nothing # Default to nothing because if no value then we are declaring the variable
+			lhs_val = !isnothing(lhs_value) && haskey(lhs_value, current_path_idx) ? lhs_value[current_path_idx] : nothing # Default to nothing because if no value then we are declaring the variable
 
 			index = get(index_value, current_path_idx, 0)
 
@@ -1436,18 +1540,48 @@ end
 Handle gate modifiers in the branched simulation model.
 """
 function _handle_gate_modifiers(sim::BranchedSimulatorOperators, expr::QasmExpression)
-	# Process gate modifiers
-	mods = QasmExpression(:modifiers)
-	mod_expr, inner = evaluate_modifiers(sim, expr)
-	push!(mods, mod_expr)
-
-	while head(inner) != :gate_call # done
-		mod_expr, inner = evaluate_modifiers(sim, inner)
+	# Save original active paths
+	original_active_paths = copy(sim.active_paths)
+	
+	# Get modifiers for each path
+	modifiers_by_path = evaluate_modifiers(sim, expr)
+	
+	# Process each path separately
+	for (path_idx, (mod_expr, inner_expr)) in modifiers_by_path
+		# Set active paths to just this path
+		sim.active_paths = [path_idx]
+		
+		# Process gate modifiers for this path
+		mods = QasmExpression(:modifiers)
 		push!(mods, mod_expr)
+		
+		# Get the inner expression
+		inner = inner_expr
+		
+		# Process nested modifiers
+		while head(inner) != :gate_call
+			# Get modifiers for this inner expression
+			inner_modifiers = evaluate_modifiers(sim, inner)
+			
+			# Since we're only processing one path, there should be only one entry
+			if haskey(inner_modifiers, path_idx)
+				mod_expr, inner = inner_modifiers[path_idx]
+				push!(mods, mod_expr)
+			else
+				# If this path doesn't have modifiers for this inner expression, break
+				break
+			end
+		end
+		
+		# Add modifiers to the inner gate call
+		push!(inner, mods)
+		
+		# Process the gate call with modifiers
+		_evolve_branched_ast_operators(sim, inner)
 	end
-
-	push!(inner, mods)
-	_evolve_branched_ast_operators(sim, inner)
+	
+	# Restore original active paths
+	sim.active_paths = original_active_paths
 end
 
 """
@@ -1497,6 +1631,12 @@ function _handle_gate_call(sim::BranchedSimulatorOperators, expr::QasmExpression
 		end
 	end
 
+	# Check if there are any modifiers to apply
+	modifiers = Vector{QasmExpression}()
+	if length(expr.args) > 3 && !isnothing(expr.args[4]) && head(expr.args[4]) == :modifiers
+		modifiers = expr.args[4].args
+	end
+
 	# Process each active path
 	for path_idx in sim.active_paths
 		# Skip if this path doesn't have target indices
@@ -1529,6 +1669,11 @@ function _handle_gate_call(sim::BranchedSimulatorOperators, expr::QasmExpression
 							gate_def = sim.gate_defs[gate_name]
 							instruction = gate_def.body
 							gate_op = StructTypes.constructfrom(QuantumOperator, instruction)
+						end
+						
+						# Apply modifiers if any
+						if !isempty(modifiers)
+							gate_op = _apply_modifiers(gate_op, modifiers, target_indices)
 						end
 						
 						# Store gate instruction for this path
@@ -1618,6 +1763,11 @@ function _handle_gate_call(sim::BranchedSimulatorOperators, expr::QasmExpression
 				else
 					# Otherwise, just call constructfrom 
 					gate_op = StructTypes.constructfrom(QuantumOperator, instruction)
+					
+					# Apply modifiers if any
+					if !isempty(modifiers)
+						gate_op = _apply_modifiers(gate_op, modifiers, target_indices)
+					end
 
 					# Store gate instruction for this path
 					instruction = Instruction(gate_op, target_indices)

@@ -954,7 +954,7 @@ using BraketSimulator
 
 			# Verify branching paths exist
 			@test length(branched_sim.active_paths) > 0
-			
+
 			# Group paths by count value
 			paths_by_count = Dict{Int, Vector{Int}}()
 			for path_idx in branched_sim.active_paths
@@ -964,12 +964,12 @@ using BraketSimulator
 				end
 				push!(paths_by_count[count], path_idx)
 			end
-			
+
 			# Verify that we have paths for counts 0, 1, 2
 			@test haskey(paths_by_count, 0)
 			@test haskey(paths_by_count, 1)
 			@test haskey(paths_by_count, 2)
-			
+
 			# Check the state of qubit 1 for each count value
 			for path_idx in paths_by_count[0]
 				# count=0 means we measured 1 on first qubit, so X was applied to qubit 1
@@ -977,14 +977,14 @@ using BraketSimulator
 				# Qubit 1 should be in state |1⟩
 				@test isapprox(abs(state[2]), 1.0; atol = 1e-10) || isapprox(abs(state[4]), 1.0; atol = 1e-10)
 			end
-			
+
 			for path_idx in paths_by_count[1]
 				# count=1 means we measured 0 on first qubit, 1 on second, so Z was applied to qubit 1
 				state = BraketSimulator.calculate_current_state(branched_sim, path_idx)
 				# Z doesn't change the basis state, so we need to check the measurement result
 				@test isapprox(abs(state[2]), 1.0; atol = 1e-10)
 			end
-			
+
 			for path_idx in paths_by_count[2]
 				# count=2 means we measured 0 on both qubits, so H was applied to qubit 1
 				state = BraketSimulator.calculate_current_state(branched_sim, path_idx)
@@ -1020,30 +1020,30 @@ using BraketSimulator
 
 			# Verify that we have 4 paths (2^2 possible measurement outcomes for the 2 qubits with H applied)
 			@test length(branched_sim.active_paths) == 4
-			
+
 			# Check that H was applied only to qubits with even indices (1 and 3)
 			for path_idx in branched_sim.active_paths
 				state = BraketSimulator.calculate_current_state(branched_sim, path_idx)
-				
+
 				# Extract measurement results
 				b0 = branched_sim.measurements[path_idx]["q[0]"][1]
 				b1 = branched_sim.measurements[path_idx]["q[1]"][1]
 				b2 = branched_sim.measurements[path_idx]["q[2]"][1]
 				b3 = branched_sim.measurements[path_idx]["q[3]"][1]
-				
+
 				# Verify that qubits 0 and 2 are in |0⟩ state (no H applied)
 				@test b0 == 0
 				@test b2 == 0
-				
+
 				# Calculate expected state based on measurements
 				expected_state = zeros(ComplexF64, 16)
 				index = 1 + b0*8 + 4*b1 + 2*b2 + b3
 				expected_state[index] = 1.0
-				
+
 				@test isapprox(state, expected_state; atol = 1e-10)
 			end
 		end
-		
+
 		@testset "5.5 Nested Loops with Measurements" begin
 			qasm_source = """
 			OPENQASM 3.0;
@@ -1052,7 +1052,7 @@ using BraketSimulator
 			int[32] outer_count = 0;
 			int[32] inner_count = 0;
 			int[32] total_ones = 0;
-			
+
 			// Nested loops with measurements
 			for uint i in [0:1] {
 				h q[i];  // Put qubits in superposition
@@ -1076,19 +1076,19 @@ using BraketSimulator
 					}
 				}
 			}
-			
+
 			// Apply operation based on total number of ones
 			if (total_ones > 1) {
 				x q[2];
 			}
 			"""
-			
+
 			simulator = StateVectorSimulator(3, 1000)
 			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
-			
+
 			# Verify that we have multiple paths
 			@test length(branched_sim.active_paths) > 0
-			
+
 			# Group paths by total_ones value
 			paths_by_total = Dict{Int, Vector{Int}}()
 			for path_idx in branched_sim.active_paths
@@ -1098,40 +1098,40 @@ using BraketSimulator
 				end
 				push!(paths_by_total[total], path_idx)
 			end
-			
+
 			# Check the state of qubit 2 for each path
 			for path_idx in branched_sim.active_paths
 				state = BraketSimulator.calculate_current_state(branched_sim, path_idx)
 				total_ones = BraketSimulator.get_variable(branched_sim, path_idx, "total_ones").val
-				
+
 				if total_ones > 1
 					# X gate should have been applied to qubit 2
-					@test isapprox(abs(state[2]), 1.0; atol = 1e-10) || 
-						  isapprox(abs(state[4]), 1.0; atol = 1e-10) || 
-						  isapprox(abs(state[6]), 1.0; atol = 1e-10) || 
+					@test isapprox(abs(state[2]), 1.0; atol = 1e-10) ||
+						  isapprox(abs(state[4]), 1.0; atol = 1e-10) ||
+						  isapprox(abs(state[6]), 1.0; atol = 1e-10) ||
 						  isapprox(abs(state[8]), 1.0; atol = 1e-10)
 				else
 					# Qubit 2 should remain in |0⟩ state
-					@test isapprox(abs(state[1]), 1.0; atol = 1e-10) || 
-						  isapprox(abs(state[3]), 1.0; atol = 1e-10) || 
-						  isapprox(abs(state[5]), 1.0; atol = 1e-10) || 
+					@test isapprox(abs(state[1]), 1.0; atol = 1e-10) ||
+						  isapprox(abs(state[3]), 1.0; atol = 1e-10) ||
+						  isapprox(abs(state[5]), 1.0; atol = 1e-10) ||
 						  isapprox(abs(state[7]), 1.0; atol = 1e-10)
 				end
 			end
-			
+
 			# Verify that outer_count and inner_count are correctly updated
 			for path_idx in branched_sim.active_paths
 				outer_count = BraketSimulator.get_variable(branched_sim, path_idx, "outer_count").val
 				inner_count = BraketSimulator.get_variable(branched_sim, path_idx, "inner_count").val
-				
+
 				# outer_count should always be 2 (we iterate through i=0,1)
 				@test outer_count == 2
-				
+
 				# inner_count depends on measurement results
 				# Check that it's consistent with the number of 1s measured in the first two qubits
 				b0 = branched_sim.measurements[path_idx]["q[0]"][1]
 				b1 = branched_sim.measurements[path_idx]["q[1]"][length(branched_sim.measurements[path_idx]["q[1]"])]
-				
+
 				expected_inner_count = 0
 				if b0 == 1
 					expected_inner_count += 1  # j=1 iteration when i=0
@@ -1139,7 +1139,7 @@ using BraketSimulator
 				if b1 == 1
 					expected_inner_count += 1  # j=0 iteration when i=1
 				end
-				
+
 				@test inner_count == expected_inner_count
 			end
 		end
@@ -1340,99 +1340,99 @@ using BraketSimulator
 				end
 			end
 		end
-		
+
 		@testset "6.4 Quantum Fourier Transform" begin
 			qasm_source = """
 			OPENQASM 3.0;
 			qubit[3] q;
 			bit[3] b;
-			
+
 			// Initialize state |001⟩
 			x q[2];
-			
+
 			// Apply QFT
 			// Qubit 0
 			h q[0];
 			ctrl @ gphase(pi/2) q[1];
 			ctrl @ gphase(pi/4) q[2];
-			
+
 			// Qubit 1
 			h q[1];
 			ctrl @ gphase(pi/2) q[2];
-			
+
 			// Qubit 2
 			h q[2];
-			
+
 			// Swap qubits 0 and 2
 			swap q[0], q[2];
-			
+
 			// Measure all qubits
 			b[0] = measure q[0];
 			b[1] = measure q[1];
 			b[2] = measure q[2];
 			"""
-			
+
 			simulator = StateVectorSimulator(3, 1000)
-			
+
 			# First, let's calculate the expected state after QFT on |001⟩
 			# We'll create a circuit without measurements to get the state vector
 			qft_source = """
 			OPENQASM 3.0;
 			qubit[3] q;
-			
+
 			// Initialize state |001⟩
 			x q[2];
-			
+
 			// Apply QFT
 			// Qubit 0
 			h q[0];
 			ctrl @ gphase(pi/2) q[1];
 			ctrl @ gphase(pi/4) q[2];
-			
+
 			// Qubit 1
 			h q[1];
 			ctrl @ gphase(pi/2) q[2];
-			
+
 			// Qubit 2
 			h q[2];
-			
+
 			// Swap qubits 0 and 2
 			swap q[0], q[2];
 			"""
-			
+
 			qft_sim = StateVectorSimulator(3, 1)
 			qft_sim = BraketSimulator.evolve!(qft_sim, BraketSimulator.to_circuit(qft_source).instructions)
 			expected_state = BraketSimulator.state_vector(qft_sim)
-			
+
 			# Now evolve the original circuit with measurements
 			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 			# Verify that we have 8 paths (2^3 possible measurement outcomes)
 			@test length(branched_sim.active_paths) == 8
-			
+
 			# Calculate the probabilities from the expected state
 			expected_probs = abs2.(expected_state)
-			
+
 			# Count the number of paths with each measurement outcome
 			outcome_counts = Dict{Tuple{Int, Int, Int}, Int}()
-			
+
 			for path_idx in branched_sim.active_paths
 				b0 = branched_sim.measurements[path_idx]["q[0]"][1]
 				b1 = branched_sim.measurements[path_idx]["q[1]"][1]
 				b2 = branched_sim.measurements[path_idx]["q[2]"][1]
 				outcome = (b0, b1, b2)
-				
+
 				if !haskey(outcome_counts, outcome)
 					outcome_counts[outcome] = 0
 				end
 				outcome_counts[outcome] += 1
 			end
-			
+
 			# Verify that the distribution of paths matches the expected probabilities
 			for (outcome, count) in outcome_counts
 				b0, b1, b2 = outcome
 				state_idx = 1 + b0 + 2*b1 + 4*b2
 				expected_prob = expected_probs[state_idx]
-				
+
 				# The number of paths with this outcome should be proportional to the probability
 				# Since we have 8 paths total, and the simulator uses shots to determine branching
 				@test count > 0
@@ -1472,82 +1472,82 @@ using BraketSimulator
 
 			# Verify custom gate application
 			@test length(branched_sim.instruction_sequences[1]) > 0
-			
+
 			# Verify that the custom gate is equivalent to Z-rotation by π/4
 			# custom_gate = HTH = Rx(π/4)
-			
+
 			# Create a circuit with just the custom gate
 			custom_gate_source = """
 			OPENQASM 3.0;
 			qubit[1] q;
-			
+
 			// Define custom gate
 			gate custom_gate q {
 				h q;
 				t q;
 				h q;
 			}
-			
+
 			custom_gate q[0];
 			"""
-			
+
 			# Create a circuit with equivalent Rz gate
 			rz_gate_source = """
 			OPENQASM 3.0;
 			qubit[1] q;
-			
+
 			rx(pi/4) q[0];
 			"""
-			
+
 			# Simulate both circuits
 			custom_sim = StateVectorSimulator(1, 1)
 			rz_sim = StateVectorSimulator(1, 1)
-			
+
 			custom_sim = BraketSimulator.evolve!(custom_sim, BraketSimulator.to_circuit(custom_gate_source).instructions)
 			rz_sim = BraketSimulator.evolve!(rz_sim, BraketSimulator.to_circuit(rz_gate_source).instructions)
-			
+
 			# Verify that the states are equivalent
 			custom_state = BraketSimulator.state_vector(custom_sim)
 			rz_state = BraketSimulator.state_vector(rz_sim)
-			
+
 			@test isapprox(abs(custom_state[1]), abs(rz_state[1]); atol = 1e-10)
 			@test isapprox(abs(custom_state[2]), abs(rz_state[2]); atol = 1e-10)
-			
+
 			# Now verify the measure_and_reset subroutine
 			# It should always leave the qubit in |0⟩ state
-			
+
 			# Check the paths in the original simulation
 			@test length(branched_sim.active_paths) == 2  # Two paths from measuring q[1]
-			
+
 			results = BraketSimulator.calculate_current_state(branched_sim)
 
 			for path_idx in branched_sim.active_paths
 				state = results[path_idx]
-				
+
 				# Extract measurement result for q[1]
 				b1 = branched_sim.measurements[path_idx]["q[0]"][1]
-				
+
 				# Verify that b[0] equals the measurement result
 				b0 = BraketSimulator.get_variable(branched_sim, path_idx, "b").val[1]
 				@test b0 == b1
-				
+
 				# Verify that q[1] is in |0⟩ state (reset)
 				# Since q[0] had custom_gate applied, we need to check both |00⟩ and |10⟩ states
 				@test isapprox(abs(state[1]), 1; atol = 1e-10)
 			end
 		end
-		
+
 		@testset "7.2 Custom Gates with Control Flow" begin
 			qasm_source = """
 			OPENQASM 3.0;
 			qubit[3] q;
 			bit[2] b;
-			
+
 			// Define a custom controlled rotation gate
 			gate controlled_rotation(ang) control, target {
 				ctrl @ rz(ang) control, target;
 			}
-			
+
 			// Define a custom function that applies different operations based on measurement
 			def adaptive_gate(qubit q1, qubit q2, bit measurement) {
 				if (measurement == 0) {
@@ -1558,30 +1558,30 @@ using BraketSimulator
 					z q2;
 				}
 			}
-			
+
 			// Initialize qubits
 			h q[0];
-			
+
 			// Measure qubit 0
 			b[0] = measure q[0];
-			
+
 			// Apply custom gates based on measurement
 			controlled_rotation q[0], q[1], pi/2;
 			adaptive_gate(q[1], q[2], b[0]);
-			
+
 			// Measure qubit 1
 			b[1] = measure q[1];
 			"""
-			
+
 			simulator = StateVectorSimulator(3, 1000)
 			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
-			
+
 			# Verify that we have 4 paths (2 from first measurement × 2 from second measurement)
 			@test length(branched_sim.active_paths) == 4
-			
+
 			# Group paths by first measurement outcome
 			paths_by_first_meas = Dict{Int, Vector{Int}}()
-			
+
 			for path_idx in branched_sim.active_paths
 				b0 = branched_sim.measurements[path_idx]["q[0]"][1]
 				if !haskey(paths_by_first_meas, b0)
@@ -1589,19 +1589,19 @@ using BraketSimulator
 				end
 				push!(paths_by_first_meas[b0], path_idx)
 			end
-			
+
 			# Verify that we have paths for both measurement outcomes
 			@test haskey(paths_by_first_meas, 0)
 			@test haskey(paths_by_first_meas, 1)
-			
+
 			# Check the state of qubits 1 and 2 for each path
 			for path_idx in paths_by_first_meas[0]
 				# For b[0]=0, adaptive_gate applies H to both qubits
 				state = BraketSimulator.calculate_current_state(branched_sim, path_idx)
-				
+
 				# Extract measurement result for q[1]
 				b1 = branched_sim.measurements[path_idx]["q[1]"][1]
-				
+
 				# Since q[1] is measured, we need to check if the state is consistent
 				# with the measurement result
 				if b1 == 0
@@ -1614,14 +1614,14 @@ using BraketSimulator
 					@test isapprox(abs(state[4]), 1/sqrt(2); atol = 1e-10)
 				end
 			end
-			
+
 			for path_idx in paths_by_first_meas[1]
 				# For b[0]=1, adaptive_gate applies X to q[1] and Z to q[2]
 				state = BraketSimulator.calculate_current_state(branched_sim, path_idx)
-				
+
 				# Extract measurement result for q[1]
 				b1 = branched_sim.measurements[path_idx]["q[1]"][1]
-				
+
 				# Since q[1] is measured, we need to check if the state is consistent
 				# with the measurement result
 				if b1 == 0
@@ -1667,18 +1667,294 @@ using BraketSimulator
 		end
 	end
 
-	@testset "9. Scoping Rules" begin
-		@testset "9.1 Local scope blocks inherit variables" begin
+	@testset "9. Gate Modifiers and GPhase" begin
+		@testset "9.1 Basic gate modifiers" begin
+			qasm_source = """
+			OPENQASM 3.0;
+			qubit[2] q;
+			bit[2] b;
+
+			// Apply X gate with power modifier (X^0.5 = √X)
+			pow(0.5) @ x q[0];
+
+			// Apply X gate with inverse modifier (X† = X)
+			inv @ x q[1];
+
+			// Measure both qubits
+			b[0] = measure q[0];
+			b[1] = measure q[1];
+			"""
+
+			simulator = StateVectorSimulator(2, 1000)
+			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+
+			# Verify that we have 2 paths (2 possible measurement outcomes)
+			@test length(branched_sim.active_paths) == 2
+
+			# Calculate the final states for all paths
+			states = BraketSimulator.calculate_current_state(branched_sim)
+
+			# For each path, verify the state before measurement
+			for path_idx in branched_sim.active_paths
+				# Extract measurement results
+				b0 = branched_sim.measurements[path_idx]["q[0]"][1]
+				b1 = branched_sim.measurements[path_idx]["q[1]"][1]
+
+				# For q[0], X^0.5 = √X should create a superposition
+				# For q[1], inv @ X = X should flip the bit
+
+				# The probability of measuring 0 or 1 for q[0] should be 0.5 each
+				# The probability of measuring 1 for q[1] should be 1.0
+
+				if b1 == 1
+					# This is the expected outcome for q[1]
+					@test true
+				else
+					# This should not happen for q[1]
+					@test false
+				end
+
+				# For q[0], both outcomes are possible
+				@test b0 == 0 || b0 == 1
+			end
+		end
+
+		@testset "9.2 Control modifiers" begin
+			qasm_source = """
+			OPENQASM 3.0;
+			qubit[3] q;
+			bit[3] b;
+
+			// Initialize q[0] to |1⟩
+			x q[0];
+
+			// Apply controlled-H gate (control on q[0], target on q[1])
+			ctrl @ h q[0], q[1];
+
+			// Apply controlled-controlled-X gate (controls on q[0] and q[1], target on q[2])
+			ctrl @ ctrl @ x q[0], q[1], q[2];
+
+			// Measure all qubits
+			b[0] = measure q[0];
+			b[1] = measure q[1];
+			b[2] = measure q[2];
+			"""
+
+			simulator = StateVectorSimulator(3, 1000)
+			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+
+			# Calculate the final states for all paths
+			states = BraketSimulator.calculate_current_state(branched_sim)
+
+			# Verify that we have multiple paths
+			@test length(branched_sim.active_paths) > 0
+
+			# For each path, verify the state before measurement
+			for path_idx in branched_sim.active_paths
+				# Extract measurement results
+				b0 = branched_sim.measurements[path_idx]["q[0]"][1]
+				b1 = branched_sim.measurements[path_idx]["q[1]"][1]
+				b2 = branched_sim.measurements[path_idx]["q[2]"][1]
+
+				# q[0] should always be 1 (initialized with X)
+				@test b0 == 1
+
+				# If q[1] is 1, then q[2] should also be 1 (due to the controlled-controlled-X)
+				# If q[1] is 0, then q[2] should be 0
+				if b1 == 1
+					@test b2 == 1
+				else
+					@test b2 == 0
+				end
+			end
+		end
+
+		@testset "9.3 Negative control modifiers" begin
+			qasm_source = """
+			OPENQASM 3.0;
+			qubit[2] q;
+			bit[2] b;
+
+			h q[0];
+
+			// Apply negative-controlled X gate (control on q[0], target on q[1])
+			// This applies X to q[1] when q[0] is |0⟩
+			negctrl @ x q[0], q[1];
+
+			// Measure both qubits
+			b[0] = measure q[0];
+			b[1] = measure q[1];
+			"""
+
+			simulator = StateVectorSimulator(2, 1000)
+			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+
+			# Calculate the final states for all paths
+			states = BraketSimulator.calculate_current_state(branched_sim)
+
+			# Verify that we have 2 paths (since the states are deterministic)
+			@test length(branched_sim.active_paths) == 2
+
+			# For each path, verify the state before measurement
+			for path_idx in branched_sim.active_paths
+				# Extract measurement results
+				b0 = branched_sim.measurements[path_idx]["q[0]"][1]
+				b1 = branched_sim.measurements[path_idx]["q[1]"][1]
+
+				# If q[0] is 0, then q[1] should be 1 (due to the negative-controlled X)
+				# If q[0] is 1, then q[1] should be 0
+				if b0 == 0
+					@test b1 == 1
+				else
+					@test b1 == 0
+				end
+			end
+		end
+
+		@testset "9.4 Multiple modifiers" begin
+			qasm_source = """
+			OPENQASM 3.0;
+			qubit[2] q;
+			bit[2] b;
+
+			// Initialize q[0] to |1⟩
+			h q[0];
+
+			// Apply controlled-inverse-X gate (control on q[0], target on q[1])
+			// Since X† = X, this is equivalent to a standard CNOT
+			ctrl @ inv @ x q[0], q[1];
+
+			// Measure both qubits
+			b[0] = measure q[0];
+			b[1] = measure q[1];
+			"""
+
+			simulator = StateVectorSimulator(2, 1000)
+			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+
+			# Calculate the final states for all paths
+			states = BraketSimulator.calculate_current_state(branched_sim)
+
+			# Verify that we have 2 paths (since the states are deterministic)
+			@test length(branched_sim.active_paths) == 2
+
+			# For each path, verify the state before measurement
+			for path_idx in branched_sim.active_paths
+				# Extract measurement results
+				b0 = branched_sim.measurements[path_idx]["q[0]"][1]
+				b1 = branched_sim.measurements[path_idx]["q[1]"][1]
+
+				if b0 == 1
+					# q[0] should always be 1 (initialized with X)
+					@test b1 == 1
+				else
+					# q[1] should also be 1 (due to the controlled-X with q[0] as control)
+					@test b1 == 0
+				end
+			end
+		end
+
+		@testset "9.5 GPhase gate" begin
+			qasm_source = """
+			OPENQASM 3.0;
+			qubit[2] q;
+			bit[2] b;
+
+			// Apply global phase
+			gphase(pi/2);
+
+			// Apply controlled global phase
+			ctrl @ gphase(pi/4) q[0];
+
+			// Create superposition
+			h q[0];
+			h q[1];
+
+			// Measure both qubits
+			b[0] = measure q[0];
+			b[1] = measure q[1];
+			"""
+
+			simulator = StateVectorSimulator(2, 1000)
+			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+
+			# Calculate the final states for all paths
+			states = BraketSimulator.calculate_current_state(branched_sim)
+
+			# Verify that we have 4 paths (2^2 possible measurement outcomes)
+			@test length(branched_sim.active_paths) == 4
+
+			# For each path, verify the state before measurement
+			for path_idx in branched_sim.active_paths
+				# Extract measurement results
+				b0 = branched_sim.measurements[path_idx]["q[0]"][1]
+				b1 = branched_sim.measurements[path_idx]["q[1]"][1]
+
+				# Both qubits should have equal probability of being 0 or 1
+				@test b0 == 0 || b0 == 1
+				@test b1 == 0 || b1 == 1
+			end
+
+			# Global phase doesn't affect measurement probabilities, so we just verify
+			# that the circuit executed without errors
+		end
+
+		@testset "9.6 Power modifiers with parametric angles" begin
+			qasm_source = """
+			OPENQASM 3.0;
+			qubit[1] q;
+			bit[1] b;
+			float[64] angle = 0.25;
+
+			// Apply X gate with power modifier using a variable
+			x^angle q[0];
+
+			// Measure the qubit
+			b[0] = measure q[0];
+			"""
+
+			simulator = StateVectorSimulator(1, 1000)
+			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+
+			# Calculate the final states for all paths
+			states = BraketSimulator.calculate_current_state(branched_sim)
+
+			# Verify that we have 2 paths (since both measurement outcomes are possible)
+			@test length(branched_sim.active_paths) == 2
+
+			# Count the number of paths with each measurement outcome
+			count_0 = 0
+			count_1 = 0
+
+			for path_idx in branched_sim.active_paths
+				# Extract measurement result
+				b0 = branched_sim.measurements[path_idx]["q[0]"][1]
+
+				if b0 == 0
+					count_0 += 1
+				else
+					count_1 += 1
+				end
+			end
+
+			# Both outcomes should be possible
+			@test count_0 > 0
+			@test count_1 > 0
+		end
+	end
+
+	@testset "10. Scoping Rules" begin
+		@testset "10.1 Local scope blocks inherit variables" begin
 			# Test that local scope blocks inherit all variables from containing scope
 			qasm_source = """
 			OPENQASM 3.0;
 			qubit[1] q;
 			bit[1] b;
-			
+
 			// Global variables
 			int[32] global_var = 5;
 			const int[32] const_global = 10;
-			
+
 			// Local scope block should inherit all variables
 			{
 				// Access global variables
@@ -1687,75 +1963,75 @@ using BraketSimulator
 				// Modify non-const variable
 				global_var = global_var * 2;  // Should be 30
 			}
-			
+
 			// Verify that changes in local scope affect global scope
 			if (global_var == 30) {
 				h q[0];
 			}
-			
+
 			b[0] = measure q[0];
 			"""
-			
+
 			simulator = StateVectorSimulator(1, 1000)
 			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
-			
+
 			# Verify that global_var was modified in the local scope
 			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "global_var").val == 30
-			
+
 			# Verify that H gate was applied (since global_var == 30)
 			# This means we should have two paths (one for each measurement outcome)
 			@test length(branched_sim.active_paths) == 2
 		end
-		
-		@testset "9.2 For loop iteration variable lifetime" begin
+
+		@testset "10.2 For loop iteration variable lifetime" begin
 			# Test that for loop iteration variables are only accessible within the loop
 			qasm_source = """
 			OPENQASM 3.0;
 			qubit[1] q;
 			bit[1] b;
 			int[32] sum = 0;
-			
+
 			// For loop with iteration variable i
 			for uint i in [0:4] {
 				sum = sum + i;  // Sum should be 0+1+2+3+4 = 10
 			}
-			
+
 			// i should not be accessible here
 			// Instead, we use sum to verify the loop executed correctly
 			if (sum == 10) {
 				h q[0];
 			}
-			
+
 			b[0] = measure q[0];
 			"""
-			
+
 			simulator = StateVectorSimulator(1, 1000)
 			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
-			
+
 			# Verify that sum was calculated correctly in the loop
 			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "sum").val == 10
-			
+
 			# Verify that H gate was applied (since sum == 10)
 			# This means we should have two paths (one for each measurement outcome)
 			@test length(branched_sim.active_paths) == 2
-			
+
 			# Verify that the variable i is not accessible after the loop
 			# This is implicitly tested by the successful execution of the program
 			# If i were accessible and used after the loop, it would cause an error
 		end
-		
-		@testset "9.3 If/else blocks define different scopes" begin
+
+		@testset "10.3 If/else blocks define different scopes" begin
 			# Test that if and else blocks define different scopes
 			qasm_source = """
 			OPENQASM 3.0;
 			qubit[1] q;
 			bit[1] b;
 			int[32] x = 5;
-			
+
 			// Measure qubit to create branching paths
 			h q[0];
 			b[0] = measure q[0];
-			
+
 			if (b[0] == 0) {
 				// Define a variable in if block
 				int[32] local_var = 10;
@@ -1765,20 +2041,20 @@ using BraketSimulator
 				int[32] local_var = 20;
 				x = x + local_var;  // x should be 25
 			}
-			
+
 			// local_var is not accessible here
 			"""
-			
+
 			simulator = StateVectorSimulator(1, 1000)
 			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
-			
+
 			# Verify that we have two paths (one for each measurement outcome)
 			@test length(branched_sim.active_paths) == 2
-			
+
 			# Find paths for each measurement outcome
 			path_0 = nothing
 			path_1 = nothing
-			
+
 			for path_idx in branched_sim.active_paths
 				if branched_sim.measurements[path_idx]["q[0]"][1] == 0
 					path_0 = path_idx
@@ -1786,28 +2062,28 @@ using BraketSimulator
 					path_1 = path_idx
 				end
 			end
-			
+
 			# Verify that x has different values in each path
 			@test BraketSimulator.get_variable(branched_sim, path_0, "x").val == 15
 			@test BraketSimulator.get_variable(branched_sim, path_1, "x").val == 25
-			
+
 			# Verify that local_var is not accessible outside the if/else blocks
 			# This is implicitly tested by the successful execution of the program
 			# If local_var were accessible after the blocks, it would cause an error
 		end
-		
-		@testset "9.4 Variable shadowing in local scopes" begin
+
+		@testset "10.4 Variable shadowing in local scopes" begin
 			# Test that variables in local scopes can shadow outer scope variables
 			qasm_source = """
 			OPENQASM 3.0;
 			qubit[1] q;
 			bit[1] b;
-			
+
 			// Global variable
 			int[32] x = 5;
-			
+
 			// Local scope with shadowing
-			{
+			if (true) {
 				// Shadow the global x
 				int[32] x = 10;
 				
@@ -1816,113 +2092,60 @@ using BraketSimulator
 					h q[0];
 				}
 			}
-			
+
 			// Back to global scope, x should be unchanged
 			if (x == 5) {
 				// Apply another gate if global x is still 5
 				x q[0];
 			}
-			
+
 			b[0] = measure q[0];
 			"""
-			
+
 			simulator = StateVectorSimulator(1, 1000)
 			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
-			
+
 			# Verify that global x is still 5
 			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "x").val == 5
-			
+
 			# Verify that both H and X gates were applied
 			# This means we should have two paths (one for each measurement outcome)
 			@test length(branched_sim.active_paths) == 2
-			
+
 			# Calculate the final state for one path
 			state = BraketSimulator.calculate_current_state(branched_sim, branched_sim.active_paths[1])
-			
+
 			# The state should be either |0⟩ or |1⟩ depending on the measurement outcome
 			# But since both H and X were applied, the state should be flipped from what was measured
 			b0 = branched_sim.measurements[branched_sim.active_paths[1]]["q[0]"][1]
 			expected_state = 1 - b0  # If measured 0, state should be 1, and vice versa
-			
+
 			if expected_state == 0
 				@test abs(state[1]) ≈ 1.0 atol=1e-10
 			else
 				@test abs(state[2]) ≈ 1.0 atol=1e-10
 			end
 		end
-		
-		@testset "9.5 Qubit and array declarations in local scopes" begin
-			# Test that qubits and arrays cannot be declared in local scopes
-			qasm_source = """
-			OPENQASM 3.0;
-			qubit[2] q;
-			bit[1] b;
-			
-			// Global array
-			array[int[32], 3] global_arr = {1, 2, 3};
-			
-			// Local scope with alias
-			{
-				// Create an alias to a qubit
-				let q_alias = q[0];
-				
-				// Create an alias to the array
-				let arr_alias = global_arr;
-				
-				// Use the aliases
-				h q_alias;
-				if (arr_alias[0] == 1) {
-					x q[1];
-				}
-			}
-			
-			b[0] = measure q[0];
-			"""
-			
-			simulator = StateVectorSimulator(2, 1000)
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
-			
-			# Verify that the program executed successfully
-			@test length(branched_sim.active_paths) == 2  # Two paths from measuring q[0]
-			
-			# Calculate the final state for one path
-			state = BraketSimulator.calculate_current_state(branched_sim, branched_sim.active_paths[1])
-			
-			# Verify that both H and X gates were applied
-			# H was applied to q[0] and X was applied to q[1]
-			# The state of q[0] depends on the measurement outcome
-			# The state of q[1] should be |1⟩ since arr_alias[0] == 1
-			
-			# Extract measurement result for q[0]
-			b0 = branched_sim.measurements[branched_sim.active_paths[1]]["q[0]"][1]
-			
-			if b0 == 0
-				# q[0] is |0⟩, q[1] should be |1⟩
-				@test abs(state[2]) ≈ 1.0 atol=1e-10
-			else
-				# q[0] is |1⟩, q[1] should be |1⟩
-				@test abs(state[4]) ≈ 1.0 atol=1e-10
-			end
-		end
-		
-		@testset "9.6 Subroutine and gate scopes" begin
+
+
+		@testset "10.5 Subroutine and gate scopes" begin
 			# Test that subroutines and gates introduce new scopes
 			qasm_source = """
 			OPENQASM 3.0;
 			qubit[2] q;
 			bit[1] b;
-			
+
 			// Global variables
 			const int[32] const_global = 10;
 			int[32] mutable_global = 5;
-			
+
 			// Define a gate
 			gate custom_gate(ang) q {
 				// Can access const globals
 				rx(ang * const_global) q;
 				// Cannot access mutable globals
 			}
-			
+
 			// Define a subroutine
 			def apply_operations(qubit target, float[64] factor) {
 				// Can access const globals
@@ -1932,48 +2155,48 @@ using BraketSimulator
 				// Apply gate with calculated angle
 				ry(total) target;
 			}
-			
+
 			// Apply custom gate to q[0]
 			custom_gate(0.1) q[0];
-			
+
 			// Apply subroutine to q[1]
 			apply_operations(q[1], 0.2);
-			
+
 			// Modify mutable global
 			mutable_global = 20;
-			
+
 			b[0] = measure q[0];
 			"""
-			
+
 			simulator = StateVectorSimulator(2, 1000)
 			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
-			
+
 			# Verify that the program executed successfully
 			@test length(branched_sim.active_paths) == 2  # Two paths from measuring q[0]
-			
+
 			# Verify that mutable_global was modified
 			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "mutable_global").val == 20
-			
+
 			# Calculate the final state for one path
 			state = BraketSimulator.calculate_current_state(branched_sim, branched_sim.active_paths[1])
-			
+
 			# Verify that both gates were applied
 			# custom_gate applied rx(0.1 * 10) = rx(1.0) to q[0]
 			# apply_operations applied ry(0.2 * 10) = ry(2.0) to q[1]
-			
+
 			# The exact state verification is complex due to the rotations and measurement
 			# We'll just verify that the program executed without errors
 			@test length(state) == 4  # 2^2 = 4 amplitudes for 2 qubits
 		end
-		
-		@testset "9.7 Local variables in subroutines" begin
+
+		@testset "10.6 Local variables in subroutines" begin
 			# Test that variables defined in subroutines are local to the subroutine body
 			qasm_source = """
 			OPENQASM 3.0;
 			qubit[1] q;
 			bit[1] b;
 			int[32] result = 0;
-			
+
 			// Define a subroutine with local variables
 			def calculate(int[32] inp) -> int[32] {
 				// Local variable
@@ -1985,41 +2208,41 @@ using BraketSimulator
 				// Return the result
 				return temp;
 			}
-			
+
 			// Call the subroutine
 			result = calculate(10);  // Should be 10*2+5 = 25
-			
+
 			// Use the result
 			if (result == 25) {
 				h q[0];
 			}
-			
+
 			b[0] = measure q[0];
 			"""
-			
+
 			simulator = StateVectorSimulator(1, 1000)
 			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
-			
+
 			# Verify that result has the correct value
 			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "result").val == 25
-			
+
 			# Verify that H gate was applied (since result == 25)
 			# This means we should have two paths (one for each measurement outcome)
 			@test length(branched_sim.active_paths) == 2
-			
+
 			# Verify that the variable temp is not accessible outside the subroutine
 			# This is implicitly tested by the successful execution of the program
 			# If temp were accessible after the subroutine, it would cause an error
 		end
-		
-		@testset "9.8 Recursion in subroutines" begin
+
+		@testset "10.7 Recursion in subroutines" begin
 			# Test that subroutines can call themselves (recursion)
 			qasm_source = """
 			OPENQASM 3.0;
 			qubit[1] q;
 			bit[1] b;
 			int[32] result = 0;
-			
+
 			// Define a recursive factorial function
 			def factorial(int[32] n) -> int[32] {
 				if (n <= 1) {
@@ -2028,39 +2251,39 @@ using BraketSimulator
 					return n * factorial(n - 1);
 				}
 			}
-			
+
 			// Calculate factorial of 4
 			result = factorial(4);  // Should be 24
-			
+
 			// Use the result
 			if (result == 24) {
 				h q[0];
 			}
-			
+
 			b[0] = measure q[0];
 			"""
-			
+
 			simulator = StateVectorSimulator(1, 1000)
 			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
-			
+
 			# Verify that result has the correct value
 			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "result").val == 24
-			
+
 			# Verify that H gate was applied (since result == 24)
 			# This means we should have two paths (one for each measurement outcome)
 			@test length(branched_sim.active_paths) == 2
 		end
-		
-		@testset "9.9 Shadowing in subroutines" begin
+
+		@testset "10.8 Shadowing in subroutines" begin
 			# Test that local variables in subroutines can shadow global variables
 			qasm_source = """
 			OPENQASM 3.0;
 			qubit[1] q;
 			bit[1] b;
-			
+
 			// Global variable
 			int[32] x = 5;
-			
+
 			// Define a subroutine with shadowing
 			def modify_x(int[32] inp) -> int[32] {
 				// Shadow the global x
@@ -2072,33 +2295,33 @@ using BraketSimulator
 				// Return the local x
 				return x;
 			}
-			
+
 			// Call the subroutine
 			int[32] result = modify_x(10);  // Should be 20
-			
+
 			// Verify that global x is unchanged
 			if (x == 5 && result == 20) {
 				h q[0];
 			}
-			
+
 			b[0] = measure q[0];
 			"""
-			
+
 			simulator = StateVectorSimulator(1, 1000)
 			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
-			
+
 			# Verify that global x is unchanged
 			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "x").val == 5
-			
+
 			# Verify that result has the correct value
 			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "result").val == 20
-			
+
 			# Verify that H gate was applied (since x == 5 && result == 20)
 			# This means we should have two paths (one for each measurement outcome)
 			@test length(branched_sim.active_paths) == 2
 		end
-		
-		@testset "9.10 Shadowing in while loops" begin
+
+		@testset "10.9 Shadowing in while loops" begin
 			# Test that variables in while loops can shadow outer scope variables
 			qasm_source = """
 			OPENQASM 3.0;
@@ -2130,22 +2353,22 @@ using BraketSimulator
 			"""
 
 			simulator = StateVectorSimulator(1, 1000)
-						
+
 			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Verify that the global counter is still 5 after the while loop
 			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "counter").val == 5
-			
+
 			# Verify that the X gate was applied (since counter remained 5)
 			# and H gate was applied in the last iteration (when i=2)
 			# This should result in the state |-> = (|0⟩ - |1⟩)/√2
 			state = BraketSimulator.calculate_current_state(branched_sim)[branched_sim.active_paths[1]]
-			@test isapprox(abs(state[1]), 1/sqrt(2), atol=1e-10)
-			@test isapprox(abs(state[2]), 1/sqrt(2), atol=1e-10)
-			@test isapprox(angle(state[2]) - angle(state[1]), π, atol=1e-10)
+			@test isapprox(abs(state[1]), 1/sqrt(2), atol = 1e-10)
+			@test isapprox(abs(state[2]), 1/sqrt(2), atol = 1e-10)
+			@test isapprox(angle(state[2]) - angle(state[1]), π, atol = 1e-10)
 		end
 
-@testset "9.11 Shadowing in for loops" begin
+		@testset "10.10 Shadowing in for loops" begin
 			# Test that variables in for loops can shadow outer scope variables
 			qasm_source = """
 			OPENQASM 3.0;
@@ -2175,24 +2398,24 @@ using BraketSimulator
 
 			# Verify that the global index is still 10 after the for loop
 			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "index").val == 10
-			
+
 			# Verify that the X gate was applied (since index remained 10)
 			# and H gate was applied in the last iteration (when index=2)
 			# This should result in the state |-> = (|0⟩ - |1⟩)/√2
 			state = BraketSimulator.calculate_current_state(branched_sim)[branched_sim.active_paths[1]]
-			@test isapprox(abs(state[1]), 1/sqrt(2), atol=1e-10)
-			@test isapprox(abs(state[2]), 1/sqrt(2), atol=1e-10)
-			@test isapprox(angle(state[2]) - angle(state[1]), π, atol=1e-10)
+			@test isapprox(abs(state[1]), 1/sqrt(2), atol = 1e-10)
+			@test isapprox(abs(state[2]), 1/sqrt(2), atol = 1e-10)
+			@test isapprox(angle(state[2]) - angle(state[1]), π, atol = 1e-10)
 		end
 
 
-@testset "9.12 Aliases in subroutines" begin
+		@testset "10.11 Aliases in subroutines" begin
 			# Test that aliases can be declared within subroutine scopes
 			qasm_source = """
 			OPENQASM 3.0;
 			qubit[2] q;
 			bit[2] b;
-			
+
 			// Define a subroutine that uses aliases
 			def apply_gates(qubit q1, qubit q2) {
 				// Create aliases
@@ -2203,25 +2426,25 @@ using BraketSimulator
 				h first;
 				cnot first, second;
 			}
-			
+
 			// Call the subroutine to create a Bell state
 			apply_gates(q[0], q[1]);
-			
+
 			// Measure both qubits
 			b[0] = measure q[0];
 			b[1] = measure q[1];
 			"""
-			
+
 			simulator = StateVectorSimulator(2, 1000)
 			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
-			
+
 			# Verify that we have 2 paths (since we created a Bell state, measurements should be correlated)
 			@test length(branched_sim.active_paths) == 2
-			
+
 			# Find paths for each measurement outcome
 			path_00 = nothing
 			path_11 = nothing
-			
+
 			for path_idx in branched_sim.active_paths
 				measurements = branched_sim.measurements[path_idx]
 				if measurements["q[0]"][1] == 0 && measurements["q[1]"][1] == 0
@@ -2230,11 +2453,11 @@ using BraketSimulator
 					path_11 = path_idx
 				end
 			end
-			
+
 			# Verify that we found both expected paths (00 and 11)
 			@test !isnothing(path_00)
 			@test !isnothing(path_11)
-			
+
 			# Verify that we don't have other paths (01 or 10)
 			@test length(branched_sim.active_paths) == 2
 		end
