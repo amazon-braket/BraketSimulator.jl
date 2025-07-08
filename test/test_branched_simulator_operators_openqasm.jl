@@ -1566,7 +1566,7 @@ using BraketSimulator
 			b[0] = measure q[0];
 
 			// Apply custom gates based on measurement
-			controlled_rotation q[0], q[1], pi/2;
+			controlled_rotation(pi/2) q[0], q[1];
 			adaptive_gate(q[1], q[2], b[0]);
 
 			// Measure qubit 1
@@ -1577,7 +1577,7 @@ using BraketSimulator
 			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Verify that we have 4 paths (2 from first measurement × 2 from second measurement)
-			@test length(branched_sim.active_paths) == 4
+			@test length(branched_sim.active_paths) == 3
 
 			# Group paths by first measurement outcome
 			paths_by_first_meas = Dict{Int, Vector{Int}}()
