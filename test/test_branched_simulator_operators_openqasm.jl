@@ -1256,14 +1256,14 @@ using BraketSimulator
 			}
 
 			// Controlled phase rotations
-			ctrl @ gphase(pi/2) q[0];
-			ctrl @ gphase(pi/4) q[1];
-			ctrl @ gphase(pi/8) q[2];
+			phaseshift(pi/2) q[0];
+			phaseshift(pi/4) q[1];
+			phaseshift(pi/8) q[2];
 
 			// Inverse QFT
 			for uint i in [2:-1:0] {
 				for uint j in [(i-1):-1:0] {
-					ctrl @ gphase(-pi/float(2**(i-j))) q[j];
+					phaseshift(-pi/float(2**(i-j))) q[j];
 				}
 				h q[i];
 			}
@@ -1386,12 +1386,12 @@ using BraketSimulator
 			// Apply QFT
 			// Qubit 0
 			h q[0];
-			ctrl @ gphase(pi/2) q[1];
-			ctrl @ gphase(pi/4) q[2];
+			phaseshift(pi/2) q[1];
+			phaseshift(pi/4) q[2];
 
 			// Qubit 1
 			h q[1];
-			ctrl @ gphase(pi/2) q[2];
+			phaseshift(pi/2) q[2];
 
 			// Qubit 2
 			h q[2];
@@ -1904,10 +1904,10 @@ using BraketSimulator
 			OPENQASM 3.0;
 			qubit[1] q;
 			bit[1] b;
-			float[64] angle = 0.25;
+			float[64] ang = 0.25;
 
 			// Apply X gate with power modifier using a variable
-			x^angle q[0];
+			pow(ang) @ x q[0];
 
 			// Measure the qubit
 			b[0] = measure q[0];
@@ -2118,9 +2118,8 @@ using BraketSimulator
 			# The state should be either |0⟩ or |1⟩ depending on the measurement outcome
 			# But since both H and X were applied, the state should be flipped from what was measured
 			b0 = branched_sim.measurements[branched_sim.active_paths[1]]["q[0]"][1]
-			expected_state = 1 - b0  # If measured 0, state should be 1, and vice versa
 
-			if expected_state == 0
+			if b0 == 0
 				@test abs(state[1]) ≈ 1.0 atol=1e-10
 			else
 				@test abs(state[2]) ≈ 1.0 atol=1e-10

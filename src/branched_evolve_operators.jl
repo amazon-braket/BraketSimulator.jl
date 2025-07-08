@@ -52,7 +52,7 @@ function evaluate_qubits(sim::BranchedSimulatorOperators, qubit_expr::QasmExpres
 				else
 					push!(all_qubits, stored_qubit_idx)
 				end
-			# Check if it's a qubit alias
+				# Check if it's a qubit alias
 			elseif !isnothing(var) && var.type == :qubit_alias && !isnothing(var.val)
 				# If it's a qubit alias, use the stored qubit indices
 				alias_qubits = var.val
@@ -61,7 +61,7 @@ function evaluate_qubits(sim::BranchedSimulatorOperators, qubit_expr::QasmExpres
 				else
 					push!(all_qubits, alias_qubits)
 				end
-			# Check if the qubit name exists directly in the mapping
+				# Check if the qubit name exists directly in the mapping
 			elseif haskey(sim.qubit_mapping, qubit_name)
 				qubit_idx = sim.qubit_mapping[qubit_name]
 				if qubit_idx isa Vector
@@ -116,7 +116,7 @@ function evaluate_qubits(sim::BranchedSimulatorOperators, qubit_expr::QasmExpres
 			if !isnothing(var) && var.type == :qubit_alias && !isnothing(var.val)
 				# If the base name is an alias for a register, use the indexed qubit from the register
 				register_qubits = var.val
-				
+
 				# Handle array indexing
 				if path_qubit_ix isa Vector
 					for ix in path_qubit_ix
@@ -135,11 +135,11 @@ function evaluate_qubits(sim::BranchedSimulatorOperators, qubit_expr::QasmExpres
 						error("Index $path_qubit_ix out of bounds for register $qubit_name")
 					end
 				end
-			# Then check if the base name is an alias for a register in qubit_mapping
+				# Then check if the base name is an alias for a register in qubit_mapping
 			elseif haskey(sim.qubit_mapping, qubit_name) && sim.qubit_mapping[qubit_name] isa Vector
 				# If the base name is an alias for a register, use the indexed qubit from the register
 				register_qubits = sim.qubit_mapping[qubit_name]
-				
+
 				# Handle array indexing
 				if path_qubit_ix isa Vector
 					for ix in path_qubit_ix
@@ -222,7 +222,7 @@ Evaluates gate modifiers. Always returns a dictionary mapping path indices to tu
 function evaluate_modifiers(sim::BranchedSimulatorOperators, expr::QasmExpression)
 	# Create a dictionary to store results for each path
 	results = Dict{Int, Tuple{QasmExpression, Any}}()
-	
+
 	if head(expr) == :power_mod
 		pow_val = _evolve_branched_ast_operators(sim, expr.args[1])
 
@@ -240,14 +240,14 @@ function evaluate_modifiers(sim::BranchedSimulatorOperators, expr::QasmExpressio
 				results[path_idx] = (pow_expr, expr.args[2])
 			end
 		end
-		
+
 		return results
 	elseif head(expr) == :inverse_mod
 		# Use the same inverse modifier for all active paths
 		for path_idx in sim.active_paths
 			results[path_idx] = (QasmExpression(:inv), expr.args[1])
 		end
-		
+
 		return results
 	elseif head(expr) ∈ (:control_mod, :negctrl_mod)
 		has_argument = length(expr.args) > 1
@@ -276,14 +276,14 @@ function evaluate_modifiers(sim::BranchedSimulatorOperators, expr::QasmExpressio
 				isinteger(arg_val) || error("Cannot apply non-integer ($arg_val) number of controls or negcontrols.")
 				true_inner = expr.args[2]
 				inner = QasmExpression(head(expr), true_inner)
-				
+
 				while arg_val > 2
 					inner = QasmExpression(head(expr), inner)
 					arg_val -= 1
 				end
-				
+
 				new_head = head(expr) == :control_mod ? :ctrl : :negctrl
-				
+
 				for path_idx in sim.active_paths
 					results[path_idx] = (QasmExpression(new_head), inner)
 				end
@@ -291,12 +291,12 @@ function evaluate_modifiers(sim::BranchedSimulatorOperators, expr::QasmExpressio
 		else
 			inner = expr.args[1]
 			new_head = head(expr) == :control_mod ? :ctrl : :negctrl
-			
+
 			for path_idx in sim.active_paths
 				results[path_idx] = (QasmExpression(new_head), inner)
 			end
 		end
-		
+
 		return results
 	else
 		error("Unknown modifier type: $(head(expr))")
@@ -304,94 +304,93 @@ function evaluate_modifiers(sim::BranchedSimulatorOperators, expr::QasmExpressio
 end
 
 """
-    _apply_modifiers(gate_op::QuantumOperator, modifiers::Vector, target_indices::Vector{Int}) -> QuantumOperator
+	_apply_modifiers(gate_op::QuantumOperator, modifiers::Vector, target_indices::Vector{Int}) -> QuantumOperator
 
 Apply gate modifiers to a gate operator. This function takes a gate operator and a list of modifiers,
 and returns a new gate operator with the modifiers applied.
 """
 function _apply_modifiers(gate_op::QuantumOperator, modifiers::Vector, target_indices::Vector{Int})
-    # Process each modifier in order
-    for modifier in modifiers
-        modifier_type = head(modifier)
-        
-        if modifier_type == :ctrl
-            # Special handling for global phase gates
-            if isa(gate_op, PhaseShift)
-                # For PhaseShift (gphase), we only need one control qubit
-                if length(target_indices) < 1
-                    error("Control modifier requires at least 1 qubit for phase gates")
-                end
-                
-                # Create a controlled version of the gate
-                # For phase gates, the control is the only qubit
-                bitvals = tuple(1)
-                
-                # Create the controlled gate
-                gate_op = Control(gate_op, bitvals)
-            else
-                # For regular gates, we need at least 2 qubits (control + target)
-                if length(target_indices) < 2
-                    error("Control modifier requires at least 2 qubits")
-                end
-                
-                # Create a controlled version of the gate
-                # The first qubit is the control, the rest are targets for the gate
-                bitvals = tuple(1)
-                
-                # Create the controlled gate
-                gate_op = Control(gate_op, bitvals)
-            end
-            
-        elseif modifier_type == :negctrl
-            # Special handling for global phase gates
-            if isa(gate_op, PhaseShift)
-                # For PhaseShift (gphase), we only need one control qubit
-                if length(target_indices) < 1
-                    error("Negative control modifier requires at least 1 qubit for phase gates")
-                end
-                
-                # Create a controlled version of the gate with control on |0⟩ state
-                bitvals = tuple(0)
-                
-                # Create the negatively controlled gate
-                gate_op = Control(gate_op, bitvals)
-            else
-                # Apply negative control modifier (control on |0⟩ state)
-                if length(target_indices) < 2
-                    error("Negative control modifier requires at least 2 qubits")
-                end
-                
-                # Create a controlled version of the gate with control on |0⟩ state
-                bitvals = tuple(0)
-                
-                # Create the negatively controlled gate
-                gate_op = Control(gate_op, bitvals)
-            end
-            
-        elseif modifier_type == :pow
-            # Apply power modifier
-            if hasfield(typeof(gate_op), :pow_exponent)
-                # If the gate has a pow_exponent field, update it
-                power_value = modifier.args[1]
-                gate_op.pow_exponent = power_value
-            else
-                # If the gate doesn't have a pow_exponent field, we can't apply the power modifier
-                error("Power modifier not supported for gate type $(typeof(gate_op))")
-            end
-            
-        elseif modifier_type == :inv
-            # Apply inverse modifier
-            if hasfield(typeof(gate_op), :pow_exponent)
-                # If the gate has a pow_exponent field, negate it to invert
-                gate_op.pow_exponent = -gate_op.pow_exponent
-            else
-                # If the gate doesn't have a pow_exponent field, we can't apply the inverse modifier
-                error("Inverse modifier not supported for gate type $(typeof(gate_op))")
-            end
-        end
-    end
-    
-    return gate_op
+	# Process each modifier in order
+	for modifier in modifiers
+		modifier_type = head(modifier)
+
+		if modifier_type == :ctrl
+			# Special handling for global phase gates
+			if isa(gate_op, GPhase)
+				if length(target_indices) < 1
+					error("Control modifier requires at least 1 qubit for phase gates")
+				end
+
+				# Create a controlled version of the gate
+				# For phase gates, the control is the only qubit
+				bitvals = tuple(1)
+
+				# Create the controlled gate
+				gate_op = Control(gate_op, bitvals)
+			else
+				# For regular gates, we need at least 2 qubits (control + target)
+				if length(target_indices) < 2
+					error("Control modifier requires at least 2 qubits")
+				end
+
+				# Create a controlled version of the gate
+				# The first qubit is the control, the rest are targets for the gate
+				bitvals = tuple(1)
+
+				# Create the controlled gate
+				gate_op = Control(gate_op, bitvals)
+			end
+
+		elseif modifier_type == :negctrl
+			# Special handling for global phase gates
+			if isa(gate_op, PhaseShift)
+				# For PhaseShift (gphase), we only need one control qubit
+				if length(target_indices) < 1
+					error("Negative control modifier requires at least 1 qubit for phase gates")
+				end
+
+				# Create a controlled version of the gate with control on |0⟩ state
+				bitvals = tuple(0)
+
+				# Create the negatively controlled gate
+				gate_op = Control(gate_op, bitvals)
+			else
+				# Apply negative control modifier (control on |0⟩ state)
+				if length(target_indices) < 2
+					error("Negative control modifier requires at least 2 qubits")
+				end
+
+				# Create a controlled version of the gate with control on |0⟩ state
+				bitvals = tuple(0)
+
+				# Create the negatively controlled gate
+				gate_op = Control(gate_op, bitvals)
+			end
+
+		elseif modifier_type == :pow
+			# Apply power modifier
+			if hasfield(typeof(gate_op), :pow_exponent)
+				# If the gate has a pow_exponent field, update it
+				power_value = modifier.args[1]
+				gate_op.pow_exponent = power_value
+			else
+				# If the gate doesn't have a pow_exponent field, we can't apply the power modifier
+				error("Power modifier not supported for gate type $(typeof(gate_op))")
+			end
+
+		elseif modifier_type == :inv
+			# Apply inverse modifier
+			if hasfield(typeof(gate_op), :pow_exponent)
+				# If the gate has a pow_exponent field, negate it to invert
+				gate_op.pow_exponent = -gate_op.pow_exponent
+			else
+				# If the gate doesn't have a pow_exponent field, we can't apply the inverse modifier
+				error("Inverse modifier not supported for gate type $(typeof(gate_op))")
+			end
+		end
+	end
+
+	return gate_op
 end
 
 #####################################
@@ -466,9 +465,13 @@ function _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::Q
 		# If there is no return value, the empty return keyword may be used to immediately exit from the subroutine, which implicitly returns the void type.
 	elseif expr_type == :return
 		if length(expr.args) == 0 # No return value
-			return nothing
+			for path_idx in sim.active_paths
+				sim.return_values[path_idx] = nothing
+			end
+		else
+			sim.return_values = merge(sim.return_values, _evolve_branched_ast_operators(sim, expr.args[1]))
 		end
-		return _evolve_branched_ast_operators(sim, expr.args[1])
+		sim.active_paths = []
 
 	elseif expr_type == :version
 		# Version node - ignore
@@ -524,7 +527,7 @@ function _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::Q
 	elseif expr_type == :alias
 		alias_name = Quasar.name(expr)
 		right_hand_side = expr.args[1]
-		
+
 		# Check if the right-hand side is a direct expression or wrapped in args
 		if length(right_hand_side.args) > 0
 			right_hand_side = right_hand_side.args[1]
@@ -575,34 +578,34 @@ function _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::Q
 
 			# Get the qubits from the identifier
 			qubits_by_path = evaluate_qubits(sim, right_hand_side)
-			
+
 			# Process for each active path
 			for path_idx in sim.active_paths
 				# Skip if this path doesn't have qubit indices
 				if !haskey(qubits_by_path, path_idx)
 					continue
 				end
-				
+
 				alias_qubits = qubits_by_path[path_idx]
-				
+
 				# Store the alias in variables
 				set_variable!(sim, path_idx, alias_name, ClassicalVariable(alias_name, :qubit_alias, alias_qubits, false))
 			end
 		elseif head(right_hand_side) == :indexed_identifier
 			referent_name = Quasar.name(right_hand_side)
-			
+
 			# Get the qubits from the indexed identifier
 			qubits_by_path = evaluate_qubits(sim, right_hand_side)
-			
+
 			# Process for each active path
 			for path_idx in sim.active_paths
 				# Skip if this path doesn't have qubit indices
 				if !haskey(qubits_by_path, path_idx)
 					continue
 				end
-				
+
 				alias_qubits = qubits_by_path[path_idx]
-				
+
 				# Store the alias in variables
 				set_variable!(sim, path_idx, alias_name, ClassicalVariable(alias_name, :qubit_alias, alias_qubits, false))
 			end
@@ -637,7 +640,7 @@ function _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::Q
 				elseif !isnothing(var.val)
 					results[path_idx] = var.val
 				end
-			# Then check qubit_mapping
+				# Then check qubit_mapping
 			elseif haskey(sim.qubit_mapping, id_name)
 				results[path_idx] = sim.qubit_mapping[id_name]
 			else
@@ -693,7 +696,7 @@ function _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::Q
 				sim.active_paths = [path_idx]
 				path_results = evaluate_qubits(sim, expr)
 				sim.active_paths = original_active_paths
-				
+
 				if haskey(path_results, path_idx)
 					results[path_idx] = path_results[path_idx]
 				end
@@ -988,7 +991,7 @@ function _create_block_scope(sim::BranchedSimulatorOperators)
 
 	# Increment the current frame as we're entering a new scope
 	sim.curr_frame += 1
-	
+
 	# Save current variables state for all active paths (dont deep copy to include aliasing)
 	for path_idx in sim.active_paths
 		original_variables[path_idx] = copy(sim.variables[path_idx])
@@ -1073,7 +1076,7 @@ function _handle_conditional(sim::BranchedSimulatorOperators, expr::QasmExpressi
 	# Process if branch for true paths
 	if !isempty(true_paths)
 		sim.active_paths = true_paths
-		
+
 		# Create a new scope for the if branch
 		original_variables = _create_block_scope(sim)
 
@@ -1082,7 +1085,7 @@ function _handle_conditional(sim::BranchedSimulatorOperators, expr::QasmExpressi
 			_evolve_branched_ast_operators(sim, child_expr)
 			isempty(sim.active_paths) && break
 		end
-		
+
 		# Restore original scope
 		_restore_original_scope(sim, original_variables)
 
@@ -1093,7 +1096,7 @@ function _handle_conditional(sim::BranchedSimulatorOperators, expr::QasmExpressi
 	# Process else branch for false paths
 	if !isnothing(has_else) && !isempty(false_paths)
 		sim.active_paths = false_paths
-		
+
 		# Create a new scope for the else branch
 		original_variables = _create_block_scope(sim)
 
@@ -1102,7 +1105,7 @@ function _handle_conditional(sim::BranchedSimulatorOperators, expr::QasmExpressi
 			_evolve_branched_ast_operators(sim, child_expr)
 			isempty(sim.active_paths) && break
 		end
-		
+
 		# Restore original scope
 		_restore_original_scope(sim, original_variables)
 
@@ -1111,7 +1114,7 @@ function _handle_conditional(sim::BranchedSimulatorOperators, expr::QasmExpressi
 	else
 		append!(new_paths, false_paths) # Add false paths directly if no else branch
 	end
-	
+
 	# Update active paths
 	sim.active_paths = new_paths
 end
@@ -1289,14 +1292,14 @@ function _handle_while_loop(sim::BranchedSimulatorOperators, expr::QasmExpressio
 		# Execute the loop body
 		sim.active_paths = new_continue_paths
 		_evolve_branched_ast_operators(sim, loop_body)
-		
+
 		# Update continue_paths for next iteration
 		continue_paths = copy(sim.active_paths)
 	end
 
 	# Restore paths that didn't enter the loop
 	sim.active_paths = setdiff(range(1, length(sim.instruction_sequences)), paths_not_to_add)
-	
+
 	# Restore original scope
 	_restore_original_scope(sim, original_variables)
 end
@@ -1542,27 +1545,27 @@ Handle gate modifiers in the branched simulation model.
 function _handle_gate_modifiers(sim::BranchedSimulatorOperators, expr::QasmExpression)
 	# Save original active paths
 	original_active_paths = copy(sim.active_paths)
-	
+
 	# Get modifiers for each path
 	modifiers_by_path = evaluate_modifiers(sim, expr)
-	
+
 	# Process each path separately
 	for (path_idx, (mod_expr, inner_expr)) in modifiers_by_path
 		# Set active paths to just this path
 		sim.active_paths = [path_idx]
-		
+
 		# Process gate modifiers for this path
 		mods = QasmExpression(:modifiers)
 		push!(mods, mod_expr)
-		
+
 		# Get the inner expression
 		inner = inner_expr
-		
+
 		# Process nested modifiers
 		while head(inner) != :gate_call
 			# Get modifiers for this inner expression
 			inner_modifiers = evaluate_modifiers(sim, inner)
-			
+
 			# Since we're only processing one path, there should be only one entry
 			if haskey(inner_modifiers, path_idx)
 				mod_expr, inner = inner_modifiers[path_idx]
@@ -1572,14 +1575,14 @@ function _handle_gate_modifiers(sim::BranchedSimulatorOperators, expr::QasmExpre
 				break
 			end
 		end
-		
+
 		# Add modifiers to the inner gate call
 		push!(inner, mods)
-		
+
 		# Process the gate call with modifiers
 		_evolve_branched_ast_operators(sim, inner)
 	end
-	
+
 	# Restore original active paths
 	sim.active_paths = original_active_paths
 end
@@ -1649,60 +1652,60 @@ function _handle_gate_call(sim::BranchedSimulatorOperators, expr::QasmExpression
 
 		# Get gate operator
 		if haskey(sim.gate_defs, gate_name)
-				# Check if the gate is parametric
-				if !isempty(evaluated_params)
-					# Extract parameters for this path
-					path_params = evaluated_params[path_idx]
+			# Check if the gate is parametric
+			if !isempty(evaluated_params)
+				# Extract parameters for this path
+				path_params = evaluated_params[path_idx]
 
-					# Check if it's a built-in gate (in the mapping) or a user-defined gate
-					if haskey(sim.gate_name_mapping, gate_name)
+				# Check if it's a built-in gate (in the mapping) or a user-defined gate
+				if haskey(sim.gate_name_mapping, gate_name)
+					# Special case for GPhase gate which needs to know the number of qubits
+					if gate_name == "gphase"
+						# Get the number of target qubits
+						N = sim.n_qubits-length(target_indices)
+
+						# Create GPhase{N} gate with the correct number of qubits
+						gate_op = GPhase{N}(tuple(path_params...))
+					else
 						# Built-in gate - use the mapping to get the gate type
 						gate_type = getfield(BraketSimulator, sim.gate_name_mapping[gate_name])
 
 						# Create gate operator
-						gate_op = nothing
-						try
-							# Try with tuple
-							gate_op = gate_type(tuple(path_params...))
-						catch e
-							# If that fails, fall back to the original method
-							gate_def = sim.gate_defs[gate_name]
-							instruction = gate_def.body
-							gate_op = StructTypes.constructfrom(QuantumOperator, instruction)
-						end
-						
-						# Apply modifiers if any
-						if !isempty(modifiers)
-							gate_op = _apply_modifiers(gate_op, modifiers, target_indices)
-						end
-						
-						# Store gate instruction for this path
-						instruction = Instruction(gate_op, target_indices)
-						push!(sim.instruction_sequences[path_idx], instruction)
-					else
-						# Gate is parametric and user defined, so create a gate scope and execute the body
-						gate_def = sim.gate_defs[gate_name]
+						gate_op = gate_type(tuple(path_params...))
+					end
 
-						# Save original active paths
-						original_active_paths = copy(sim.active_paths)
+					# Apply modifiers if any
+					if !isempty(modifiers)
+						gate_op = _apply_modifiers(gate_op, modifiers, target_indices)
+					end
 
-						# Set active paths to just this path
-						sim.active_paths = [path_idx]
+					# Store gate instruction for this path
+					instruction = Instruction(gate_op, target_indices)
+					push!(sim.instruction_sequences[path_idx], instruction)
+				else
+					# Gate is parametric and user defined, so create a gate scope and execute the body
+					gate_def = sim.gate_defs[gate_name]
 
-						# Create a new scope with only const variables
-						original_variables = _create_const_only_scope(sim)
+					# Save original active paths
+					original_active_paths = copy(sim.active_paths)
 
-						# Bind parameters to the gate scope
-						if !isempty(path_params) && !isempty(gate_def.arguments)
-							for (i, param_name) in enumerate(gate_def.arguments)
-								if i <= length(path_params)
-									# Store parameters with their actual type, not just Any
-									param_value = path_params[i]
-									param_type = typeof(param_value)
-									set_variable!(sim, path_idx, param_name, ClassicalVariable(param_name, param_type, param_value, false))
-								end
+					# Set active paths to just this path
+					sim.active_paths = [path_idx]
+
+					# Create a new scope with only const variables
+					original_variables = _create_const_only_scope(sim)
+
+					# Bind parameters to the gate scope
+					if !isempty(path_params) && !isempty(gate_def.arguments)
+						for (i, param_name) in enumerate(gate_def.arguments)
+							if i <= length(path_params)
+								# Store parameters with their actual type, not just Any
+								param_value = path_params[i]
+								param_type = typeof(param_value)
+								set_variable!(sim, path_idx, param_name, ClassicalVariable(param_name, param_type, param_value, false))
 							end
 						end
+					end
 
 					# Bind qubit targets to the gate scope
 					if !isempty(target_indices) && !isempty(gate_def.qubit_targets)
@@ -1763,7 +1766,7 @@ function _handle_gate_call(sim::BranchedSimulatorOperators, expr::QasmExpression
 				else
 					# Otherwise, just call constructfrom 
 					gate_op = StructTypes.constructfrom(QuantumOperator, instruction)
-					
+
 					# Apply modifiers if any
 					if !isempty(modifiers)
 						gate_op = _apply_modifiers(gate_op, modifiers, target_indices)
@@ -1851,7 +1854,7 @@ function _create_const_only_scope(sim::BranchedSimulatorOperators)
 
 	# Increment the current frame as we're entering a new scope
 	sim.curr_frame += 1
-	
+
 	# Current frame that variables in this scope will be assigned to
 	current_frame = sim.curr_frame
 
@@ -1889,24 +1892,24 @@ It also properly handles variable shadowing by restoring the original variables 
 function _restore_original_scope(sim::BranchedSimulatorOperators, original_variables::Dict{Int, Dict{String, FramedVariable}})
 	# Get all paths that existed before the function call
 	original_paths = collect(keys(original_variables))
-	
+
 	# Store the current frame that we're exiting from
 	exiting_frame = sim.curr_frame
-	
+
 	# Decrement the current frame as we're exiting a scope
 	sim.curr_frame -= 1
-	
+
 	# For paths that existed before, restore the original scope
 	for path_idx in sim.active_paths
 		if haskey(original_variables, path_idx)
 			# Create a new scope that combines original variables with updated values
 			new_scope = Dict{String, FramedVariable}()
-			
+
 			# First, copy all original variables to ensure we don't lose any
 			for (var_name, orig_var) in original_variables[path_idx]
 				new_scope[var_name] = orig_var
 			end
-			
+
 			# Then update any variables that were modified in outer scopes
 			for (var_name, current_var) in sim.variables[path_idx]
 				if current_var.frame_number < exiting_frame && haskey(new_scope, var_name)
@@ -1918,7 +1921,7 @@ function _restore_original_scope(sim::BranchedSimulatorOperators, original_varia
 						orig_var.type,
 						copy(current_var.val),  # Use the updated value
 						orig_var.is_const,
-						orig_var.frame_number  # Keep the original frame number
+						orig_var.frame_number,  # Keep the original frame number
 					)
 				elseif current_var.frame_number < exiting_frame && !haskey(new_scope, var_name)
 					# This is a new variable declared in an outer scope
@@ -1926,19 +1929,19 @@ function _restore_original_scope(sim::BranchedSimulatorOperators, original_varia
 				end
 				# Variables declared in the current frame (frame_number == exiting_frame) are discarded
 			end
-			
+
 			# Update the path's variables to the new scope
 			sim.variables[path_idx] = new_scope
 		else
 			# This is a new path created during function execution or measurement
 			# We need to keep variables from outer scopes but remove variables from the current frame
-			
+
 			# Create a new scope for this path
 			new_scope = Dict{String, FramedVariable}()
-			
+
 			# Find a reference path to copy variables from
 			reference_path = original_paths[1]
-			
+
 			# Copy all variables from the current path that were declared in outer frames
 			for (var_name, var) in sim.variables[path_idx]
 				if var.frame_number < exiting_frame
@@ -1946,7 +1949,7 @@ function _restore_original_scope(sim::BranchedSimulatorOperators, original_varia
 					new_scope[var_name] = var
 				end
 			end
-			
+
 			# Also copy variables from the reference path that might not be in this path
 			# This ensures that all paths have the same variable names after exiting a scope
 			for (var_name, var) in original_variables[reference_path]
@@ -1957,11 +1960,11 @@ function _restore_original_scope(sim::BranchedSimulatorOperators, original_varia
 						var.type,
 						copy(var.val),
 						var.is_const,
-						var.frame_number
+						var.frame_number,
 					)
 				end
 			end
-			
+
 			# Update the path's variables to the new scope
 			sim.variables[path_idx] = new_scope
 		end
@@ -2119,30 +2122,25 @@ function _handle_function_call(sim::BranchedSimulatorOperators, expr::QasmExpres
 			end
 		end
 
-		# Execute the function body by recursively calling _evolve_branched_ast_operators
-		local return_value = Dict{Int, Any}()
-
 		# Make sure we're handling the function body correctly
 		if func_def.body isa Vector{QasmExpression}
 			# If it's a vector of expressions, process each one
 			for expr in func_def.body
-				result = _evolve_branched_ast_operators(sim, expr)
-				# If we encounter a return statement, store the result and break out of the loop
-				if !isnothing(result)
-					return_value = result
-					break
-				end
+				_evolve_branched_ast_operators(sim, expr)
 			end
 		else
 			# Otherwise, process it directly
-			return_value = _evolve_branched_ast_operators(sim, func_def.body)
+			_evolve_branched_ast_operators(sim, func_def.body)
 		end
+
+		active_paths = keys(sim.return_values)
+		append!(sim.active_paths, active_paths)
 
 		# Restore original variables
 		_restore_original_scope(sim, original_variables)
 
 		# Return the function's return value
-		return return_value
+		return sim.return_values
 	else
 		error("Function $function_name was never defined")
 	end

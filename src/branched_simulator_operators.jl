@@ -97,6 +97,9 @@ mutable struct BranchedSimulatorOperators <: AbstractSimulator
 	# Input parameters for the circuit
 	inputs::Dict{String, Any}
 
+	# Return values for function calls
+	return_values::Dict{Int, Any}
+
 	# Constructor
 	function BranchedSimulatorOperators(simulator::AbstractSimulator; inputs::Dict{String, Any} = Dict{String, Any}())
 		# If the number of shots for the simulator is <= 0, then throw an error
@@ -134,7 +137,7 @@ mutable struct BranchedSimulatorOperators <: AbstractSimulator
 			"cphaseshift00" => :CPhaseShift00,
 			"cphaseshift01" => :CPhaseShift01,
 			"cphaseshift10" => :CPhaseShift10,
-			"gphase" => :PhaseShift
+			"gphase" => :GPhase
 		)
 
 		# Initialize with empty instruction sequence
@@ -154,6 +157,7 @@ mutable struct BranchedSimulatorOperators <: AbstractSimulator
 			gate_defs,
 			gate_name_mapping,
 			inputs,
+			Dict{Int, Any}(),
 		)
 	end
 end
