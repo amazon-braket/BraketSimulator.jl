@@ -1179,7 +1179,7 @@ function _handle_switch_statement(sim::BranchedSimulatorOperators, expr::QasmExp
 
 		for (case_idx, case) in enumerate(all_cases_vals)
 			# Case value matched
-			if case[path_idx] == case_val
+			if case[path_idx] == case_val || case_val in case[path_idx]
 				if !haskey(case_paths, case_idx)
 					case_paths[case_idx] = Int[]
 				end
@@ -2026,19 +2026,19 @@ According to the scoping rules:
 function _handle_function_call(sim::BranchedSimulatorOperators, expr::QasmExpression)
 	function_name = Quasar.name(expr)
 
+	# Extract function arguments from the call and evaluate them in the current scope
+	concrete_arguments = []
+	if length(expr.args) > 1 && !isnothing(expr.args[2])
+		concrete_arguments = expr.args[2].args[1]
+	end
+
+	# Evaluate all arguments in the current scope - these will be dictionaries mapping path indices to values
+	evaluated_arguments = _evolve_branched_ast_operators(sim, concrete_arguments)
+
 	# Check if it's a user-defined function
 	if haskey(sim.function_defs, function_name)
 		# Get the function definition
 		func_def = sim.function_defs[function_name]
-
-		# Extract function arguments from the call and evaluate them in the current scope
-		concrete_arguments = []
-		if length(expr.args) > 1 && !isnothing(expr.args[2])
-			concrete_arguments = expr.args[2].args[1]
-		end
-
-		# Evaluate all arguments in the current scope - these will be dictionaries mapping path indices to values
-		evaluated_arguments = _evolve_branched_ast_operators(sim, concrete_arguments)
 
 		# Create a new scope with only const variables
 		original_variables = _create_const_only_scope(sim)
@@ -2124,6 +2124,13 @@ function _handle_function_call(sim::BranchedSimulatorOperators, expr::QasmExpres
 
 		# Return the function's return value
 		return sim.return_values
+	elseif haskey(sim.function_builtin, function_name) # Evaluate builtin function
+		F = sim.function_builtin[function_name]
+		results = Dict{Int, Any}()
+		for (path_idx, arg) in evaluated_arguments
+			results[path_idx] = F(arg...)
+		end
+		return results
 	else
 		error("Function $function_name was never defined")
 	end

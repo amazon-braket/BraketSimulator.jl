@@ -88,6 +88,9 @@ mutable struct BranchedSimulatorOperators <: AbstractSimulator
 	# Maps function names to FunctionDefinition objects
 	function_defs::Dict{String, FunctionDefinition}
 
+	# Maps built in function names to corresponding Julia function
+	function_builtin::Dict{String, Function}
+
 	# Maps gate names to GateDefinition objects
 	gate_defs::Dict{String, AbstractGateDefinition}
 
@@ -95,13 +98,13 @@ mutable struct BranchedSimulatorOperators <: AbstractSimulator
 	gate_name_mapping::Dict{String, Symbol}
 
 	# Input parameters for the circuit
-	inputs::Dict{String, Any}
+	inputs::Dict{String, <:Any}
 
 	# Return values for function calls
 	return_values::Dict{Int, Any}
 
 	# Constructor
-	function BranchedSimulatorOperators(simulator::AbstractSimulator; inputs::Dict{String, Any} = Dict{String, Any}())
+	function BranchedSimulatorOperators(simulator::AbstractSimulator; inputs::Dict{String, <:Any} = Dict{String, <:Any}())
 		# If the number of shots for the simulator is <= 0, then throw an error
 		if simulator.shots <= 0
 			error("The number of shots for simulating a circuit with MCM must be > 0")
@@ -140,6 +143,11 @@ mutable struct BranchedSimulatorOperators <: AbstractSimulator
 			"gphase" => :GPhase
 		)
 
+		functions_builtin = Dict{String, Function}(
+			"arccos" => acos, "arcsin" => asin, "arctan" => atan, "ceiling" => ceil, "cos" => cos, "exp" => exp,
+			"floor" => floor, "log" => log, "mod" => mod, "sin" => sin, "sqrt" => sqrt, "tan" => tan
+		)
+
 		# Initialize with empty instruction sequence
 		instructions = Vector{Instruction}()
 
@@ -154,6 +162,7 @@ mutable struct BranchedSimulatorOperators <: AbstractSimulator
 			0,
 			[simulator.shots],
 			function_defs,
+			functions_builtin,
 			gate_defs,
 			gate_name_mapping,
 			inputs,
