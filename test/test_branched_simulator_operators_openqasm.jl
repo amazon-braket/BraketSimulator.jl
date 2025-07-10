@@ -2551,7 +2551,7 @@ using BraketSimulator
 			end
 		end
 
-		@testset "11.3 GPhase" begin
+		@testset "11.2 GPhase" begin
 			qasm = """
 			qubit[2] qs;
 
@@ -2592,7 +2592,7 @@ using BraketSimulator
 			@test state ≈ expected_sv
 		end
 
-		@testset "11.4 Gate def with argument manipulation" begin
+		@testset "11.3 Gate def with argument manipulation" begin
 			qasm = """
 			qubit[2] __qubits__;
 			gate u3(θ, ϕ, λ) q {
@@ -2616,7 +2616,7 @@ using BraketSimulator
 			@test branched_sim.instruction_sequences[1] == canonical_ixs
 		end
 
-		@testset "11.5 Physical qubits" begin
+		@testset "11.4 Physical qubits" begin
 			qasm = """
 			h \$0;
 			cnot \$0, \$1;
@@ -2635,7 +2635,7 @@ using BraketSimulator
 			@test branched_sim.instruction_sequences[1] == [BraketSimulator.Instruction(BraketSimulator.H(), 0), BraketSimulator.Instruction(BraketSimulator.CNot(), [0, 1])]
 		end
 
-		@testset "11.6 For loop and subroutines" begin
+		@testset "11.5 For loop and subroutines" begin
 			qasm_str = """
 			OPENQASM 3.0;
 			def bell(qubit q0, qubit q1) {
@@ -2684,7 +2684,7 @@ using BraketSimulator
 			end
 		end
 
-		@testset "11.7 Builtin functions" begin
+		@testset "11.6 Builtin functions" begin
 			qasm = """
 				input float x;
 				input float y;
@@ -2738,7 +2738,7 @@ using BraketSimulator
 			end
 		end
 
-		@testset "11.9 Reset" begin
+		@testset "11.7 Reset" begin
 			qasm = """
 			qubit[4] q;
 			x q[0];
@@ -2759,7 +2759,7 @@ using BraketSimulator
 									 BraketSimulator.Instruction(BraketSimulator.Reset(), 0)]
 		end
 
-		@testset "11.10 Switch/case" begin
+		@testset "11.8 Switch/case" begin
 			# Test switch with default case
 			qasm1 = """
 			input int[8] x;
@@ -2804,7 +2804,7 @@ using BraketSimulator
 			@test branched_sim2c.instruction_sequences[1] == [BraketSimulator.Instruction(BraketSimulator.Z(), 0)]
 		end
 
-		@testset "11.11 Global gate control" begin
+		@testset "11.9 Global gate control" begin
 			qasm = """
 			qubit q1;
 			qubit q2;
@@ -2830,7 +2830,7 @@ using BraketSimulator
 			@test state ≈ [0.5, 0.5, 0.5, 0.5im]
 		end
 
-		@testset "11.12 Power modifiers" begin
+		@testset "11.10 Power modifiers" begin
 			# Test sqrt(Z) = S
 			qasm_z = """
 			qubit q1;
@@ -2917,7 +2917,7 @@ using BraketSimulator
 			@test state_x ≈ state_v
 		end
 
-		@testset "11.13 Complex Power modifiers" begin
+		@testset "11.11 Complex Power modifiers" begin
 			qasm = """
 			const int[8] two = 2;
 			gate x a { U(π, 0, π) a; }
@@ -2972,7 +2972,7 @@ using BraketSimulator
 			@test state ≈ expected_sv
 		end
 
-		@testset "11.14 Gate control" begin
+		@testset "11.12 Gate control" begin
 			qasm = """
 			const int[8] two = 2;
 			gate x a { U(π, 0, π) a; }
@@ -3029,7 +3029,7 @@ using BraketSimulator
 			@test state ≈ expected_sv rtol=1e-10
 		end
 
-		@testset "11.15 Gate inverses" begin
+		@testset "11.13 Gate inverses" begin
 			qasm = """
 			gate rand_u_1 a { U(1, 2, 3) a; }
 			gate rand_u_2 a { U(2, 3, 4) a; }
@@ -3098,7 +3098,7 @@ using BraketSimulator
 		end
 		
 
-		@testset "11.19 Gate on qubit registers" begin
+		@testset "11.14 Gate on qubit registers" begin
 			qasm = """
 			qubit[3] qs;
 			qubit q;
@@ -3125,7 +3125,7 @@ using BraketSimulator
 			@test state ≈ (1/√2)*[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0]
 		end
 
-		@testset "11.20 Verbatim" begin
+		@testset "11.15 Verbatim" begin
 			with_verbatim = """
 			OPENQASM 3.0;
 			bit[2] b;
@@ -3169,7 +3169,7 @@ using BraketSimulator
 			@test state_with ≈ state_without
 		end
 
-		@testset "11.21 Void subroutine" begin
+		@testset "11.16 Void subroutine" begin
 			qasm = """
 			def flip(qubit q) {
 				x q;
@@ -3194,7 +3194,7 @@ using BraketSimulator
 			@test state ≈ [0, 0, 1, 0]
 		end
 
-		@testset "11.22 Rotation parameter expressions" begin
+		@testset "11.17 Rotation parameter expressions" begin
 			qasm_pi = """
 			OPENQASM 3.0;
 			qubit[1] q;

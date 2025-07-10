@@ -1706,23 +1706,90 @@ function _handle_gate_call(sim::BranchedSimulatorOperators, expr::QasmExpression
 			instruction = gate_def.body
 
 			if instruction isa Quasar.QasmExpression
-				for gate_call in instruction.args
-					original_instruction_length = length(sim.instruction_sequences[path_idx])
+				# Check for inv modifier - need to reverse the order of operations
+				has_inv = any(head(modifier) == :inv for modifier in modifiers)
 
+				# For pow modifier, we need to apply the entire gate sequence multiple times
+				pow_value = 1.0
+				for modifier in modifiers
+					if head(modifier) == :pow
+						pow_value *= modifier.args[1]
+					end
+				end
+
+				# Store the original instructions before processing
+				original_instruction_length = length(sim.instruction_sequences[path_idx])
+
+				# Process the gate body
+				gate_calls = instruction.args
+
+				# If inverse, reverse the order of operations
+				if has_inv
+					gate_calls = reverse(gate_calls)
+				end
+
+				# Apply the gate sequence
+				for gate_call in gate_calls
 					_evolve_branched_ast_operators(sim, gate_call)
-					
-					for ind in range(original_instruction_length+1, length(sim.instruction_sequences[path_idx]))
-						instruction = sim.instruction_sequences[path_idx][ind]
+				end
 
-						gate_op = instruction.operator
+				# Get the new instructions that were added
+				new_instructions = sim.instruction_sequences[path_idx][(original_instruction_length+1):end]
 
-						# Apply modifiers if any
-						if !isempty(modifiers)
-							gate_op = _apply_modifiers(gate_op, modifiers, target_indices)
+				# Remove the newly added instructions (we'll add them back with proper modifiers)
+				resize!(sim.instruction_sequences[path_idx], original_instruction_length)
+
+				# Apply modifiers to each instruction
+				modified_instructions = Instruction[]
+				for instruction in new_instructions
+					gate_op = instruction.operator
+
+					# Apply all modifiers except pow (we handle that separately)
+					if !isempty(modifiers)
+						for modifier in modifiers
+							if head(modifier) != :pow
+								# For inv, we've already reversed the order, so just apply to each gate
+								if head(modifier) == :inv
+									if hasfield(typeof(gate_op), :pow_exponent)
+										gate_op.pow_exponent = -gate_op.pow_exponent
+									else
+										error("Inverse modifier not supported for gate type $(typeof(gate_op))")
+									end
+								else
+									# Apply other modifiers (ctrl, negctrl)
+									gate_op = _apply_modifiers(gate_op, [modifier], target_indices)
+								end
+							end
 						end
+					end
 
-						gate_instruction = Instruction(gate_op, target_indices)
-						sim.instruction_sequences[path_idx][ind] = gate_instruction
+					push!(modified_instructions, Instruction(gate_op, target_indices))
+				end
+
+				# For pow modifier, repeat the entire sequence |pow_value| times
+				# If pow_value is negative, we've already inverted each gate and reversed the order
+				abs_pow = abs(pow_value)
+				integer_pow = floor(Int, abs_pow)
+
+				# Add the integer part of the power
+				for _ in 1:integer_pow
+					for instruction in modified_instructions
+						push!(sim.instruction_sequences[path_idx], instruction)
+					end
+				end
+
+				# Handle fractional part if needed
+				fractional_part = abs_pow - integer_pow
+				if fractional_part > 0
+					for instruction in modified_instructions
+						gate_op = instruction.operator
+						if hasfield(typeof(gate_op), :pow_exponent)
+							# Apply fractional power to each gate
+							gate_op.pow_exponent *= fractional_part
+							push!(sim.instruction_sequences[path_idx], Instruction(gate_op, instruction.target))
+						else
+							error("Power modifier with fractional part not supported for gate type $(typeof(gate_op))")
+						end
 					end
 				end
 			else
@@ -1746,8 +1813,14 @@ function _handle_gate_call(sim::BranchedSimulatorOperators, expr::QasmExpression
 
 			# Special case for GPhase gate which needs to know the number of qubits
 			if gate_name == "gphase"
-				# Get the number of target qubits
-				N = sim.n_qubits-length(target_indices)
+				# Determine N based on the context
+				N = if isempty(target_indices)
+					# No targets specified, use all qubits
+					sim.n_qubits
+				else
+					# Specific targets specified, use the number of targets
+					length(target_indices)
+				end
 
 				# Create GPhase{N} gate with the correct number of qubits
 				gate_op = if !isempty(path_params)
@@ -1774,6 +1847,12 @@ function _handle_gate_call(sim::BranchedSimulatorOperators, expr::QasmExpression
 
 			# Store gate instruction for this path
 			instruction = Instruction(gate_op, target_indices)
+
+			# If we have a gphase with no targets, it acts on the whole statevector
+			if (gate_name == "gphase") && isempty(target_indices)
+				instruction = Instruction(gate_op, range(0, sim.n_qubits-1))
+			end
+
 			push!(sim.instruction_sequences[path_idx], instruction)
 		else
 			error("Gate $gate_name not defined!")
