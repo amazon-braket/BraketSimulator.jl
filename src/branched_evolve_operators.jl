@@ -310,8 +310,8 @@ Apply gate modifiers to a gate operator. This function takes a gate operator and
 and returns a new gate operator with the modifiers applied.
 """
 function _apply_modifiers(gate_op::QuantumOperator, modifiers::Vector, target_indices::Vector{Int})
-	# Process each modifier in order
-	for modifier in modifiers
+	# Process each modifier in reverse order to handle nested modifiers correctly
+	for modifier in reverse(modifiers)
 		modifier_type = head(modifier)
 
 		if modifier_type == :ctrl
@@ -369,10 +369,26 @@ function _apply_modifiers(gate_op::QuantumOperator, modifiers::Vector, target_in
 
 		elseif modifier_type == :pow
 			# Apply power modifier
-			if hasfield(typeof(gate_op), :pow_exponent)
+			if isa(gate_op, Control)
+				# If the gate is a controlled gate, apply the power modifier to the controlled gate itself
+				power_value = modifier.args[1]
+
+				# If the gate already has a pow_exponent, multiply with the new value
+				if isdefined(gate_op, :pow_exponent)
+					gate_op.pow_exponent *= power_value
+				else
+					gate_op.pow_exponent = power_value
+				end
+			elseif hasfield(typeof(gate_op), :pow_exponent)
 				# If the gate has a pow_exponent field, update it
 				power_value = modifier.args[1]
-				gate_op.pow_exponent = power_value
+
+				# If the gate already has a pow_exponent, multiply with the new value
+				if isdefined(gate_op, :pow_exponent)
+					gate_op.pow_exponent *= power_value
+				else
+					gate_op.pow_exponent = power_value
+				end
 			else
 				# If the gate doesn't have a pow_exponent field, we can't apply the power modifier
 				error("Power modifier not supported for gate type $(typeof(gate_op))")
@@ -1653,45 +1669,65 @@ function _handle_gate_call(sim::BranchedSimulatorOperators, expr::QasmExpression
 
 	# Process each active path
 	for path_idx in sim.active_paths
-		# Skip if this path doesn't have target indices
-		if !haskey(target_indices_dict, path_idx)
-			continue
-		end
-
 		# Get target indices for this path
 		target_indices = target_indices_dict[path_idx]
 
-		# Get gate operator
+		# User-defined gate - create a new scope and execute the body
 		if haskey(sim.gate_defs, gate_name)
 			gate_def = sim.gate_defs[gate_name]
 
-			# Check if it's a built-in gate (in the mapping) or a user-defined gate
-			if haskey(sim.gate_name_mapping, gate_name)
-				# Built-in gate
-				path_params = haskey(evaluated_params, path_idx) ? evaluated_params[path_idx] : []
+			original_active_paths = copy(sim.active_paths)
+			sim.active_paths = [path_idx]
+			original_variables = _create_const_only_scope(sim)
 
-				# Special case for GPhase gate which needs to know the number of qubits
-				if gate_name == "gphase"
-					# Get the number of target qubits
-					N = sim.n_qubits-length(target_indices)
-
-					# Create GPhase{N} gate with the correct number of qubits
-					gate_op = if !isempty(path_params)
-						GPhase{N}(tuple(path_params...))
-					else
-						GPhase{N}()
-					end
-				else
-					# Built-in gate - use the mapping to get the gate type
-					gate_type = getfield(BraketSimulator, sim.gate_name_mapping[gate_name])
-
-					# Create gate operator
-					gate_op = if !isempty(path_params)
-						gate_type(tuple(path_params...))
-					else
-						gate_type()
+			# Bind parameters to the gate scope if this is a parametric gate
+			if haskey(evaluated_params, path_idx) && !isempty(gate_def.arguments)
+				path_params = evaluated_params[path_idx]
+				for (i, param_name) in enumerate(gate_def.arguments)
+					if i <= length(path_params)
+						# Store parameters with their actual type, not just Any
+						param_value = path_params[i]
+						param_type = typeof(param_value)
+						set_variable!(sim, path_idx, param_name, param_type, param_value, false)
 					end
 				end
+			end
+
+			num_ctrl = sum([(modifier == :ctrl || modifier == :negctrl) ? 1 : 0 for modifier in modifiers])
+
+			# Bind qubit targets to the gate scope
+			if !isempty(target_indices) && !isempty(gate_def.qubit_targets)
+				for (i, name) in enumerate(gate_def.qubit_targets)
+					set_variable!(sim, path_idx, name, :qubit_declaration, target_indices[i+num_ctrl], false)
+				end
+			end
+
+			# Execute the gate body
+			instruction = gate_def.body
+
+			if instruction isa Quasar.QasmExpression
+				for gate_call in instruction.args
+					original_instruction_length = length(sim.instruction_sequences[path_idx])
+
+					_evolve_branched_ast_operators(sim, gate_call)
+					
+					for ind in range(original_instruction_length+1, length(sim.instruction_sequences[path_idx]))
+						instruction = sim.instruction_sequences[path_idx][ind]
+
+						gate_op = instruction.operator
+
+						# Apply modifiers if any
+						if !isempty(modifiers)
+							gate_op = _apply_modifiers(gate_op, modifiers, target_indices)
+						end
+
+						gate_instruction = Instruction(gate_op, target_indices)
+						sim.instruction_sequences[path_idx][ind] = gate_instruction
+					end
+				end
+			else
+				# For non-QasmExpression instructions (e.g., direct gate operators)
+				gate_op = StructTypes.constructfrom(QuantumOperator, instruction)
 
 				# Apply modifiers if any
 				if !isempty(modifiers)
@@ -1699,67 +1735,46 @@ function _handle_gate_call(sim::BranchedSimulatorOperators, expr::QasmExpression
 				end
 
 				# Store gate instruction for this path
-				instruction = Instruction(gate_op, target_indices)
-				push!(sim.instruction_sequences[path_idx], instruction)
-			else
-				# User-defined gate - create a new scope and execute the body
-				# Save original active paths
-				original_active_paths = copy(sim.active_paths)
-
-				# Set active paths to just this path
-				sim.active_paths = [path_idx]
-
-				# Create a new scope with only const variables
-				original_variables = _create_const_only_scope(sim)
-
-				# Bind parameters to the gate scope if this is a parametric gate
-				if haskey(evaluated_params, path_idx) && !isempty(gate_def.arguments)
-					path_params = evaluated_params[path_idx]
-					for (i, param_name) in enumerate(gate_def.arguments)
-						if i <= length(path_params)
-							# Store parameters with their actual type, not just Any
-							param_value = path_params[i]
-							param_type = typeof(param_value)
-							set_variable!(sim, path_idx, param_name, param_type, param_value, false)
-						end
-					end
-				end
-
-				# Bind qubit targets to the gate scope
-				if !isempty(target_indices) && !isempty(gate_def.qubit_targets)
-					for (i, target_name) in enumerate(gate_def.qubit_targets)
-						if i <= length(target_indices)
-							set_variable!(sim, path_idx, target_name, :qubit_declaration, target_indices[i], false)
-						end
-					end
-				end
-
-				# Execute the gate body
-				instruction = gate_def.body
-				if instruction isa Quasar.QasmExpression
-					for gate_call in instruction.args
-						_evolve_branched_ast_operators(sim, gate_call)
-					end
-				else
-					# For non-QasmExpression instructions (e.g., direct gate operators)
-					gate_op = StructTypes.constructfrom(QuantumOperator, instruction)
-
-					# Apply modifiers if any
-					if !isempty(modifiers)
-						gate_op = _apply_modifiers(gate_op, modifiers, target_indices)
-					end
-
-					# Store gate instruction for this path
-					gate_instruction = Instruction(gate_op, target_indices)
-					push!(sim.instruction_sequences[path_idx], gate_instruction)
-				end
-
-				# Restore original variables
-				_restore_original_scope(sim, original_variables)
-
-				# Restore original active paths
-				sim.active_paths = original_active_paths
+				gate_instruction = Instruction(gate_op, target_indices)
+				push!(sim.instruction_sequences[path_idx], gate_instruction)
 			end
+
+			_restore_original_scope(sim, original_variables)
+			sim.active_paths = original_active_paths
+		elseif haskey(sim.gate_name_mapping, gate_name) # Builtin gate
+			path_params = haskey(evaluated_params, path_idx) ? evaluated_params[path_idx] : []
+
+			# Special case for GPhase gate which needs to know the number of qubits
+			if gate_name == "gphase"
+				# Get the number of target qubits
+				N = sim.n_qubits-length(target_indices)
+
+				# Create GPhase{N} gate with the correct number of qubits
+				gate_op = if !isempty(path_params)
+					GPhase{N}(tuple(path_params...))
+				else
+					GPhase{N}()
+				end
+			else
+				# Built-in gate - use the mapping to get the gate type
+				gate_type = getfield(BraketSimulator, sim.gate_name_mapping[gate_name])
+
+				# Create gate operator
+				gate_op = if !isempty(path_params)
+					gate_type(tuple(path_params...))
+				else
+					gate_type()
+				end
+			end
+
+			# Apply modifiers if any
+			if !isempty(modifiers)
+				gate_op = _apply_modifiers(gate_op, modifiers, target_indices)
+			end
+
+			# Store gate instruction for this path
+			instruction = Instruction(gate_op, target_indices)
+			push!(sim.instruction_sequences[path_idx], instruction)
 		else
 			error("Gate $gate_name not defined!")
 		end
@@ -1994,7 +2009,7 @@ function _bind_qubit_parameter(sim::BranchedSimulatorOperators, path_idx::Int, p
 		if haskey(sim.qubit_mapping, indexed_name)
 			qubit_idx = sim.qubit_mapping[indexed_name]
 			# Store the qubit index directly
-			sim.variables[path_idx][param_name] = ClassicalVariable(param_name, :qubit_declaration, qubit_idx, false)
+			sim.variables[path_idx][param_name] = ClassicalVariable(param_name, :qubit_declaration, qubit_idx, true)
 		else
 			error("Qubit $indexed_name not found in qubit mapping")
 		end
@@ -2004,7 +2019,7 @@ function _bind_qubit_parameter(sim::BranchedSimulatorOperators, path_idx::Int, p
 		if haskey(sim.qubit_mapping, qubit_name)
 			qubit_idx = sim.qubit_mapping[qubit_name]
 			# Store the qubit index directly
-			sim.variables[path_idx][param_name] = ClassicalVariable(param_name, :qubit_declaration, qubit_idx, false)
+			sim.variables[path_idx][param_name] = ClassicalVariable(param_name, :qubit_declaration, qubit_idx, true)
 		else
 			error("Qubit $qubit_name not found in qubit mapping")
 		end

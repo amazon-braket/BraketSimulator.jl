@@ -104,7 +104,7 @@ mutable struct BranchedSimulatorOperators <: AbstractSimulator
 	return_values::Dict{Int, Any}
 
 	# Constructor
-	function BranchedSimulatorOperators(simulator::AbstractSimulator; inputs::Dict{String, <:Any} = Dict{String, <:Any}())
+	function BranchedSimulatorOperators(simulator::AbstractSimulator; inputs::Dict{String, <:Any} = Dict{String, Any}())
 		# If the number of shots for the simulator is <= 0, then throw an error
 		if simulator.shots <= 0
 			error("The number of shots for simulating a circuit with MCM must be > 0")
@@ -113,12 +113,6 @@ mutable struct BranchedSimulatorOperators <: AbstractSimulator
 		# Initialize function and gate definitions
 		function_defs = Dict{String, FunctionDefinition}()
 		gate_defs = Dict{String, AbstractGateDefinition}()
-
-		# Initialize with built-in gates
-		if @isdefined(builtin_gates)
-			gate_defs = builtin_gates()
-			gate_defs["gphase"] = gate_defs["phaseshift"]
-		end
 
 		# Create gate name mapping
 		gate_name_mapping = Dict{String, Symbol}(
