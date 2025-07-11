@@ -103,6 +103,9 @@ mutable struct BranchedSimulatorOperators <: AbstractSimulator
 	# Return values for function calls
 	return_values::Dict{Int, Any}
 
+	# Simulation indices for continue in for loop
+	continue_paths::Vector{Int}
+
 	# Constructor
 	function BranchedSimulatorOperators(simulator::AbstractSimulator; inputs::Dict{String, <:Any} = Dict{String, Any}())
 		# If the number of shots for the simulator is <= 0, then throw an error
@@ -161,6 +164,7 @@ mutable struct BranchedSimulatorOperators <: AbstractSimulator
 			gate_name_mapping,
 			inputs,
 			Dict{Int, Any}(),
+			Vector{Int}()
 		)
 	end
 end

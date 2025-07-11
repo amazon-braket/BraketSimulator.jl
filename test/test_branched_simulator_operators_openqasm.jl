@@ -3513,8 +3513,8 @@ using BraketSimulator
 			# Verify that outer_count is 4 (outer loop should run all 4 iterations)
 			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "outer_count").val == 4
 
-			# Verify that inner_count is 8 (inner loop should run 2 iterations for i=0, 0 for i=1, 2 for i=2, 2 for i=3)
-			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "inner_count").val == 6
+			# Verify that inner_count is 8 (inner loop should run 3 iterations for i=0, 0 for i=1, 3 for i=2, 3 for i=3)
+			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "inner_count").val == 9
 
 			# Verify that total_ops is 6 (H should be applied 6 times)
 			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "total_ops").val == 6

@@ -416,14 +416,6 @@ function _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::Q
 	elseif expr_type == :scope
 		for child_expr in expr.args
 			child_head = head(child_expr)
-			if child_head in (:end, :continue, :break)
-				if child_head == :break
-					# For break statements, clear all active paths to stop the simulation
-					# from continuing through the loop
-					empty!(sim.active_paths)
-				end
-				return
-			end
 			return_value = _evolve_branched_ast_operators(sim, child_expr)
 			if child_head == :return
 				return return_value
@@ -482,6 +474,9 @@ function _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::Q
 			# For break statements, clear all active paths to stop the simulation
 			# from continuing through the loop
 			empty!(sim.active_paths)
+		else
+			sim.continue_paths = copy(sim.active_paths)
+			sim.active_paths = []
 		end
 		return
 
@@ -997,8 +992,12 @@ function _handle_for_loop(sim::BranchedSimulatorOperators, expr::QasmExpression)
 			# Process loop body
 			_evolve_branched_ast_operators(sim, loop_body)
 
+			# Add any paths that were continued back onto the for loop for the next iteration
+			append!(sim.active_paths, sim.continue_paths)
+			sim.continue_paths = []
+
 			# If no active paths left, continue to next value
-			isempty(sim.active_paths) && continue
+			isempty(sim.active_paths) && break
 		end
 	end
 
