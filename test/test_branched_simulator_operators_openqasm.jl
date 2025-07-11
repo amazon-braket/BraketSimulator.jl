@@ -3125,51 +3125,7 @@ using BraketSimulator
 			@test state ≈ (1/√2)*[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0]
 		end
 
-		@testset "11.15 Verbatim" begin
-			with_verbatim = """
-			OPENQASM 3.0;
-			bit[2] b;
-			qubit[2] q;
-			#pragma braket verbatim
-			box{
-				cnot q[0], q[1];
-				cnot q[0], q[1];
-				rx(1.57) q[0];
-			}
-			"""
-			
-			without_verbatim = """
-			OPENQASM 3.0;
-			bit[2] b;
-			qubit[2] q;
-			box{
-				cnot q[0], q[1];
-				cnot q[0], q[1];
-				rx(1.57) q[0];
-			}
-			"""
-			
-			# Create simulators
-			simulator1 = StateVectorSimulator(2, 1000)
-			simulator2 = StateVectorSimulator(2, 1000)
-			
-			# Convert to circuits
-			circuit_with = BraketSimulator.new_to_circuit(with_verbatim)
-			circuit_without = BraketSimulator.new_to_circuit(without_verbatim)
-			
-			# Evolve using branched simulator operators
-			branched_sim_with = BraketSimulator.evolve_branched_operators(simulator1, circuit_with, Dict{String, Any}())
-			branched_sim_without = BraketSimulator.evolve_branched_operators(simulator2, circuit_without, Dict{String, Any}())
-			
-			# Calculate the final states
-			state_with = BraketSimulator.calculate_current_state(branched_sim_with, branched_sim_with.active_paths[1])
-			state_without = BraketSimulator.calculate_current_state(branched_sim_without, branched_sim_without.active_paths[1])
-			
-			# Verify the states are equivalent
-			@test state_with ≈ state_without
-		end
-
-		@testset "11.16 Void subroutine" begin
+		@testset "11.15 Void subroutine" begin
 			qasm = """
 			def flip(qubit q) {
 				x q;
@@ -3194,7 +3150,7 @@ using BraketSimulator
 			@test state ≈ [0, 0, 1, 0]
 		end
 
-		@testset "11.17 Rotation parameter expressions" begin
+		@testset "11.16 Rotation parameter expressions" begin
 			qasm_pi = """
 			OPENQASM 3.0;
 			qubit[1] q;

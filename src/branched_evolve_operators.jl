@@ -651,7 +651,7 @@ function _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::Q
 
 			if !isnothing(var)
 				# This is because we store the value of singular bits as a bit register with one bit
-				if var.type == Quasar.SizedBitVector && length(var.val) == 1
+				if var.type isa Quasar.SizedBitVector && length(var.val) == 1
 					results[path_idx] = var.val[1]
 				elseif !isnothing(var.val)
 					results[path_idx] = var.val
@@ -687,16 +687,25 @@ function _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::Q
 			# Get the variable
 			var = get_variable(sim, path_idx, identifier_name)
 
-			if !isnothing(var)
+ 			if !isnothing(var)
 				# Check if it's a bit array (SizedBitVector)
-				if var.type == Quasar.SizedBitVector
+				if var.type isa Quasar.SizedBitVector
 					# Convert to 1-based indexing for Julia arrays
 					julia_index = index + 1
 
 					if julia_index <= length(var.val)
 						# Access the bit directly from the boolean array
 						results[path_idx] = var.val[julia_index]
+					else
+						error("Index out of bounds error, index too large for bit vector")
 					end
+				elseif var.type isa Quasar.SizedUInt
+					size = var.type.size.args[1]
+					if index isa Vector
+						results[path_idx] = [(var.val & (1 << (size-1-i))) >> (siz-1-i) for i in index]                                                   
+					else
+						results[path_idx] = (var.val & (1 << (size-1-index))) >> (size-1-index)
+					end                                              
 				elseif !isnothing(var.type) && var.type <: Quasar.SizedArray
 					# For other array types
 					# Convert to 1-based indexing for Julia arrays
@@ -837,7 +846,7 @@ function _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::Q
 		for (path_idx, path_val) in value
 			# Apply the appropriate cast based on the target type
 			if casting_to == Bool
-				results[path_idx] = path_val > 0
+				results[path_idx] = path_val isa Vector ? !isempty(path_val) : path_val > 0
 			elseif casting_to isa Quasar.SizedInt
 				if typeof(path_val) <: AbstractFloat
 					results[path_idx] = floor(path_val)
@@ -1436,6 +1445,7 @@ function _handle_classical_assignment(sim::BranchedSimulatorOperators, expr::Qas
 					if bit_array isa Vector && index + 1 <= length(bit_array)
 						# Convert to 1-based indexing for Julia arrays
 						julia_index = index + 1
+						new_val = new_val isa Vector ? new_val[1] : new_val
 						bit_array[julia_index] = new_val
 					end
 				end
@@ -1469,16 +1479,16 @@ function _handle_classical_declaration(sim::BranchedSimulatorOperators, expr::Qa
 				# If the size is -1, then it is a single bit, not a register
 				if register_size == -1
 					# Initialize with a single boolean value
-					set_variable!(sim, path_idx, var_name, ClassicalVariable(var_name, typeof(var_type), [1], false))
+					set_variable!(sim, path_idx, var_name, ClassicalVariable(var_name, var_type, [1], false))
 				else
 					# Initialize the register with a boolean array
-					set_variable!(sim, path_idx, var_name, ClassicalVariable(var_name, typeof(var_type), [0 for _ in 1:register_size], false))
+					set_variable!(sim, path_idx, var_name, ClassicalVariable(var_name, var_type, [0 for _ in 1:register_size], false))
 				end
 			end
 		else
 			# Initialize variable for each active path
 			for path_idx in sim.active_paths
-				set_variable!(sim, path_idx, var_name, ClassicalVariable(var_name, typeof(var_type), nothing, false))
+				set_variable!(sim, path_idx, var_name, ClassicalVariable(var_name, var_type, nothing, false))
 			end
 		end
 		# This for all other classical variables
@@ -1693,7 +1703,7 @@ function _handle_gate_call(sim::BranchedSimulatorOperators, expr::QasmExpression
 				end
 			end
 
-			num_ctrl = sum([(modifier == :ctrl || modifier == :negctrl) ? 1 : 0 for modifier in modifiers])
+			num_ctrl = sum([(head(modifier) == :ctrl || head(modifier) == :negctrl) ? 1 : 0 for modifier in modifiers])
 
 			# Bind qubit targets to the gate scope
 			if !isempty(target_indices) && !isempty(gate_def.qubit_targets)
@@ -1743,7 +1753,8 @@ function _handle_gate_call(sim::BranchedSimulatorOperators, expr::QasmExpression
 				modified_instructions = Instruction[]
 				for instruction in new_instructions
 					gate_op = instruction.operator
-
+					targets = []
+					ctrl_idx = 1
 					# Apply all modifiers except pow (we handle that separately)
 					if !isempty(modifiers)
 						for modifier in modifiers
@@ -1758,12 +1769,16 @@ function _handle_gate_call(sim::BranchedSimulatorOperators, expr::QasmExpression
 								else
 									# Apply other modifiers (ctrl, negctrl)
 									gate_op = _apply_modifiers(gate_op, [modifier], target_indices)
+									push!(targets, target_indices[ctrl_idx])
+									ctrl_idx += 1
 								end
 							end
 						end
 					end
 
-					push!(modified_instructions, Instruction(gate_op, target_indices))
+					append!(targets, instruction.target)
+
+					push!(modified_instructions, Instruction(gate_op, targets))
 				end
 
 				# For pow modifier, repeat the entire sequence |pow_value| times
@@ -2186,11 +2201,6 @@ function _handle_function_call(sim::BranchedSimulatorOperators, expr::QasmExpres
 					end
 				elseif param_type == :classical_declaration
 					var_type = param_def.args[1].args[1]
-
-					# For bit parameters, update the value to a vector if not already
-					if !(path_arg_value isa Vector) && var_type == Quasar.SizedBitVector
-						path_arg_value = [path_arg_value]
-					end
 					sim.variables[path_idx][param_name] = FramedVariable(param_name, param_type, path_arg_value, false, sim.curr_frame+1)
 				else
 					# For other parameter types, use the evaluated value
