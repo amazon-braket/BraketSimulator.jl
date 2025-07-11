@@ -2500,18 +2500,18 @@ using BraketSimulator
 			for int[8] i in [1: 3] { unmaj a[i], b[i - 1], a[i - 1]; }
 			unmaj cin, b[3], a[3];
 			"""
-			
+
 			# Create a simulator
 			simulator = StateVectorSimulator(10, 1000)
-			
+
 			# Convert to circuit with inputs
 			circuit = BraketSimulator.new_to_circuit(sv_adder_qasm)
-			
+
 			# Evolve using branched simulator operators
 			branched_sim = BraketSimulator.evolve_branched_operators(simulator, circuit, Dict("a_in"=>3, "b_in"=>7))
-			
+
 			# Verify the instructions match the expected ones
-			correct_instructions = [ 
+			correct_instructions = [
 				BraketSimulator.Instruction(BraketSimulator.X(), BraketSimulator.QubitSet(6))
 				BraketSimulator.Instruction(BraketSimulator.X(), BraketSimulator.QubitSet(3))
 				BraketSimulator.Instruction(BraketSimulator.X(), BraketSimulator.QubitSet(7))
@@ -2543,7 +2543,7 @@ using BraketSimulator
 				BraketSimulator.Instruction(BraketSimulator.CNot(), BraketSimulator.QubitSet(4, 0))
 				BraketSimulator.Instruction(BraketSimulator.CNot(), BraketSimulator.QubitSet(0, 8))
 			]
-			
+
 			# Check that the instructions match
 			@test length(branched_sim.instruction_sequences[1]) == length(correct_instructions)
 			for (ix, c_ix) in zip(branched_sim.instruction_sequences[1], correct_instructions)
@@ -2566,27 +2566,27 @@ using BraketSimulator
 			gate h a { U(π/2, 0, π) a; }
 
 			h qs[0];
-			
+
 			cx qs[0], qs[1];
 			phase qs[0], qs[1];
-			
+
 			gphase(π);
 			inv @ gphase(π / 2);
 			negctrl @ ctrl @ gphase(2 * π) qs[0], qs[1];
 			"""
-			
+
 			# Create a simulator
 			simulator = StateVectorSimulator(2, 1000)
-			
+
 			# Convert to circuit
 			circuit = BraketSimulator.new_to_circuit(qasm)
-			
+
 			# Evolve using branched simulator operators
 			branched_sim = BraketSimulator.evolve_branched_operators(simulator, circuit, Dict{String, Any}())
-			
+
 			# Calculate the final state for the first path
 			state = BraketSimulator.calculate_current_state(branched_sim, branched_sim.active_paths[1])
-			
+
 			# Verify the state vector
 			expected_sv = 1/√2 * [-1; 0; 0; 1]
 			@test state ≈ expected_sv
@@ -2601,16 +2601,16 @@ using BraketSimulator
 			}
 			u3(0.1, 0.2, 0.3) __qubits__[0];
 			"""
-			
+
 			# Create a simulator
 			simulator = StateVectorSimulator(2, 1000)
-			
+
 			# Convert to circuit
 			circuit = BraketSimulator.new_to_circuit(qasm)
-			
+
 			# Evolve using branched simulator operators
 			branched_sim = BraketSimulator.evolve_branched_operators(simulator, circuit, Dict{String, Any}())
-			
+
 			# Verify the instructions
 			canonical_ixs = [BraketSimulator.Instruction(BraketSimulator.GPhase{1}(-(0.2 + 0.3)/2), 0), BraketSimulator.Instruction(BraketSimulator.U(0.1, 0.2, 0.3), 0)]
 			@test branched_sim.instruction_sequences[1] == canonical_ixs
@@ -2621,16 +2621,16 @@ using BraketSimulator
 			h \$0;
 			cnot \$0, \$1;
 			"""
-			
+
 			# Create a simulator
 			simulator = StateVectorSimulator(2, 1000)
-			
+
 			# Convert to circuit
 			circuit = BraketSimulator.new_to_circuit(qasm)
-			
+
 			# Evolve using branched simulator operators
 			branched_sim = BraketSimulator.evolve_branched_operators(simulator, circuit, Dict{String, Any}())
-			
+
 			# Verify the instructions
 			@test branched_sim.instruction_sequences[1] == [BraketSimulator.Instruction(BraketSimulator.H(), 0), BraketSimulator.Instruction(BraketSimulator.CNot(), [0, 1])]
 		end
@@ -2652,31 +2652,31 @@ using BraketSimulator
 			bell(__qubits__[0], __qubits__[1]);
 			n_bells(5, __qubits__[2], __qubits__[3]);
 			"""
-			
+
 			# Create a simulator
 			simulator = StateVectorSimulator(4, 1000)
-			
+
 			# Convert to circuit
 			circuit = BraketSimulator.new_to_circuit(qasm_str)
-			
+
 			# Evolve using branched simulator operators
 			branched_sim = BraketSimulator.evolve_branched_operators(simulator, circuit, Dict("theta"=>0.2))
-			
+
 			# Verify the instructions (excluding measurements)
 			expected_instructions = [BraketSimulator.Instruction(BraketSimulator.H(), 0),
-								   BraketSimulator.Instruction(BraketSimulator.CNot(), [0, 1]),
-								   BraketSimulator.Instruction(BraketSimulator.H(), 2),
-								   BraketSimulator.Instruction(BraketSimulator.CNot(), [2, 3]),
-								   BraketSimulator.Instruction(BraketSimulator.H(), 2),
-								   BraketSimulator.Instruction(BraketSimulator.CNot(), [2, 3]),
-								   BraketSimulator.Instruction(BraketSimulator.H(), 2), 
-								   BraketSimulator.Instruction(BraketSimulator.CNot(), [2, 3]),
-								   BraketSimulator.Instruction(BraketSimulator.H(), 2),
-								   BraketSimulator.Instruction(BraketSimulator.CNot(), [2, 3]),
-								   BraketSimulator.Instruction(BraketSimulator.H(), 2),
-								   BraketSimulator.Instruction(BraketSimulator.CNot(), [2, 3])
-								  ]
-			
+				BraketSimulator.Instruction(BraketSimulator.CNot(), [0, 1]),
+				BraketSimulator.Instruction(BraketSimulator.H(), 2),
+				BraketSimulator.Instruction(BraketSimulator.CNot(), [2, 3]),
+				BraketSimulator.Instruction(BraketSimulator.H(), 2),
+				BraketSimulator.Instruction(BraketSimulator.CNot(), [2, 3]),
+				BraketSimulator.Instruction(BraketSimulator.H(), 2),
+				BraketSimulator.Instruction(BraketSimulator.CNot(), [2, 3]),
+				BraketSimulator.Instruction(BraketSimulator.H(), 2),
+				BraketSimulator.Instruction(BraketSimulator.CNot(), [2, 3]),
+				BraketSimulator.Instruction(BraketSimulator.H(), 2),
+				BraketSimulator.Instruction(BraketSimulator.CNot(), [2, 3]),
+			]
+
 			# Check that the instructions match (excluding measurements)
 			@test length(branched_sim.instruction_sequences[1]) >= length(expected_instructions)
 			for (ix, c_ix) in zip(branched_sim.instruction_sequences[1][1:length(expected_instructions)], expected_instructions)
@@ -2702,35 +2702,35 @@ using BraketSimulator
 				rx(sqrt(x)) \$0;
 				rx(tan(x)) \$0;
 				"""
-			
+
 			x = 1.0
 			y = 2.0
 			inputs = Dict("x"=>x, "y"=>y)
-			
+
 			# Create a simulator
 			simulator = StateVectorSimulator(1, 1000)
-			
+
 			# Convert to circuit
 			circuit = BraketSimulator.new_to_circuit(qasm)
-			
+
 			# Evolve using branched simulator operators
 			branched_sim = BraketSimulator.evolve_branched_operators(simulator, circuit, inputs)
-			
+
 			# Verify the instructions
-			expected_ixs = [BraketSimulator.Instruction(BraketSimulator.Rx(x), 0),  
-					   BraketSimulator.Instruction(BraketSimulator.Rx(acos(x)), 0),  
-					   BraketSimulator.Instruction(BraketSimulator.Rx(asin(x)), 0),  
-					   BraketSimulator.Instruction(BraketSimulator.Rx(atan(x)), 0),  
-					   BraketSimulator.Instruction(BraketSimulator.Rx(ceil(x)), 0),  
-					   BraketSimulator.Instruction(BraketSimulator.Rx(cos(x)), 0),  
-					   BraketSimulator.Instruction(BraketSimulator.Rx(exp(x)), 0),  
-					   BraketSimulator.Instruction(BraketSimulator.Rx(floor(x)), 0),  
-					   BraketSimulator.Instruction(BraketSimulator.Rx(log(x)), 0),  
-					   BraketSimulator.Instruction(BraketSimulator.Rx(mod(x, y)), 0),  
-					   BraketSimulator.Instruction(BraketSimulator.Rx(sin(x)), 0),  
-					   BraketSimulator.Instruction(BraketSimulator.Rx(sqrt(x)), 0),  
-					   BraketSimulator.Instruction(BraketSimulator.Rx(tan(x)), 0)]
-			
+			expected_ixs = [BraketSimulator.Instruction(BraketSimulator.Rx(x), 0),
+				BraketSimulator.Instruction(BraketSimulator.Rx(acos(x)), 0),
+				BraketSimulator.Instruction(BraketSimulator.Rx(asin(x)), 0),
+				BraketSimulator.Instruction(BraketSimulator.Rx(atan(x)), 0),
+				BraketSimulator.Instruction(BraketSimulator.Rx(ceil(x)), 0),
+				BraketSimulator.Instruction(BraketSimulator.Rx(cos(x)), 0),
+				BraketSimulator.Instruction(BraketSimulator.Rx(exp(x)), 0),
+				BraketSimulator.Instruction(BraketSimulator.Rx(floor(x)), 0),
+				BraketSimulator.Instruction(BraketSimulator.Rx(log(x)), 0),
+				BraketSimulator.Instruction(BraketSimulator.Rx(mod(x, y)), 0),
+				BraketSimulator.Instruction(BraketSimulator.Rx(sin(x)), 0),
+				BraketSimulator.Instruction(BraketSimulator.Rx(sqrt(x)), 0),
+				BraketSimulator.Instruction(BraketSimulator.Rx(tan(x)), 0)]
+
 			# Check that the instructions match
 			@test length(branched_sim.instruction_sequences[1]) == length(expected_ixs)
 			for (ix, c_ix) in zip(branched_sim.instruction_sequences[1], expected_ixs)
@@ -2744,19 +2744,19 @@ using BraketSimulator
 			x q[0];
 			reset q[0];
 			"""
-			
+
 			# Create a simulator
 			simulator = StateVectorSimulator(4, 1000)
-			
+
 			# Convert to circuit
 			circuit = BraketSimulator.new_to_circuit(qasm)
-			
+
 			# Evolve using branched simulator operators
 			branched_sim = BraketSimulator.evolve_branched_operators(simulator, circuit, Dict{String, Any}())
-			
+
 			# Verify the instructions
-			@test branched_sim.instruction_sequences[1] == [BraketSimulator.Instruction(BraketSimulator.X(), 0), 
-									 BraketSimulator.Instruction(BraketSimulator.Reset(), 0)]
+			@test branched_sim.instruction_sequences[1] == [BraketSimulator.Instruction(BraketSimulator.X(), 0),
+				BraketSimulator.Instruction(BraketSimulator.Reset(), 0)]
 		end
 
 		@testset "11.8 Switch/case" begin
@@ -2768,39 +2768,39 @@ using BraketSimulator
 				default { z \$0; }
 			}
 			"""
-			
+
 			# Create a simulator
 			simulator = StateVectorSimulator(1, 1000)
-			
+
 			# Test with x = -1
 			circuit1a = BraketSimulator.new_to_circuit(qasm1)
-			branched_sim1a = BraketSimulator.evolve_branched_operators(simulator, circuit1a, Dict("x"=> -1))
+			branched_sim1a = BraketSimulator.evolve_branched_operators(simulator, circuit1a, Dict("x" => -1))
 			@test isempty(branched_sim1a.instruction_sequences[1])
-			
+
 			# Test with x = 0
 			circuit1b = BraketSimulator.new_to_circuit(qasm1)
-			branched_sim1b = BraketSimulator.evolve_branched_operators(simulator, circuit1b, Dict("x"=> 0))
+			branched_sim1b = BraketSimulator.evolve_branched_operators(simulator, circuit1b, Dict("x" => 0))
 			@test branched_sim1b.instruction_sequences[1] == [BraketSimulator.Instruction(BraketSimulator.Z(), 0)]
-			
+
 			# Test switch with multiple cases
 			qasm2 = """
 			input int[8] x;
 			switch (x) { case 0 {} case 1, 2 { z \$0; } }
 			"""
-			
+
 			# Test with x = 0
 			circuit2a = BraketSimulator.new_to_circuit(qasm2)
-			branched_sim2a = BraketSimulator.evolve_branched_operators(simulator, circuit2a, Dict("x"=> 0))
+			branched_sim2a = BraketSimulator.evolve_branched_operators(simulator, circuit2a, Dict("x" => 0))
 			@test isempty(branched_sim2a.instruction_sequences[1])
-			
+
 			# Test with x = 1
 			circuit2b = BraketSimulator.new_to_circuit(qasm2)
-			branched_sim2b = BraketSimulator.evolve_branched_operators(simulator, circuit2b, Dict("x"=> 1))
+			branched_sim2b = BraketSimulator.evolve_branched_operators(simulator, circuit2b, Dict("x" => 1))
 			@test branched_sim2b.instruction_sequences[1] == [BraketSimulator.Instruction(BraketSimulator.Z(), 0)]
-			
+
 			# Test with x = 2
 			circuit2c = BraketSimulator.new_to_circuit(qasm2)
-			branched_sim2c = BraketSimulator.evolve_branched_operators(simulator, circuit2c, Dict("x"=> 2))
+			branched_sim2c = BraketSimulator.evolve_branched_operators(simulator, circuit2c, Dict("x" => 2))
 			@test branched_sim2c.instruction_sequences[1] == [BraketSimulator.Instruction(BraketSimulator.Z(), 0)]
 		end
 
@@ -2813,19 +2813,19 @@ using BraketSimulator
 			h q2;
 			ctrl @ s q1, q2;
 			"""
-			
+
 			# Create a simulator
 			simulator = StateVectorSimulator(2, 1000)
-			
+
 			# Convert to circuit
 			circuit = BraketSimulator.new_to_circuit(qasm)
-			
+
 			# Evolve using branched simulator operators
 			branched_sim = BraketSimulator.evolve_branched_operators(simulator, circuit, Dict{String, Any}())
-			
+
 			# Calculate the final state
 			state = BraketSimulator.calculate_current_state(branched_sim, branched_sim.active_paths[1])
-			
+
 			# Verify the state vector
 			@test state ≈ [0.5, 0.5, 0.5, 0.5im]
 		end
@@ -2837,82 +2837,82 @@ using BraketSimulator
 			qubit q2;
 			h q1;
 			h q2;
-			
+
 			pow(1/2) @ z q1;
 			"""
-			
+
 			# Create a simulator
 			simulator = StateVectorSimulator(2, 1000)
-			
+
 			# Convert to circuit
 			circuit_z = BraketSimulator.new_to_circuit(qasm_z)
-			
+
 			# Evolve using branched simulator operators
 			branched_sim_z = BraketSimulator.evolve_branched_operators(simulator, circuit_z, Dict{String, Any}())
-			
+
 			# Calculate the final state
 			state_z = BraketSimulator.calculate_current_state(branched_sim_z, branched_sim_z.active_paths[1])
-			
+
 			# Create a reference circuit with S gate
 			qasm_s = """
 			qubit q1;
 			qubit q2;
 			h q1;
 			h q2;
-			
+
 			s q1;
 			"""
-			
+
 			# Convert to circuit
 			circuit_s = BraketSimulator.new_to_circuit(qasm_s)
-			
+
 			# Evolve using branched simulator operators
 			branched_sim_s = BraketSimulator.evolve_branched_operators(simulator, circuit_s, Dict{String, Any}())
-			
+
 			# Calculate the final state
 			state_s = BraketSimulator.calculate_current_state(branched_sim_s, branched_sim_s.active_paths[1])
-			
+
 			# Verify the states are equivalent
 			@test state_z ≈ state_s
-			
+
 			# Test sqrt(X) = V
 			qasm_x = """
 			qubit q1;
 			qubit q2;
 			h q1;
 			h q2;
-			
+
 			pow(1/2) @ x q1;
 			"""
-			
+
 			# Convert to circuit
 			circuit_x = BraketSimulator.new_to_circuit(qasm_x)
-			
+
 			# Evolve using branched simulator operators
 			branched_sim_x = BraketSimulator.evolve_branched_operators(simulator, circuit_x, Dict{String, Any}())
-			
+
 			# Calculate the final state
 			state_x = BraketSimulator.calculate_current_state(branched_sim_x, branched_sim_x.active_paths[1])
-			
+
 			# Create a reference circuit with V gate
 			qasm_v = """
 			qubit q1;
 			qubit q2;
 			h q1;
 			h q2;
-			
+
 			v q1;
 			"""
-			
+
 			# Convert to circuit
 			circuit_v = BraketSimulator.new_to_circuit(qasm_v)
-			
+
 			# Evolve using branched simulator operators
 			branched_sim_v = BraketSimulator.evolve_branched_operators(simulator, circuit_v, Dict{String, Any}())
-			
+
 			# Calculate the final state
 			state_v = BraketSimulator.calculate_current_state(branched_sim_v, branched_sim_v.active_paths[1])
-			
+
 			# Verify the states are equivalent
 			@test state_x ≈ state_v
 		end
@@ -2953,19 +2953,19 @@ using BraketSimulator
 			s q1;   // again
 			inv @ z q1; // inv z
 			"""
-			
+
 			# Create a simulator
 			simulator = StateVectorSimulator(5, 1000)
-			
+
 			# Convert to circuit
 			circuit = BraketSimulator.new_to_circuit(qasm)
-			
+
 			# Evolve using branched simulator operators
 			branched_sim = BraketSimulator.evolve_branched_operators(simulator, circuit, Dict{String, Any}())
-			
+
 			# Calculate the final state
 			state = BraketSimulator.calculate_current_state(branched_sim, branched_sim.active_paths[1])
-			
+
 			# Verify the state vector
 			expected_sv = zeros(32)
 			expected_sv[end] = 1.0
@@ -3010,19 +3010,19 @@ using BraketSimulator
 			ccx_2 q1, q2, q4;
 			ccx_2 q1, q2, q5;
 			"""
-			
+
 			# Create a simulator
 			simulator = StateVectorSimulator(5, 1000)
-			
+
 			# Convert to circuit
 			circuit = BraketSimulator.new_to_circuit(qasm)
-			
+
 			# Evolve using branched simulator operators
 			branched_sim = BraketSimulator.evolve_branched_operators(simulator, circuit, Dict{String, Any}())
-			
+
 			# Calculate the final state
 			state = BraketSimulator.calculate_current_state(branched_sim, branched_sim.active_paths[1])
-			
+
 			# Verify the state vector
 			expected_sv = zeros(32)
 			expected_sv[end] = 1.0
@@ -3079,24 +3079,24 @@ using BraketSimulator
 			t q;
 			inv @ t q;
 			"""
-			
+
 			# Create a simulator
 			simulator = StateVectorSimulator(1, 1000)
-			
+
 			# Convert to circuit
 			circuit = BraketSimulator.new_to_circuit(qasm)
-			
+
 			# Evolve using branched simulator operators
 			branched_sim = BraketSimulator.evolve_branched_operators(simulator, circuit, Dict{String, Any}())
-			
+
 			# Calculate the final state
 			state = BraketSimulator.calculate_current_state(branched_sim, branched_sim.active_paths[1])
-			
+
 			# Verify the state vector - all gates should cancel out
 			expected_sv = [1.0, 0.0]
 			@test state ≈ expected_sv
 		end
-		
+
 
 		@testset "11.14 Gate on qubit registers" begin
 			qasm = """
@@ -3108,19 +3108,19 @@ using BraketSimulator
 			cphaseshift(1) qs, q;
 			phaseshift(-2) q;
 			"""
-			
+
 			# Create a simulator
 			simulator = StateVectorSimulator(4, 1000)
-			
+
 			# Convert to circuit
 			circuit = BraketSimulator.new_to_circuit(qasm)
-			
+
 			# Evolve using branched simulator operators
 			branched_sim = BraketSimulator.evolve_branched_operators(simulator, circuit, Dict{String, Any}())
-			
+
 			# Calculate the final state
 			state = BraketSimulator.calculate_current_state(branched_sim, branched_sim.active_paths[1])
-			
+
 			# Verify the state vector
 			@test state ≈ (1/√2)*[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0]
 		end
@@ -3133,19 +3133,19 @@ using BraketSimulator
 			qubit[2] qs;
 			flip(qs[0]);
 			"""
-			
+
 			# Create a simulator
 			simulator = StateVectorSimulator(2, 1000)
-			
+
 			# Convert to circuit
 			circuit = BraketSimulator.new_to_circuit(qasm)
-			
+
 			# Evolve using branched simulator operators
 			branched_sim = BraketSimulator.evolve_branched_operators(simulator, circuit, Dict{String, Any}())
-			
+
 			# Calculate the final state
 			state = BraketSimulator.calculate_current_state(branched_sim, branched_sim.active_paths[1])
-			
+
 			# Verify the state vector
 			@test state ≈ [0, 0, 1, 0]
 		end
@@ -3156,40 +3156,529 @@ using BraketSimulator
 			qubit[1] q;
 			rx(π) q[0];
 			"""
-			
+
 			# Create a simulator
 			simulator = StateVectorSimulator(1, 1000)
-			
+
 			# Convert to circuit
 			circuit = BraketSimulator.new_to_circuit(qasm_pi)
-			
+
 			# Evolve using branched simulator operators
 			branched_sim = BraketSimulator.evolve_branched_operators(simulator, circuit, Dict{String, Any}())
-			
+
 			# Calculate the final state
 			state = BraketSimulator.calculate_current_state(branched_sim, branched_sim.active_paths[1])
-			
+
 			# Verify the state vector
 			@test state ≈ [0, -im]
-			
+
 			# Test more complex expressions
 			qasm_expr = """
 			OPENQASM 3.0;
 			qubit[1] q;
 			rx(pi + pi / 2) q[0];
 			"""
-			
+
 			# Convert to circuit
 			circuit_expr = BraketSimulator.new_to_circuit(qasm_expr)
-			
+
 			# Evolve using branched simulator operators
 			branched_sim_expr = BraketSimulator.evolve_branched_operators(simulator, circuit_expr, Dict{String, Any}())
-			
+
 			# Calculate the final state
 			state_expr = BraketSimulator.calculate_current_state(branched_sim_expr, branched_sim_expr.active_paths[1])
-			
+
 			# Verify the state vector
 			@test state_expr ≈ [-0.70710678, -0.70710678im]
+		end
+	end
+
+
+	@testset "12. Aliasing Tests" begin
+		@testset "12.1 Aliasing of qubit registers" begin
+			qasm_source = """
+			OPENQASM 3.0;
+			qubit[4] q;
+
+			// Create an alias for the entire register
+			let qreg = q;
+
+			// Apply operations using the alias
+			h qreg[0];
+			x qreg[1];
+			cnot qreg[0], qreg[2];
+			cnot qreg[1], qreg[3];
+			"""
+
+			simulator = StateVectorSimulator(4, 1000)
+			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+
+			# Verify that the operations were applied correctly
+			state = BraketSimulator.calculate_current_state(branched_sim, branched_sim.active_paths[1])
+
+			# Expected state: H on q[0], X on q[1], CNOT from q[0] to q[2], CNOT from q[1] to q[3]
+			# This should create a state where q[0] and q[2] are entangled, and q[1] and q[3] are entangled
+			# q[0] is in superposition, q[1] is |1⟩, and q[2] and q[3] depend on their controls
+
+			# Check that the state has the expected structure
+			# |0⟩|1⟩|0⟩|1⟩ and |1⟩|1⟩|1⟩|1⟩ should have equal probability (1/2 each)
+			@test isapprox(abs(state[3]), 1/sqrt(2), atol = 1e-10)  # |0010⟩ -> |0⟩|1⟩|0⟩|1⟩
+			@test isapprox(abs(state[15]), 1/sqrt(2), atol = 1e-10) # |1110⟩ -> |1⟩|1⟩|1⟩|1⟩
+		end
+
+		@testset "12.2 Aliasing with concatenation" begin
+			qasm_source = """
+			OPENQASM 3.0;
+			qubit[2] q1;
+			qubit[2] q2;
+
+			// Create an alias using concatenation
+			let combined = q1 || q2;
+
+			// Apply operations using the alias
+			h combined[0];
+			x combined[2];
+			cnot combined[0], combined[3];
+			"""
+
+			simulator = StateVectorSimulator(4, 1000)
+			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+
+			# Verify that the operations were applied correctly
+			state = BraketSimulator.calculate_current_state(branched_sim, branched_sim.active_paths[1])
+
+			# Expected state: H on q1[0], X on q2[0], CNOT from q1[0] to q2[1]
+			# This should create a state where q1[0] and q2[1] are entangled, and q2[0] is |1⟩
+
+			# Check that the state has the expected structure
+			# |0⟩|0⟩|1⟩|0⟩ and |1⟩|0⟩|1⟩|1⟩ should have equal probability (1/2 each)
+			@test isapprox(abs(state[4]), 1/sqrt(2), atol = 1e-10)  # |0010⟩ -> |0⟩|0⟩|1⟩|0⟩
+			@test isapprox(abs(state[13]), 1/sqrt(2), atol = 1e-10) # |1101⟩ -> |1⟩|0⟩|1⟩|1⟩
+		end
+
+		@testset "12.3 Aliasing with physical qubits" begin
+			qasm_source = """
+			OPENQASM 3.0;
+
+			// Create an alias for physical qubits
+			let q0 = \$0;
+			let q1 = \$1;
+
+			// Apply operations using the aliases
+			h q0;
+			cnot q0, q1;
+			"""
+
+			simulator = StateVectorSimulator(2, 1000)
+			failed = false
+			try
+				branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			catch e
+				failed = true
+			end
+
+			@test failed
+		end
+
+		@testset "12.4 Aliasing with indexed identifiers" begin
+			qasm_source = """
+			OPENQASM 3.0;
+			qubit[4] q;
+
+			// Create aliases for individual qubits
+			let q0 = q[0];
+			let q1 = q[1];
+			let q2 = q[2];
+			let q3 = q[3];
+
+			// Apply operations using the aliases
+			h q0;
+			x q1;
+			cnot q0, q2;
+			cnot q1, q3;
+			"""
+
+			simulator = StateVectorSimulator(4, 1000)
+			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+
+			# Verify that the operations were applied correctly
+			state = BraketSimulator.calculate_current_state(branched_sim, branched_sim.active_paths[1])
+
+			# Expected state: Same as in test 12.1
+			@test isapprox(abs(state[6]), 1/sqrt(2), atol = 1e-10)  # |0101⟩
+			@test isapprox(abs(state[16]), 1/sqrt(2), atol = 1e-10) # |1111⟩
+		end
+	end
+
+	@testset "13. Subroutine Return Tests" begin
+		@testset "13.1 Early return in subroutine" begin
+			qasm_source = """
+			OPENQASM 3.0;
+			qubit[2] q;
+			bit[2] b;
+			int[32] result = 0;
+
+			// Define a subroutine with an early return
+			def conditional_apply(bit condition) -> int[32] {
+				if (condition) {
+					h q[0];
+					cnot q[0], q[1];
+					return 1;  // Early return
+				}
+				
+				// This should not be executed if condition is true
+				x q[0];
+				x q[1];
+				return 0;
+			}
+
+			// Call the subroutine with true condition
+			result = conditional_apply(true);
+
+			// Measure both qubits
+			b[0] = measure q[0];
+			b[1] = measure q[1];
+			"""
+
+			simulator = StateVectorSimulator(2, 1000)
+			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+
+			# Verify that we have 2 paths (since we created a Bell state, measurements should be correlated)
+			@test length(branched_sim.active_paths) == 2
+
+			# Verify that result is 1 (from the early return)
+			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "result").val == 1
+
+			# Find paths for each measurement outcome
+			path_00 = nothing
+			path_11 = nothing
+
+			for path_idx in branched_sim.active_paths
+				measurements = branched_sim.measurements[path_idx]
+				if measurements["q[0]"][1] == 0 && measurements["q[1]"][1] == 0
+					path_00 = path_idx
+				elseif measurements["q[0]"][1] == 1 && measurements["q[1]"][1] == 1
+					path_11 = path_idx
+				end
+			end
+
+			# Verify that we found both expected paths (00 and 11)
+			@test !isnothing(path_00)
+			@test !isnothing(path_11)
+
+			# Verify that we don't have other paths (01 or 10)
+			@test length(branched_sim.active_paths) == 2
+		end
+	end
+
+	@testset "14. Loop Control Tests" begin
+		@testset "14.1 Break statement in loop" begin
+			qasm_source = """
+			OPENQASM 3.0;
+			qubit[3] q;
+			bit[3] b;
+			int[32] count = 0;
+
+			// Loop with break statement
+			for uint i in [0:5] {
+				h q[0];
+				count = count + 1;
+				
+				if (count >= 3) {
+					break;  // Exit the loop when count reaches 3
+				}
+			}
+
+			// Apply X based on final count
+			if (count == 3) {
+				x q[1];
+			}
+
+			// Measure qubits
+			b[0] = measure q[0];
+			b[1] = measure q[1];
+			"""
+
+			simulator = StateVectorSimulator(3, 1000)
+			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+
+			# Verify that count is 3 (loop should break after 3 iterations)
+			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "count").val == 3
+
+			# Verify that we have 2 paths (from measuring q[0] which had H applied 3 times)
+			@test length(branched_sim.active_paths) == 2
+
+			# Verify that q[1] has X applied (since count == 3)
+			for path_idx in branched_sim.active_paths
+				state = BraketSimulator.calculate_current_state(branched_sim, path_idx)
+				b1 = branched_sim.measurements[path_idx]["q[1]"][1]
+				@test b1 == 1  # q[1] should be measured as 1 due to X gate
+			end
+		end
+
+		@testset "14.2 Continue statement in loop" begin
+			qasm_source = """
+			OPENQASM 3.0;
+			qubit[3] q;
+			bit[3] b;
+			int[32] count = 0;
+			int[32] x_count = 0;
+
+			// Loop with continue statement
+			for uint i in [0:4] {
+				count = count + 1;
+				
+				if (count % 2 == 0) {
+					continue;  // Skip even iterations
+				}
+				
+				// This should only execute on odd iterations
+				x q[0];
+				x_count = x_count + 1;
+			}
+
+			// Apply H based on x_count
+			if (x_count == 3) {
+				h q[1];
+			}
+
+			// Measure qubits
+			b[0] = measure q[0];
+			b[1] = measure q[1];
+			"""
+
+			simulator = StateVectorSimulator(3, 1000)
+			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+
+			# Verify that count is 5 (loop should run all 5 iterations)
+			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "count").val == 5
+
+			# Verify that x_count is 3 (X should be applied on iterations 1, 3, and 5)
+			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "x_count").val == 3
+
+			# Verify that we have 2 paths (from measuring q[1] which had H applied)
+			@test length(branched_sim.active_paths) == 2
+
+			# Verify that q[0] has X applied 3 times (odd number, so it should be in |1⟩ state)
+			for path_idx in branched_sim.active_paths
+				state = BraketSimulator.calculate_current_state(branched_sim, path_idx)
+				b0 = branched_sim.measurements[path_idx]["q[0]"][1]
+				@test b0 == 1  # q[0] should be measured as 1 due to 3 X gates
+			end
+		end
+
+		@testset "14.3 Nested loops with break and continue" begin
+			qasm_source = """
+			OPENQASM 3.0;
+			qubit[3] q;
+			bit[3] b;
+			int[32] outer_count = 0;
+			int[32] inner_count = 0;
+			int[32] total_ops = 0;
+
+			// Nested loops with break and continue
+			for uint i in [0:3] {
+				outer_count = outer_count + 1;
+				
+				if (i == 1) {
+					continue;  // Skip iteration 1 of outer loop
+				}
+				
+				for uint j in [0:3] {
+					inner_count = inner_count + 1;
+					
+					if (j == 2) {
+						break;  // Exit inner loop when j reaches 2
+					}
+					
+					// This should execute for (i,j) = (0,0), (0,1), (2,0), (2,1), (3,0), (3,1)
+					h q[0];
+					total_ops = total_ops + 1;
+				}
+			}
+
+			// Apply X based on total operations
+			if (total_ops == 6) {
+				x q[1];
+			}
+
+			// Measure qubits
+			b[0] = measure q[0];
+			b[1] = measure q[1];
+			"""
+
+			simulator = StateVectorSimulator(3, 1000)
+			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+
+			# Verify that outer_count is 4 (outer loop should run all 4 iterations)
+			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "outer_count").val == 4
+
+			# Verify that inner_count is 8 (inner loop should run 2 iterations for i=0, 0 for i=1, 2 for i=2, 2 for i=3)
+			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "inner_count").val == 6
+
+			# Verify that total_ops is 6 (H should be applied 6 times)
+			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "total_ops").val == 6
+
+			# Verify that q[1] has X applied (since total_ops == 6)
+			for path_idx in branched_sim.active_paths
+				state = BraketSimulator.calculate_current_state(branched_sim, path_idx)
+				b1 = branched_sim.measurements[path_idx]["q[1]"][1]
+				@test b1 == 1  # q[1] should be measured as 1 due to X gate
+			end
+		end
+	end
+
+	@testset "15. Error Handling Tests" begin
+		@testset "15.1 Division by zero error" begin
+			# Create an OpenQASM program with division by zero
+			qasm_source = """
+			OPENQASM 3.0;
+			qubit[1] q;
+			bit[1] b;
+
+			// Division by zero error
+			int[32] x = 10;
+			int[32] y = 0;
+			int[32] result = x / y;  // This should cause an error
+
+			h q[0];
+			b[0] = measure q[0];
+			"""
+
+			simulator = StateVectorSimulator(1, 1000)
+
+			# Test that the error is caught when evolving the circuit
+			error_caught = false
+			try
+				branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			catch e
+				error_caught = true
+			end
+
+			# Verify that the error was caught
+			@test error_caught
+		end
+
+		@testset "15.2 Index out of bounds error" begin
+			# Create an OpenQASM program with index out of bounds
+			qasm_source = """
+			OPENQASM 3.0;
+			qubit[2] q;
+			bit[2] b;
+
+			// Index out of bounds error
+			array[int[32], 3] arr = {1, 2, 3};
+			int[32] result = arr[3];  // This should cause an error (valid indices are 0, 1, 2)
+
+			h q[0];
+			b[0] = measure q[0];
+			"""
+
+			simulator = StateVectorSimulator(2, 1000)
+
+			# Test that the error is caught when evolving the circuit
+			error_caught = false
+			try
+				branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			catch e
+				error_caught = true
+				# Verify that it's an index out of bounds error
+			end
+
+			# Verify that the error was caught
+			@test error_caught
+		end
+
+		@testset "15.3 Type mismatch error" begin
+			# Create an OpenQASM program with type mismatch
+			qasm_source = """
+			OPENQASM 3.0;
+			qubit[1] q;
+			bit[1] b;
+
+			// Type mismatch error
+			int[32] x = 10;
+			float[64] y = 3.14;
+			int[32] result = x + y;  // This should cause an error (can't add int and float directly)
+
+			h q[0];
+			b[0] = measure q[0];
+			"""
+
+			simulator = StateVectorSimulator(1, 1000)
+
+			# Test that the error is caught when evolving the circuit
+			error_caught = false
+			try
+				branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			catch e
+				error_caught = true
+				# Verify that it's a type mismatch error
+				@test occursin("type", string(e)) || occursin("conversion", string(e))
+			end
+
+			# Verify that the error was caught
+			@test error_caught
+		end
+
+		@testset "15.4 Undefined variable error" begin
+			# Create an OpenQASM program with undefined variable
+			qasm_source = """
+			OPENQASM 3.0;
+			qubit[1] q;
+			bit[1] b;
+
+			// Undefined variable error
+			if (true) {
+				int[32] local_var = 10;  // Variable defined in local scope
+			}
+			int[32] result = local_var;  // This should cause an error (local_var is not defined here)
+
+			h q[0];
+			b[0] = measure q[0];
+			"""
+
+			simulator = StateVectorSimulator(1, 1000)
+
+			# Test that the error is caught when evolving the circuit
+			error_caught = false
+			try
+				branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			catch e
+				error_caught = true
+				# Verify that it's an undefined variable error
+			end
+
+			# Verify that the error was caught
+			@test error_caught
+		end
+
+		@testset "15.5 Invalid gate argument error" begin
+			# Create an OpenQASM program with invalid gate argument
+			qasm_source = """
+			OPENQASM 3.0;
+			qubit[1] q;
+			bit[1] b;
+
+			// Invalid gate argument error
+			rx("invalid") q[0];  // This should cause an error (string is not a valid argument for rx)
+
+			b[0] = measure q[0];
+			"""
+
+			simulator = StateVectorSimulator(1, 1000)
+
+			# Test that the error is caught when evolving the circuit
+			error_caught = false
+			try
+				branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			catch e
+				error_caught = true
+				# Verify that it's an invalid gate argument error
+			end
+
+			# Verify that the error was caught
+			@test error_caught
 		end
 	end
 end

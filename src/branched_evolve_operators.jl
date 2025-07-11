@@ -27,11 +27,6 @@ function evaluate_qubits(sim::BranchedSimulatorOperators, qubit_expr::QasmExpres
 	# Create a dictionary to store results for each path
 	results = Dict{Int, Vector{Int}}()
 
-	# Only process for active paths
-	if isempty(sim.active_paths)
-		return results
-	end
-
 	# Process the expression to get qubit indices
 	expr_type = head(qubit_expr)
 
@@ -60,14 +55,6 @@ function evaluate_qubits(sim::BranchedSimulatorOperators, qubit_expr::QasmExpres
 					append!(all_qubits, alias_qubits)
 				else
 					push!(all_qubits, alias_qubits)
-				end
-				# Check if the qubit name exists directly in the mapping
-			elseif haskey(sim.qubit_mapping, qubit_name)
-				qubit_idx = sim.qubit_mapping[qubit_name]
-				if qubit_idx isa Vector
-					append!(all_qubits, qubit_idx)
-				else
-					push!(all_qubits, qubit_idx)
 				end
 			else
 				# Check if it's a register by looking for indexed qubits
@@ -226,19 +213,10 @@ function evaluate_modifiers(sim::BranchedSimulatorOperators, expr::QasmExpressio
 	if head(expr) == :power_mod
 		pow_val = _evolve_branched_ast_operators(sim, expr.args[1])
 
-		# Check if pow_val is a dictionary (path-specific values)
-		if isa(pow_val, Dict)
-			# For each path, evaluate with path-specific value
-			for (path_idx, path_val) in pow_val
-				pow_expr = QasmExpression(:pow, path_val)
-				results[path_idx] = (pow_expr, expr.args[2])
-			end
-		else
-			# If not a dictionary, use the same value for all active paths
-			pow_expr = QasmExpression(:pow, pow_val)
-			for path_idx in sim.active_paths
-				results[path_idx] = (pow_expr, expr.args[2])
-			end
+		# For each path, evaluate with path-specific value
+		for (path_idx, path_val) in pow_val
+			pow_expr = QasmExpression(:pow, path_val)
+			results[path_idx] = (pow_expr, expr.args[2])
 		end
 
 		return results
@@ -253,40 +231,20 @@ function evaluate_modifiers(sim::BranchedSimulatorOperators, expr::QasmExpressio
 		has_argument = length(expr.args) > 1
 		if has_argument
 			arg_val = _evolve_branched_ast_operators(sim, first(expr.args))
-
-			# Check if arg_val is a dictionary (path-specific values)
-			if isa(arg_val, Dict)
-				# For each path, evaluate with path-specific value
-				for (path_idx, path_val) in arg_val
-					isinteger(path_val) || error("Cannot apply non-integer ($path_val) number of controls or negcontrols.")
-					true_inner = expr.args[2]
-					inner = QasmExpression(head(expr), true_inner)
-
-					local_arg_val = path_val
-					while local_arg_val > 2
-						inner = QasmExpression(head(expr), inner)
-						local_arg_val -= 1
-					end
-
-					new_head = head(expr) == :control_mod ? :ctrl : :negctrl
-					results[path_idx] = (QasmExpression(new_head), inner)
-				end
-			else
-				# If not a dictionary, use the same value for all active paths
-				isinteger(arg_val) || error("Cannot apply non-integer ($arg_val) number of controls or negcontrols.")
+			# For each path, evaluate with path-specific value
+			for (path_idx, path_val) in arg_val
+				isinteger(path_val) || error("Cannot apply non-integer ($path_val) number of controls or negcontrols.")
 				true_inner = expr.args[2]
 				inner = QasmExpression(head(expr), true_inner)
 
-				while arg_val > 2
+				local_arg_val = path_val
+				while local_arg_val > 2
 					inner = QasmExpression(head(expr), inner)
-					arg_val -= 1
+					local_arg_val -= 1
 				end
 
 				new_head = head(expr) == :control_mod ? :ctrl : :negctrl
-
-				for path_idx in sim.active_paths
-					results[path_idx] = (QasmExpression(new_head), inner)
-				end
+				results[path_idx] = (QasmExpression(new_head), inner)
 			end
 		else
 			inner = expr.args[1]
@@ -343,7 +301,7 @@ function _apply_modifiers(gate_op::QuantumOperator, modifiers::Vector, target_in
 
 		elseif modifier_type == :negctrl
 			# Special handling for global phase gates
-			if isa(gate_op, PhaseShift)
+			if isa(gate_op, GPhase)
 				# For PhaseShift (gphase), we only need one control qubit
 				if length(target_indices) < 1
 					error("Negative control modifier requires at least 1 qubit for phase gates")
@@ -383,12 +341,8 @@ function _apply_modifiers(gate_op::QuantumOperator, modifiers::Vector, target_in
 				# If the gate has a pow_exponent field, update it
 				power_value = modifier.args[1]
 
-				# If the gate already has a pow_exponent, multiply with the new value
-				if isdefined(gate_op, :pow_exponent)
-					gate_op.pow_exponent *= power_value
-				else
-					gate_op.pow_exponent = power_value
-				end
+				# Multiply gate exponent with the new value
+				gate_op.pow_exponent *= power_value
 			else
 				# If the gate doesn't have a pow_exponent field, we can't apply the power modifier
 				error("Power modifier not supported for gate type $(typeof(gate_op))")
@@ -481,9 +435,7 @@ function _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::Q
 		# If there is no return value, the empty return keyword may be used to immediately exit from the subroutine, which implicitly returns the void type.
 	elseif expr_type == :return
 		if length(expr.args) == 0 # No return value
-			for path_idx in sim.active_paths
-				sim.return_values[path_idx] = nothing
-			end
+			error("Return statement must return something")
 		else
 			sim.return_values = merge(sim.return_values, _evolve_branched_ast_operators(sim, expr.args[1]))
 		end
@@ -493,14 +445,13 @@ function _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::Q
 		# Version node - ignore
 		return
 
-		# TODO: Have not looked at this code, need to check it and see if it is implemented
 	elseif expr_type == :reset
 		# Reset operation - reset qubit to |0⟩ state
 		qubit_indices = evaluate_qubits(sim, expr.args[1])
 		for path_idx in sim.active_paths
 			for qubit_idx in qubit_indices
 				# Apply reset to the qubit's index in the state
-				_apply_reset!(path_idx, qubit_idx)
+				_apply_reset!(path_idx, qubit_idx) #TODO: Implement _apply_reset!
 			end
 		end
 
@@ -687,7 +638,7 @@ function _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::Q
 			# Get the variable
 			var = get_variable(sim, path_idx, identifier_name)
 
- 			if !isnothing(var)
+			if !isnothing(var)
 				# Check if it's a bit array (SizedBitVector)
 				if var.type isa Quasar.SizedBitVector
 					# Convert to 1-based indexing for Julia arrays
@@ -702,10 +653,10 @@ function _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::Q
 				elseif var.type isa Quasar.SizedUInt
 					size = var.type.size.args[1]
 					if index isa Vector
-						results[path_idx] = [(var.val & (1 << (size-1-i))) >> (siz-1-i) for i in index]                                                   
+						results[path_idx] = [(var.val & (1 << (size-1-i))) >> (siz-1-i) for i in index]
 					else
 						results[path_idx] = (var.val & (1 << (size-1-index))) >> (size-1-index)
-					end                                              
+					end
 				elseif !isnothing(var.type) && var.type <: Quasar.SizedArray
 					# For other array types
 					# Convert to 1-based indexing for Julia arrays
@@ -922,20 +873,6 @@ function _handle_measurement(sim::BranchedSimulatorOperators, expr::QasmExpressi
 				if idx == qubit_idx
 					qubit_name = name
 					break
-				end
-			end
-
-			# If we couldn't find the qubit name directly, check if it's a function parameter
-			if qubit_name == ""
-				# Check all variables in this path to see if any are qubit parameters
-				for (var_name, var) in sim.variables[path_idx]
-					if var.type == :qubit_declaration && !isnothing(var.val)
-						stored_qubit_name = var.val
-						if haskey(sim.qubit_mapping, stored_qubit_name) && sim.qubit_mapping[stored_qubit_name] == qubit_idx
-							qubit_name = stored_qubit_name
-							break
-						end
-					end
 				end
 			end
 
@@ -1469,28 +1406,21 @@ function _handle_classical_declaration(sim::BranchedSimulatorOperators, expr::Qa
 		var_name = Quasar.name(expr.args[2])
 		var_type = head(expr.args[1]) == :classical_type ? expr.args[1].args[1] : expr.args[1]
 
-		# Check if this is a bit register declaration
-		if typeof(var_type) == Quasar.SizedBitVector
-			# Get the size of the register
-			register_size_dict = _evolve_branched_ast_operators(sim, var_type.size)
+		# Get the size of the register
+		register_size_dict = _evolve_branched_ast_operators(sim, var_type.size)
 
-			# Process each path individually
-			for (path_idx, register_size) in register_size_dict
-				# If the size is -1, then it is a single bit, not a register
-				if register_size == -1
-					# Initialize with a single boolean value
-					set_variable!(sim, path_idx, var_name, ClassicalVariable(var_name, var_type, [1], false))
-				else
-					# Initialize the register with a boolean array
-					set_variable!(sim, path_idx, var_name, ClassicalVariable(var_name, var_type, [0 for _ in 1:register_size], false))
-				end
-			end
-		else
-			# Initialize variable for each active path
-			for path_idx in sim.active_paths
-				set_variable!(sim, path_idx, var_name, ClassicalVariable(var_name, var_type, nothing, false))
+		# Process each path individually
+		for (path_idx, register_size) in register_size_dict
+			# If the size is -1, then it is a single bit, not a register
+			if register_size == -1
+				# Initialize with a single boolean value
+				set_variable!(sim, path_idx, var_name, ClassicalVariable(var_name, var_type, [1], false))
+			else
+				# Initialize the register with a boolean array
+				set_variable!(sim, path_idx, var_name, ClassicalVariable(var_name, var_type, [0 for _ in 1:register_size], false))
 			end
 		end
+
 		# This for all other classical variables
 	elseif head(expr.args[2]) == :classical_assignment
 		var_name = Quasar.name(expr.args[2].args[1].args[2])
@@ -1652,21 +1582,13 @@ function _handle_gate_call(sim::BranchedSimulatorOperators, expr::QasmExpression
 	# Extract target qubit indices and evaluate them in the current scope
 	target_indices_dict = Dict{Int, Vector{Int}}()
 	if length(expr.args) > 2 && !isnothing(expr.args[3])
-		if head(expr.args[3]) == :qubit_targets
-			for target in expr.args[3].args
-				qubit_indices = evaluate_qubits(sim, target)
-				for (path_idx, indices) in qubit_indices
-					if !haskey(target_indices_dict, path_idx)
-						target_indices_dict[path_idx] = Int[]
-					end
-					append!(target_indices_dict[path_idx], indices)
-				end
-			end
-		else
-			# Handle the case where it's not a :qubit_targets expression
-			qubit_indices = evaluate_qubits(sim, expr.args[3])
+		for target in expr.args[3].args
+			qubit_indices = evaluate_qubits(sim, target)
 			for (path_idx, indices) in qubit_indices
-				target_indices_dict[path_idx] = indices
+				if !haskey(target_indices_dict, path_idx)
+					target_indices_dict[path_idx] = Int[]
+				end
+				append!(target_indices_dict[path_idx], indices)
 			end
 		end
 	end
@@ -1715,110 +1637,96 @@ function _handle_gate_call(sim::BranchedSimulatorOperators, expr::QasmExpression
 			# Execute the gate body
 			instruction = gate_def.body
 
-			if instruction isa Quasar.QasmExpression
-				# Check for inv modifier - need to reverse the order of operations
-				has_inv = any(head(modifier) == :inv for modifier in modifiers)
+			# Check for inv modifier - need to reverse the order of operations
+			has_inv = any(head(modifier) == :inv for modifier in modifiers)
 
-				# For pow modifier, we need to apply the entire gate sequence multiple times
-				pow_value = 1.0
-				for modifier in modifiers
-					if head(modifier) == :pow
-						pow_value *= modifier.args[1]
-					end
+			# For pow modifier, we need to apply the entire gate sequence multiple times
+			pow_value = 1.0
+			for modifier in modifiers
+				if head(modifier) == :pow
+					pow_value *= modifier.args[1]
 				end
+			end
 
-				# Store the original instructions before processing
-				original_instruction_length = length(sim.instruction_sequences[path_idx])
+			# Store the original instructions before processing
+			original_instruction_length = length(sim.instruction_sequences[path_idx])
 
-				# Process the gate body
-				gate_calls = instruction.args
+			# Process the gate body
+			gate_calls = instruction.args
 
-				# If inverse, reverse the order of operations
-				if has_inv
-					gate_calls = reverse(gate_calls)
-				end
+			# If inverse, reverse the order of operations
+			if has_inv
+				gate_calls = reverse(gate_calls)
+			end
 
-				# Apply the gate sequence
-				for gate_call in gate_calls
-					_evolve_branched_ast_operators(sim, gate_call)
-				end
+			# Apply the gate sequence
+			for gate_call in gate_calls
+				_evolve_branched_ast_operators(sim, gate_call)
+			end
 
-				# Get the new instructions that were added
-				new_instructions = sim.instruction_sequences[path_idx][(original_instruction_length+1):end]
+			# Get the new instructions that were added
+			new_instructions = sim.instruction_sequences[path_idx][(original_instruction_length+1):end]
 
-				# Remove the newly added instructions (we'll add them back with proper modifiers)
-				resize!(sim.instruction_sequences[path_idx], original_instruction_length)
+			# Remove the newly added instructions (we'll add them back with proper modifiers)
+			resize!(sim.instruction_sequences[path_idx], original_instruction_length)
 
-				# Apply modifiers to each instruction
-				modified_instructions = Instruction[]
-				for instruction in new_instructions
-					gate_op = instruction.operator
-					targets = []
-					ctrl_idx = 1
-					# Apply all modifiers except pow (we handle that separately)
-					if !isempty(modifiers)
-						for modifier in modifiers
-							if head(modifier) != :pow
-								# For inv, we've already reversed the order, so just apply to each gate
-								if head(modifier) == :inv
-									if hasfield(typeof(gate_op), :pow_exponent)
-										gate_op.pow_exponent = -gate_op.pow_exponent
-									else
-										error("Inverse modifier not supported for gate type $(typeof(gate_op))")
-									end
+			# Apply modifiers to each instruction
+			modified_instructions = Instruction[]
+			for instruction in new_instructions
+				gate_op = instruction.operator
+				targets = []
+				ctrl_idx = 1
+				# Apply all modifiers except pow (we handle that separately)
+				if !isempty(modifiers)
+					for modifier in modifiers
+						if head(modifier) != :pow
+							# For inv, we've already reversed the order, so just apply to each gate
+							if head(modifier) == :inv
+								if hasfield(typeof(gate_op), :pow_exponent)
+									gate_op.pow_exponent = -gate_op.pow_exponent
 								else
-									# Apply other modifiers (ctrl, negctrl)
-									gate_op = _apply_modifiers(gate_op, [modifier], target_indices)
-									push!(targets, target_indices[ctrl_idx])
-									ctrl_idx += 1
+									error("Inverse modifier not supported for gate type $(typeof(gate_op))")
 								end
+							else
+								# Apply other modifiers (ctrl, negctrl)
+								gate_op = _apply_modifiers(gate_op, [modifier], target_indices)
+								push!(targets, target_indices[ctrl_idx])
+								ctrl_idx += 1
 							end
 						end
 					end
-
-					append!(targets, instruction.target)
-
-					push!(modified_instructions, Instruction(gate_op, targets))
 				end
 
-				# For pow modifier, repeat the entire sequence |pow_value| times
-				# If pow_value is negative, we've already inverted each gate and reversed the order
-				abs_pow = abs(pow_value)
-				integer_pow = floor(Int, abs_pow)
+				append!(targets, instruction.target)
 
-				# Add the integer part of the power
-				for _ in 1:integer_pow
-					for instruction in modified_instructions
-						push!(sim.instruction_sequences[path_idx], instruction)
+				push!(modified_instructions, Instruction(gate_op, targets))
+			end
+
+			# For pow modifier, repeat the entire sequence |pow_value| times
+			# If pow_value is negative, we've already inverted each gate and reversed the order
+			abs_pow = abs(pow_value)
+			integer_pow = floor(Int, abs_pow)
+
+			# Add the integer part of the power
+			for _ in 1:integer_pow
+				for instruction in modified_instructions
+					push!(sim.instruction_sequences[path_idx], instruction)
+				end
+			end
+
+			# Handle fractional part if needed
+			fractional_part = abs_pow - integer_pow
+			if fractional_part > 0
+				for instruction in modified_instructions
+					gate_op = instruction.operator
+					if hasfield(typeof(gate_op), :pow_exponent)
+						# Apply fractional power to each gate
+						gate_op.pow_exponent *= fractional_part
+						push!(sim.instruction_sequences[path_idx], Instruction(gate_op, instruction.target))
+					else
+						error("Power modifier with fractional part not supported for gate type $(typeof(gate_op))")
 					end
 				end
-
-				# Handle fractional part if needed
-				fractional_part = abs_pow - integer_pow
-				if fractional_part > 0
-					for instruction in modified_instructions
-						gate_op = instruction.operator
-						if hasfield(typeof(gate_op), :pow_exponent)
-							# Apply fractional power to each gate
-							gate_op.pow_exponent *= fractional_part
-							push!(sim.instruction_sequences[path_idx], Instruction(gate_op, instruction.target))
-						else
-							error("Power modifier with fractional part not supported for gate type $(typeof(gate_op))")
-						end
-					end
-				end
-			else
-				# For non-QasmExpression instructions (e.g., direct gate operators)
-				gate_op = StructTypes.constructfrom(QuantumOperator, instruction)
-
-				# Apply modifiers if any
-				if !isempty(modifiers)
-					gate_op = _apply_modifiers(gate_op, modifiers, target_indices)
-				end
-
-				# Store gate instruction for this path
-				gate_instruction = Instruction(gate_op, target_indices)
-				push!(sim.instruction_sequences[path_idx], gate_instruction)
 			end
 
 			_restore_original_scope(sim, original_variables)
@@ -1915,11 +1823,7 @@ function _handle_gate_definition(sim::BranchedSimulatorOperators, expr::QasmExpr
 	argument_exprs = !isempty(gate_arguments.args) ? convert(Vector{QasmExpression}, gate_arguments.args[1]) : QasmExpression[]
 	argument_names = String[]
 	for arg in argument_exprs
-		if arg.args[1] isa String
-			push!(argument_names, arg.args[1])
-		else
-			push!(argument_names, string(arg.args[1]))
-		end
+		push!(argument_names, arg.args[1])
 	end
 
 	# Extract qubit targets
@@ -2199,26 +2103,17 @@ function _handle_function_call(sim::BranchedSimulatorOperators, expr::QasmExpres
 							error("Qubit $qubit_name not found in qubit mapping")
 						end
 					end
-				elseif param_type == :classical_declaration
-					var_type = param_def.args[1].args[1]
-					sim.variables[path_idx][param_name] = FramedVariable(param_name, param_type, path_arg_value, false, sim.curr_frame+1)
 				else
-					# For other parameter types, use the evaluated value
+					var_type = param_def.args[1].args[1]
 					sim.variables[path_idx][param_name] = FramedVariable(param_name, param_type, path_arg_value, false, sim.curr_frame+1)
 				end
 			end
 		end
 
-		# Make sure we're handling the function body correctly
-		if func_def.body isa Vector{QasmExpression}
-			# If it's a vector of expressions, process each one
-			for expr in func_def.body
-				_evolve_branched_ast_operators(sim, expr)
-			end
-		else
-			# Otherwise, process it directly
-			_evolve_branched_ast_operators(sim, func_def.body)
+		for expr in func_def.body
+			_evolve_branched_ast_operators(sim, expr)
 		end
+
 
 		active_paths = keys(sim.return_values)
 		append!(sim.active_paths, active_paths)
@@ -2266,7 +2161,6 @@ Subroutines cannot contain qubit declarations in their bodies, but can accept va
 Aliases can be declared within subroutine scopes, and have the same lifetime and visibility as other local variables.
 """
 function _handle_function_definition(sim::BranchedSimulatorOperators, expr::QasmExpression)
-	# TODO: Check this function implementation
 	# Register function definition directly
 	function_name = expr.args[1].args[1]
 	function_args = expr.args[2]
