@@ -173,6 +173,50 @@ end
 qubit_count(sim::BranchedSimulatorOperators) = maximum(sim.n_qubits)
 device_id(sim::BranchedSimulatorOperators) = device_id(sim.base_simulator)
 
+function reinit!(sim::BranchedSimulatorOperators, qubit_count::Int, shots::Int)
+	reinit!(sim.base_simulator, qubit_count, shots)
+	sim.n_qubits = qubit_count
+	sim.shots = [shots]
+	sim.active_paths = [1]
+	sim.instruction_sequences = [Vector{Instruction}()]
+	sim.variables = [Dict{String, FramedVariable}()]
+	sim.curr_frame = 0
+	sim.gate_defs = Dict{String, AbstractGateDefinition}()
+	sim.function_defs = Dict{String, FunctionDefinition}()
+	sim.qubit_mapping = Dict{String, Union{Int, Vector{Int}}}()
+	sim.measurements = [Dict{String, Vector{Int}}()]
+	sim.function_builtin = Dict{String, Function}(
+			"arccos" => acos, "arcsin" => asin, "arctan" => atan, "ceiling" => ceil, "cos" => cos, "exp" => exp,
+			"floor" => floor, "log" => log, "mod" => mod, "sin" => sin, "sqrt" => sqrt, "tan" => tan
+		)
+	sim.gate_name_mapping = Dict{String, Symbol}(
+			# Standard gates with first letter capitalized
+			"x" => :X, "y" => :Y, "z" => :Z, "h" => :H,
+			"s" => :S, "si" => :Si, "t" => :T, "ti" => :Ti,
+			"v" => :V, "vi" => :Vi, "i" => :I,
+			"rx" => :Rx, "ry" => :Ry, "rz" => :Rz,
+			"cnot" => :CNot, "cy" => :CY, "cz" => :CZ, "cv" => :CV,
+			"swap" => :Swap, "iswap" => :ISwap, "pswap" => :PSwap,
+			"cswap" => :CSwap, "ccnot" => :CCNot,
+			"xx" => :XX, "xy" => :XY, "yy" => :YY, "zz" => :ZZ,
+			"ecr" => :ECR, "ms" => :MS,
+			"gpi" => :GPi, "gpi2" => :GPi2, "prx" => :PRx,
+			"U" => :U,
+			# Special cases
+			"phaseshift" => :PhaseShift,
+			"cphaseshift" => :CPhaseShift,
+			"cphaseshift00" => :CPhaseShift00,
+			"cphaseshift01" => :CPhaseShift01,
+			"cphaseshift10" => :CPhaseShift10,
+			"gphase" => :GPhase
+		)
+
+	sim.inputs = Dict{String, Any}()
+	sim.return_values = Dict{Int, Any}()
+	sim.continue_paths = Vector{Int}()
+end
+
+
 ########################
 # Measurement Handlers #
 ########################

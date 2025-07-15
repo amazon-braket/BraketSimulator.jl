@@ -14,9 +14,9 @@ using
 	PrecompileTools
 
 export StateVectorSimulator, DensityMatrixSimulator, BranchedSimulator, evolve!, simulate, ValidationError,
-       calculate_probability_threshold, prune_paths!, allocate_shots, get_measurement_probabilities, apply_projection!,
-       _apply_reset!, measure_qubit!, get_measurement_result, set_variable!, get_variable, qubit_count, device_id, apply_gate!,
-       new_to_circuit, _evolve_branched_ast, BranchedSimulatorOperators, evolve_branched_operators
+	calculate_probability_threshold, prune_paths!, allocate_shots, get_measurement_probabilities, apply_projection!,
+	_apply_reset!, measure_qubit!, get_measurement_result, set_variable!, get_variable, qubit_count, device_id, apply_gate!,
+	new_to_circuit, _evolve_branched_ast, BranchedSimulatorOperators, evolve_branched_operators, calculate_shots_per_state
 
 const AbstractStateVector{T} = AbstractVector{T}
 const AbstractDensityMatrix{T} = AbstractMatrix{T}
@@ -78,6 +78,14 @@ include("custom_gates.jl")
 include("pow_gates.jl")
 include("gate_kernels.jl")
 include("noise_kernels.jl")
+include("result_types.jl")
+include("properties.jl")
+include("sv_simulator.jl")
+include("dm_simulator.jl")
+include("branched_simulator.jl")
+include("branched_simulator_operators.jl")
+include("branched_evolve_operators.jl")
+include("branched_evolve.jl")
 
 function __init__()
 	Quasar.builtin_gates[] = builtin_gates
@@ -103,11 +111,11 @@ function _formatted_measurements(simulator::D, measured_qubits::Vector{Int}) whe
 	return [_index_to_endian_bits(sample, n_qubits)[measured_qubits .+ 1] for sample in sim_samples]
 end
 
-function _build_metadata(simulator, ir)
+function _build_metadata(simulator, ir; shots = nothing)
 	task_mtd = TaskMetadata(
 		braketSchemaHeader("braket.task_result.task_metadata", "1"),
 		string(uuid4()),
-		simulator.shots,
+		shots === nothing ? simulator.shots : shots,
 		device_id(simulator),
 		nothing,
 		nothing,
@@ -291,58 +299,6 @@ function simulate(
 	return _bundle_results(results, circuit_ir, simulator, measured_qubits)
 end
 
-"""
-	simulate(simulator::AbstractSimulator, circuit_ir::Union{OpenQasmProgram, Program}, shots::Int; kwargs...) -> GateModelTaskResult
-
-Simulate the evolution of a state vector or density matrix using the passed-in `simulator`.
-The instructions to apply (gates and noise channels) and measurements to make are
-encoded in `circuit_ir`. Supported IR format is `OpenQASMProgram`. Returns a list of measured qubit
-results, combining both MCM and terminal measurements.
-"""
-
-function new_simulate(
-	simulator::AbstractSimulator,
-	circuit_ir::OpenQasmProgram,
-	shots::Int;
-	inputs = Dict{String, Float64}(),
-	kwargs...,
-)
-	if shots <= 0
-		error("The number of inputted shots must be a positive integer")
-	end
-	if shots != simulator.shots
-		error("The number of shots in the simulator must be equal to the number of shots passed in")
-	end
-	
-	# Parse and prepare the program
-	program, n_qubits = _new_prepare_program(circuit_ir, shots)
-	_validate_circuit_ir(simulator, program, n_qubits, shots)
-	
-	# Initialize the simulator
-	reinit!(simulator, n_qubits, shots)
-	
-	# Use the branched simulator to handle measurements and control flow
-	branched_sim = evolve_branched_operators(simulator, program, inputs)
-	
-	# Create the result object
-	measured_qubits = sort(collect(keys(branched_sim.measurements[branched_sim.active_paths[1]])))
-	
-	# Format the measurements for each active path
-	formatted_samples = [
-		[get(branched_sim.measurements[path_idx], qubit, 0) for qubit in measured_qubits]
-		for path_idx in branched_sim.active_paths
-	]
-	
-	# Return the result
-	return GateModelTaskResult(
-		braketSchemaHeader("braket.task_result.gate_model_task_result", "1"),
-		formatted_samples,
-		nothing,
-		ResultTypeValue[],  # For now, no result types
-		measured_qubits,
-		_build_metadata(simulator, circuit_ir)...
-	)
-end
 
 """
 	_prepare_program(circuit_ir::OpenQasmProgram, inputs::Dict{String, <:Any}, shots::Int) -> (QasmExpression, Int)
@@ -351,9 +307,9 @@ Parse the OpenQASM3 source and compute basis rotation instructions if running wi
 Return the `Program` after parsing and the qubit count of the circuit.
 """
 function _new_prepare_program(circuit_ir::OpenQasmProgram, shots::Int)
-	src           = circuit_ir.source::String
-	circuit       = new_to_circuit(src)
-	n_qubits      = qubit_count(circuit)
+	src      = circuit_ir.source::String
+	circuit  = new_to_circuit(src)
+	n_qubits = qubit_count(circuit)
 	if shots > 0
 		_verify_openqasm_shots_observables(circuit, n_qubits)
 		basis_rotation_instructions!(circuit)
@@ -436,18 +392,6 @@ function simulate(simulator::AbstractSimulator,
 	return results
 end
 
-# these functions are for calls from an "external" language
-# like Python or Rust, when we're calling this package from a
-# separate process and thus don't want to have to IPC large
-# blobs of data back and forth/deal with having to serialize
-# Julia objects
-function create_sim(simulator_id::String, shots::Int)
-	return if simulator_id == "braket_sv_v2"
-		StateVectorSimulator(0, shots)
-	elseif simulator_id == "braket_dm_v2"
-		DensityMatrixSimulator(0, shots)
-	end
-end
 
 function _mmap_large_result_values(results)
 	to_mmap = findall(rt->sizeof(rt.value) > 2^20, results.resultTypes)
@@ -498,14 +442,69 @@ function BraketSimulator.simulate(simulator_id::String, task_specs::AbstractVect
 	return jsons, paths_and_lens
 end
 
-include("result_types.jl")
-include("properties.jl")
-include("sv_simulator.jl")
-include("dm_simulator.jl")
-include("branched_simulator.jl")
-include("branched_simulator_operators.jl")
-include("branched_evolve_operators.jl")
-include("branched_evolve.jl")
+
+"""
+	simulate(simulator::AbstractSimulator, circuit_ir::Union{OpenQasmProgram, Program}, shots::Int; kwargs...) -> GateModelTaskResult
+
+Simulate the evolution of a state vector or density matrix using the passed-in `simulator`.
+The instructions to apply (gates and noise channels) and measurements to make are
+encoded in `circuit_ir`. Supported IR format is `OpenQASMProgram`. Returns a list of measured qubit
+results, combining both MCM and terminal measurements.
+"""
+
+function simulate(
+	simulator::BranchedSimulatorOperators,
+	circuit_ir::OpenQasmProgram,
+	shots::Int;
+	inputs = Dict{String, Float64}(),
+	kwargs...,
+)
+	if shots <= 0
+		error("The number of inputted shots must be a positive integer")
+	end
+	if shots != simulator.shots[1]
+		error("The number of shots in the simulator must be equal to the number of shots passed in")
+	end
+
+	# Parse and prepare the program
+	program = new_to_circuit(circuit_ir.source)
+	# _validate_circuit_ir(simulator, program, n_qubits, shots)
+
+	# Initialize the simulator
+	reinit!(simulator, 0, shots) # Fix this function
+
+	# Use the branched simulator to handle measurements and control flow
+	branched_sim = evolve_branched_operators(simulator, program, inputs)
+
+	circuit_measurements = calculate_shots_per_state(branched_sim)
+	# Create the result object
+	measured_qubits = 0:(branched_sim.n_qubits-1)
+
+	# Return the result
+	return GateModelTaskResult(
+		braketSchemaHeader("braket.task_result.gate_model_task_result", "1"),
+		circuit_measurements,
+		nothing,
+		ResultTypeValue[],  # For now, no result types
+		measured_qubits,
+		_build_metadata(branched_sim, circuit_ir; shots = branched_sim.shots[1])...,
+	)
+end
+
+# these functions are for calls from an "external" language
+# like Python or Rust, when we're calling this package from a
+# separate process and thus don't want to have to IPC large
+# blobs of data back and forth/deal with having to serialize
+# Julia objects
+function create_sim(simulator_id::String, shots::Int)
+	return if simulator_id == "braket_sv_v2"
+		StateVectorSimulator(0, shots)
+	elseif simulator_id == "braket_dm_v2"
+		DensityMatrixSimulator(0, shots)
+	elseif simulator_id == "braket_sv_branched"
+		BranchedSimulatorOperators(StateVectorSimulator(0, shots)) # Fix this
+	end
+end
 
 @setup_workload begin
 	custom_qasm = """
@@ -904,5 +903,120 @@ include("branched_evolve.jl")
 		simulate("braket_sv_v2", shots_results_qasm, "{}", 10)
 		simulate("braket_dm_v2", shots_results_qasm, "{}", 10)
 	end
+	"""
+		calculate_shots_per_state(branched_sim::BranchedSimulatorOperators) -> Vector{Vector{Int}}
+
+	Takes the shots and instruction sequences from a branched simulator, evolves the states of each instruction,
+	and calculates the number of shots allocated to each possible state.
+
+	Returns a list of lists, where each inner list represents a shot and each index of the list represents a qubit.
+	For example, for a 3-qubit system, a shot might be represented as [0, 1, 0], indicating qubit 0 is in state 0,
+	qubit 1 is in state 1, and qubit 2 is in state 0.
+	"""
+	function calculate_shots_per_state(branched_sim::BranchedSimulatorOperators)
+		# Dictionary to store the shots per state
+		shots_per_state = Dict{String, Int}()
+
+		# Process each active path
+		for path_idx in branched_sim.active_paths
+			# Get the number of shots for this path
+			path_shots = branched_sim.shots[path_idx]
+
+			# Skip paths with zero shots
+			path_shots <= 0 && continue
+
+			# Calculate the current state by evolving all instructions
+			current_state = calculate_current_state(branched_sim, path_idx)
+
+			# Get the number of qubits in the system
+			n_qubits = Int(log2(length(current_state)))
+
+			# Calculate probabilities for all possible states
+			probs = abs2.(current_state)
+
+			# Create a list of (state_idx, prob) pairs for states with non-zero probability
+			state_probs = [(i, p) for (i, p) in enumerate(probs) if p > 0]
+
+			# Sort by probability in descending order
+			sort!(state_probs, by = x -> x[2], rev = true)
+
+			# Allocate shots using a more accurate method that preserves the total
+			remaining_shots = path_shots
+			allocated_shots = Dict{Int, Int}()
+
+			# First pass: allocate integer shots based on probability
+			for (state_idx, prob) in state_probs
+				if remaining_shots <= 0
+					break
+				end
+
+				# Calculate shots for this state (floor to ensure we don't over-allocate)
+				state_shots = floor(Int, path_shots * prob)
+
+				# Update remaining shots
+				remaining_shots -= state_shots
+
+				# Store allocated shots
+				allocated_shots[state_idx] = state_shots
+			end
+
+			# Second pass: distribute any remaining shots to states with highest fractional part
+			if remaining_shots > 0
+				# Calculate fractional parts
+				fractional_parts = [(i, path_shots * p - floor(path_shots * p)) for (i, p) in state_probs]
+
+				# Sort by fractional part in descending order
+				sort!(fractional_parts, by = x -> x[2], rev = true)
+
+				# Distribute remaining shots
+				for (state_idx, _) in fractional_parts
+					if remaining_shots <= 0
+						break
+					end
+
+					allocated_shots[state_idx] = get(allocated_shots, state_idx, 0) + 1
+					remaining_shots -= 1
+				end
+			end
+
+			# Convert state indices to binary strings and update shots_per_state
+			for (state_idx, state_shots) in allocated_shots
+				# Skip states with zero shots
+				state_shots <= 0 && continue
+
+				# Convert state index to binary representation (state string)
+				# Subtract 1 from state_idx because Julia is 1-indexed but our states start at 0
+				state_bits = digits(state_idx - 1, base = 2, pad = n_qubits)
+				# Reverse to get the correct endianness
+				reverse!(state_bits)
+				state_str = join(state_bits)
+
+				# Add the shots for this state to the dictionary
+				if haskey(shots_per_state, state_str)
+					shots_per_state[state_str] += state_shots
+				else
+					shots_per_state[state_str] = state_shots
+				end
+			end
+		end
+
+		# Convert the dictionary to the required format: list of lists
+		# where each inner list represents a shot and each index represents a qubit
+		result = Vector{Vector{Int}}()
+
+		# For each state and its shot count
+		for (state_str, shot_count) in shots_per_state
+			# Convert the state string to a vector of integers
+			state_vec = [parse(Int, c) for c in state_str]
+
+			# Add this state vector to the result shot_count times
+			for _ in 1:shot_count
+				push!(result, copy(state_vec))
+			end
+		end
+
+		return result
+	end
+
 end # module BraketSimulator
 end

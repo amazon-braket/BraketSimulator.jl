@@ -363,6 +363,23 @@ function _apply_modifiers(gate_op::QuantumOperator, modifiers::Vector, target_in
 	return gate_op
 end
 
+"""
+    _apply_reset!(sim::BranchedSimulatorOperators, path_idx::Int, qubit_idx::Int)
+
+Reset a qubit to the |0⟩ state. This function creates a Reset operator and adds it to the instruction
+sequence for the specified path and qubit.
+"""
+function _apply_reset!(sim::BranchedSimulatorOperators, path_idx::Int, qubit_idx::Int)
+    # Create a Reset operator
+    reset_op = Reset()
+    
+    # Create an instruction with the Reset operator targeting the specified qubit
+    instruction = Instruction(reset_op, [qubit_idx])
+    
+    # Add the instruction to the sequence for this path
+    push!(sim.instruction_sequences[path_idx], instruction)
+end
+
 #####################################
 # Main Function for State Evolution #
 #####################################
@@ -375,9 +392,9 @@ Evolve a quantum program using a branched approach that handles measurements and
 Takes in an AbstractSimulator object and generates a branched simulator object to wrap around it in order
 to perform the MCM. Allows it to be generalizable if you have any simulator as long as it is a subtype of AbstractSimulator.
 """
-function evolve_branched_operators(simulator::AbstractSimulator, program::QasmExpression, inputs::Dict{String, <:Any})
+function evolve_branched_operators(branched_sim::BranchedSimulatorOperators, program::QasmExpression, inputs::Dict{String, <:Any})
 	# Create a branched simulator with integrated visitor functionality
-	branched_sim = BranchedSimulatorOperators(simulator; inputs = inputs)
+	branched_sim.inputs = inputs
 
 	# Process the AST
 	_evolve_branched_ast_operators(branched_sim, program)
@@ -441,9 +458,9 @@ function _evolve_branched_ast_operators(sim::BranchedSimulatorOperators, expr::Q
 		# Reset operation - reset qubit to |0⟩ state
 		qubit_indices = evaluate_qubits(sim, expr.args[1])
 		for path_idx in sim.active_paths
-			for qubit_idx in qubit_indices
+			for qubit_idx in qubit_indices[path_idx]
 				# Apply reset to the qubit's index in the state
-				_apply_reset!(path_idx, qubit_idx) #TODO: Implement _apply_reset!
+				_apply_reset!(sim, path_idx, qubit_idx)
 			end
 		end
 
