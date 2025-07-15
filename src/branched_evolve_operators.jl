@@ -64,6 +64,8 @@ function evaluate_qubits(sim::BranchedSimulatorOperators, qubit_expr::QasmExpres
 						push!(register_qubits, value)
 					end
 				end
+				
+				sort!(register_qubits)
 
 				if !isempty(register_qubits)
 					for qubit_idx in register_qubits
