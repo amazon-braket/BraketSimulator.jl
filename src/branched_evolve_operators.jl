@@ -1348,12 +1348,25 @@ function _handle_classical_assignment(sim::BranchedSimulatorOperators, expr::Qas
 				# Standard variable assignment
 				# Get the existing variable
 				var = get(sim.variables[current_path_idx], var_name, nothing)
-				new_val = evaluate_binary_op(op, lhs_val, rhs_value[current_path_idx])
 
-				if !isnothing(var)
-					var.val = new_val
+				curr_val = rhs_value[current_path_idx]
+
+				if typeof(curr_val) == String && var.type isa Quasar.SizedBitVector
+					new_val = [parse(Int, c) for c in curr_val if isdigit(c)]
+
+					if !isnothing(var)
+						var.val = new_val
+					else
+						error("Variable doesn't exist")
+					end
 				else
-					error("Variable doesn't exist")
+					new_val = evaluate_binary_op(op, lhs_val, curr_val)
+
+					if !isnothing(var)
+						var.val = new_val
+					else
+						error("Variable doesn't exist")
+					end
 				end
 			end
 		end
@@ -1419,30 +1432,36 @@ Handle a classical variable declaration in the branched simulation model.
 """
 function _handle_classical_declaration(sim::BranchedSimulatorOperators, expr::QasmExpression)
 	# TODO: Update this to include all classical variable types
-	# This is for a register/bit
+	# This is for classical variables without an assignment
 	if head(expr.args[2]) == :identifier
 		var_name = Quasar.name(expr.args[2])
 		var_type = head(expr.args[1]) == :classical_type ? expr.args[1].args[1] : expr.args[1]
 
-		# Get the size of the register
-		register_size_dict = _evolve_branched_ast_operators(sim, var_type.size)
+		if var_type isa Quasar.SizedBitVector
+			# Get the size of the register
+			register_size_dict = _evolve_branched_ast_operators(sim, var_type.size)
 
-		# Process each path individually
-		for (path_idx, register_size) in register_size_dict
-			# If the size is -1, then it is a single bit, not a register
-			if register_size == -1
-				# Initialize with a single boolean value
-				set_variable!(sim, path_idx, var_name, ClassicalVariable(var_name, var_type, [1], false))
-			else
-				# Initialize the register with a boolean array
-				set_variable!(sim, path_idx, var_name, ClassicalVariable(var_name, var_type, [0 for _ in 1:register_size], false))
+			# Process each path individually
+			for (path_idx, register_size) in register_size_dict
+				# If the size is -1, then it is a single bit, not a register
+				if register_size == -1
+					# Initialize with a single boolean value
+					set_variable!(sim, path_idx, var_name, ClassicalVariable(var_name, var_type, [1], false))
+				else
+					# Initialize the register with a boolean array
+					set_variable!(sim, path_idx, var_name, ClassicalVariable(var_name, var_type, [0 for _ in 1:register_size], false))
+				end
+			end
+		else
+			for path_idx in sim.active_paths
+				set_variable!(sim, path_idx, var_name, ClassicalVariable(var_name, var_type, nothing, false))
 			end
 		end
 
-		# This for all other classical variables
+		# This for classical variables with an assignment
 	elseif head(expr.args[2]) == :classical_assignment
 		var_name = Quasar.name(expr.args[2].args[1].args[2])
-		var_type = typeof(expr.args[1].args[1])
+		var_type = expr.args[1].args[1] isa Quasar.SizedBitVector ? expr.args[1].args[1] : typeof(expr.args[1].args[1])
 
 		# Initialize variable for each active path and then handle the assignment
 		for path_idx in sim.active_paths

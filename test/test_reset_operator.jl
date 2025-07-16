@@ -211,7 +211,10 @@ using BraketSimulator
             # After the second CNOT, the state should be a superposition
             # The exact state depends on the implementation details of the reset operation
             # We'll check that the state is normalized
-            @test abs(state[1])^2 + abs(state[2])^2 + abs(state[3])^2 + abs(state[4])^2 ≈ 1.0 atol=1e-10
+            @test abs(state[1])^2 ≈ 0.25 atol=1e-10
+            @test abs(state[2])^2 ≈ 0.25 atol=1e-10
+            @test abs(state[3])^2 ≈ 0.25 atol=1e-10
+            @test abs(state[4])^2 ≈ 0.25 atol=1e-10
         end
     end
 

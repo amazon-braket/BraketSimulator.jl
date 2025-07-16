@@ -135,6 +135,11 @@ end
 Evaluate binary operations. This is a direct copy of the visitor's function.
 """
 function evaluate_binary_op(op::Symbol, lhs, rhs)
+	if op == Symbol("||") || op == Symbol("&&")
+		lhs = lhs > 0
+		rhs = rhs > 0
+	end
+
 	op == :< && return lhs < rhs
 	op == :> && return lhs > rhs
 	op == :<= && return lhs <= rhs
@@ -868,7 +873,7 @@ function _handle_for_loop(sim::BranchedSimulator, expr::QasmExpression)
 	for_loop = convert(Vector{QasmExpression}, expr.args)
 	loop_variable_type = for_loop[1].args[1]
 	loop_variable_name = for_loop[2].args[1]::String
-
+	
 	# Evaluate loop range
 	loop_variable_values = _evolve_branched_ast(sim, for_loop[3])
 	loop_body = for_loop[4]::QasmExpression
