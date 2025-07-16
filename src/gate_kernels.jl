@@ -519,7 +519,46 @@ function apply_gate!(measure_op::Measure, state_vec::AbstractStateVector{T}, qub
     return
 end
 
-apply_gate!(::Reset, state_vec, args...) = return
+function apply_gate!(::Reset, state_vec::AbstractStateVector{T}, qubit::Int) where {T<:Complex}
+    n_amps, endian_qubit = get_amps_and_qubits(state_vec, qubit)
+    
+    # Create a mask for the qubit we're resetting
+    mask = 1 << endian_qubit
+    
+    # First, calculate the total probability of states where the qubit is in |1⟩
+    prob_one = 0.0
+    for i in 0:n_amps-1
+        # Check if the qubit is in state 1
+        qubit_value = (i & mask) >> endian_qubit
+        if qubit_value == 1
+            prob_one += abs2(state_vec[i+1])
+        end
+    end
+    
+    # Now reset the qubit to |0⟩ by transferring amplitudes
+    for i in 0:n_amps-1
+        # Check if the qubit is in state 1
+        qubit_value = (i & mask) >> endian_qubit
+        if qubit_value == 1
+            # Calculate the corresponding index with the qubit set to 0
+            zero_index = i & ~mask
+            
+            # Transfer the amplitude (with proper scaling)
+            state_vec[zero_index+1] += state_vec[i+1]
+            
+            # Set the original amplitude to zero
+            state_vec[i+1] = zero(T)
+        end
+    end
+    
+    # Normalize the state vector
+    norm_factor = 1.0 / sqrt(sum(abs2.(state_vec)))
+    if !isinf(norm_factor)
+        state_vec .*= norm_factor
+    end
+    
+    return
+end
 apply_gate!(::Barrier, state_vec, args...) = return
 apply_gate!(::Delay, state_vec, args...) = return
 

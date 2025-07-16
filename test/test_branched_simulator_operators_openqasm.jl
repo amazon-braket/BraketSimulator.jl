@@ -2741,8 +2741,9 @@ using BraketSimulator
 		@testset "11.7 Reset" begin
 			qasm = """
 			qubit[4] q;
-			x q[0];
-			reset q[0];
+			x q[1];
+			x q[2];
+			reset q[1];
 			"""
 
 			# Create a simulator
@@ -2755,8 +2756,12 @@ using BraketSimulator
 			branched_sim = BraketSimulator.evolve_branched_operators(simulator, circuit, Dict{String, Any}())
 
 			# Verify the instructions
-			@test branched_sim.instruction_sequences[1] == [BraketSimulator.Instruction(BraketSimulator.X(), 0),
-				BraketSimulator.Instruction(BraketSimulator.Reset(), 0)]
+			@test branched_sim.instruction_sequences[1] == [BraketSimulator.Instruction(BraketSimulator.X(), 1), BraketSimulator.Instruction(BraketSimulator.X(), 2),
+				BraketSimulator.Instruction(BraketSimulator.Reset(), 1)]
+
+			evolved_state = evolve!(StateVectorSimulator(4, 1000), branched_sim.instruction_sequences[1])
+
+			@test evolved_state.state_vector[3] == 1.0
 		end
 
 		@testset "11.8 Switch/case" begin
