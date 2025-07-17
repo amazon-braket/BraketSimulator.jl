@@ -82,10 +82,9 @@ include("result_types.jl")
 include("properties.jl")
 include("sv_simulator.jl")
 include("dm_simulator.jl")
-include("branched_simulator.jl")
 include("branched_simulator_operators.jl")
 include("branched_evolve_operators.jl")
-include("branched_evolve.jl")
+include("utilities.jl")
 
 function __init__()
 	Quasar.builtin_gates[] = builtin_gates

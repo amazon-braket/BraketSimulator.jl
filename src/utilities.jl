@@ -36,34 +36,47 @@ function flip_bit(i::Int, pos::Int)
 	return i ⊻ mask
 end
 
+const BINARY_OPERATORS = Dict(
+    :<  => (lhs, rhs) -> lhs < rhs,
+    :>  => (lhs, rhs) -> lhs > rhs,
+    :<= => (lhs, rhs) -> lhs <= rhs,
+    :>= => (lhs, rhs) -> lhs >= rhs,
+    Symbol("=")   => (lhs, rhs) -> rhs,
+    Symbol("!=")  => (lhs, rhs) -> lhs != rhs,
+    Symbol("==")  => (lhs, rhs) -> lhs == rhs,
+    :+  => (lhs, rhs) -> lhs + rhs,
+    :-  => (lhs, rhs) -> lhs - rhs,
+    :*  => (lhs, rhs) -> lhs * rhs,
+    :/  => (lhs, rhs) -> lhs / rhs,
+    :%  => (lhs, rhs) -> lhs % rhs,
+    Symbol("<<")  => (lhs, rhs) -> lhs << rhs,
+    Symbol(">>")  => (lhs, rhs) -> lhs >> rhs,
+    Symbol("**")  => (lhs, rhs) -> lhs ^ rhs,
+    Symbol("&&")  => (lhs, rhs) -> lhs && rhs,
+    Symbol("||")  => (lhs, rhs) -> lhs || rhs,
+    :|  => (lhs, rhs) -> lhs .| rhs,
+    :&  => (lhs, rhs) -> lhs .& rhs,
+    :^  => (lhs, rhs) -> lhs .⊻ rhs 
+)
+
+
 """
 	evaluate_binary_op(op::Symbol, lhs, rhs)
 
 Evaluate binary operations. This is a direct copy of the visitor's function.
 """
 
-function evaluate_binary_op(op::Symbol, lhs, rhs)
-	op == :< && return lhs < rhs
-	op == :> && return lhs > rhs
-	op == :<= && return lhs <= rhs
-	op == :>= && return lhs >= rhs
-	op == Symbol("=") && return rhs
-	op == Symbol("!=") && return lhs != rhs
-	op == Symbol("==") && return lhs == rhs
-	op == :+ && return lhs + rhs
-	op == :- && return lhs - rhs
-	op == :* && return lhs * rhs
-	op == :/ && return lhs / rhs
-	op == :% && return lhs % rhs
-	op == Symbol("<<") && return lhs << rhs
-	op == Symbol(">>") && return lhs >> rhs
-	op == Symbol("**") && return lhs ^ rhs
-	op == Symbol("&&") && return lhs && rhs
-	op == Symbol("||") && return lhs || rhs
-	op == :| && return lhs .| rhs
-	op == :& && return lhs .& rhs
-	op == :^ && return lhs .⊻ rhs
-	error("Unknown binary operator: op")
+function evaluate_binary_op(op, lhs, rhs)
+	if op == Symbol("||") || op == Symbol("&&")
+		lhs = lhs > 0
+		rhs = rhs > 0
+	end
+
+	if op in keys(BINARY_OPERATORS)
+		return BINARY_OPERATORS[op](lhs, rhs)
+	else
+		error("Unknown binary operator: $op")
+	end
 end
 
 """
