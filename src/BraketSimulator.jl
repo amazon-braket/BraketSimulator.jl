@@ -16,7 +16,7 @@ using
 export StateVectorSimulator, DensityMatrixSimulator, BranchedSimulator, evolve!, simulate, ValidationError,
     calculate_probability_threshold, prune_paths!, allocate_shots, get_measurement_probabilities, apply_projection!,
     _apply_reset!, measure_qubit!, get_measurement_result, set_variable!, get_variable, qubit_count, device_id, apply_gate!,
-    new_to_circuit, _evolve_branched_ast, BranchedSimulatorOperators, evolve_branched_operators, calculate_shots_per_state
+    new_to_circuit, _evolve_branched_ast, BranchedSimulator, evolve_branched, calculate_shots_per_state
 
 const AbstractStateVector{T} = AbstractVector{T}
 const AbstractDensityMatrix{T} = AbstractMatrix{T}
@@ -82,8 +82,8 @@ include("result_types.jl")
 include("properties.jl")
 include("sv_simulator.jl")
 include("dm_simulator.jl")
-include("branched_simulator_operators.jl")
-include("branched_evolve_operators.jl")
+include("branched_simulator.jl")
+include("branched_evolve.jl")
 include("utilities.jl")
 
 function __init__()
@@ -452,7 +452,7 @@ results, combining both MCM and terminal measurements.
 """
 
 function simulate(
-    simulator::BranchedSimulatorOperators,
+    simulator::BranchedSimulator,
     circuit_ir::OpenQasmProgram,
     shots::Int;
     inputs = Dict{String, Float64}(),
@@ -473,7 +473,7 @@ function simulate(
     reinit!(simulator, 0, shots) # Fix this function
 
     # Use the branched simulator to handle measurements and control flow
-    branched_sim = evolve_branched_operators(simulator, program, inputs)
+    branched_sim = evolve_branched(simulator, program, inputs)
 
     circuit_measurements = calculate_shots_per_state(branched_sim)
     # Create the result object
@@ -501,7 +501,7 @@ function create_sim(simulator_id::String, shots::Int)
     elseif simulator_id == "braket_dm_v2"
         DensityMatrixSimulator(0, shots)
     elseif simulator_id == "braket_sv_branched"
-        BranchedSimulatorOperators(StateVectorSimulator(0, shots)) # Fix this
+        BranchedSimulator(StateVectorSimulator(0, shots)) # Fix this
     end
 end
 
@@ -903,7 +903,7 @@ end
         simulate("braket_dm_v2", shots_results_qasm, "{}", 10)
     end
     """
-        calculate_shots_per_state(branched_sim::BranchedSimulatorOperators) -> Vector{Vector{Int}}
+        calculate_shots_per_state(branched_sim::BranchedSimulator) -> Vector{Vector{Int}}
 
     Takes the shots and instruction sequences from a branched simulator, evolves the states of each instruction,
     and calculates the number of shots allocated to each possible state.
@@ -912,7 +912,7 @@ end
     For example, for a 3-qubit system, a shot might be represented as [0, 1, 0], indicating qubit 0 is in state 0,
     qubit 1 is in state 1, and qubit 2 is in state 0.
     """
-    function calculate_shots_per_state(branched_sim::BranchedSimulatorOperators)
+    function calculate_shots_per_state(branched_sim::BranchedSimulator)
         # Dictionary to store the shots per state
         shots_per_state = Dict{String, Int}()
 
