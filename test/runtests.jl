@@ -1,12 +1,17 @@
-using Test
+using Test, Aqua, Documenter, BraketSimulator
 
-@testset "BraketSimulator Tests" begin
-    # Run the original branched simulator tests
-    include("test_branched_simulator.jl")
+Aqua.test_all(BraketSimulator, ambiguities=false)
+Aqua.test_ambiguities(BraketSimulator)
+dir_list = filter(x-> startswith(x, "test_") && endswith(x, ".jl"), readdir(@__DIR__))
 
-    # Run the new end-to-end tests
-    include("test_branched_simulator_end_to_end.jl")
-    
-    # Run the branched simulator operators with OpenQASM tests
-    include("test_branched_simulator_operators_openqasm.jl")
+@testset "BraketSimulator" begin
+    @testset "$test" for test in dir_list
+        @info "Testing $test"
+        include(test)
+    end
+    @testset "docs" begin
+        @info "Testing docs"
+        Documenter.DocMeta.setdocmeta!(BraketSimulator, :DocTestSetup, :(using BraketSimulator, BraketSimulator.Observables; using BraketSimulator: Program, Circuit, qubits, CNot, H, Rx, FreeParameter, QubitSet, AdjointGradient, BitFlip, qubit_count, Qubit, StateVector, Measure, Probability, Ry, Amplitude, Instruction, DensityMatrix, add_instruction!); recursive=true)
+        Documenter.doctest(BraketSimulator)
+    end
 end

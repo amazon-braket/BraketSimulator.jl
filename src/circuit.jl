@@ -270,19 +270,15 @@ for later processing after the measurement outcome is known.
 """
 function to_circuit(v::Quasar.QasmProgramVisitor)
     c = Circuit()
-    
-    # Process all instructions (the visitor has already stopped at the measurement)
-    for ix in v.instructions
+    foreach(v.instructions) do ix
         sim_op = StructTypes.constructfrom(QuantumOperator, ix)
-        op = isempty(ix.controls) ? sim_op : Control(sim_op, tuple(map(c->getindex(c, 2), ix.controls)...))
+        op     = isempty(ix.controls) ? sim_op : Control(sim_op, tuple(map(c->getindex(c, 2), ix.controls)...))
         sim_ix = Instruction(op, ix.targets)
         add_instruction!(c, sim_ix)
     end
-    
-    # Process result types as before
     for rt in v.results
         sim_rt = StructTypes.constructfrom(Result, rt)
-        obs = extract_observable(sim_rt)
+        obs    = extract_observable(sim_rt)
         if !isnothing(obs) && c.observables_simultaneously_measureable && !(rt isa AdjointGradient)
             add_to_qubit_observable_mapping!(c, obs, sim_rt.targets)
         end
@@ -291,7 +287,6 @@ function to_circuit(v::Quasar.QasmProgramVisitor)
     end
     return c
 end
-
 
 # semgrep rules can't handle this macro properly yet
 function to_circuit(qasm_source::String, inputs)
@@ -303,7 +298,6 @@ function to_circuit(qasm_source::String, inputs)
     endswith(input_qasm, "\n") || (input_qasm *= "\n")
     parsed  = parse_qasm(input_qasm)
     visitor = QasmProgramVisitor(inputs)
-    # Process the AST until a measurement is encountered
     visitor(parsed) 
     return to_circuit(visitor) 
 end

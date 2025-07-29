@@ -35,7 +35,7 @@ mutable struct FramedVariable
 end
 
 """
-	BranchedSimulatorOperators
+	BranchedSimulator
 
 A simulator that supports multiple execution paths resulting from mid circuit measurements.
 Every time a measurement occurs, all the paths in the active_paths are measured and two new
@@ -53,7 +53,7 @@ For control sequences that limit the number of paths that enter a set of instruc
 active_paths list is updated, containing only the indices of the paths that will be evolved
 by the instructions
 """
-mutable struct BranchedSimulatorOperators <: AbstractSimulator
+mutable struct BranchedSimulator <: AbstractSimulator
 	# Base simulator type
 	base_simulator::AbstractSimulator
 
@@ -107,7 +107,7 @@ mutable struct BranchedSimulatorOperators <: AbstractSimulator
 	continue_paths::Vector{Int}
 
 	# Constructor
-	function BranchedSimulatorOperators(simulator::AbstractSimulator; inputs::Dict{String, <:Any} = Dict{String, Any}())
+	function BranchedSimulator(simulator::AbstractSimulator; inputs::Dict{String, <:Any} = Dict{String, Any}())
 		# If the number of shots for the simulator is <= 0, then throw an error
 		if simulator.shots <= 0
 			error("The number of shots for simulating a circuit with MCM must be > 0")
@@ -170,10 +170,10 @@ mutable struct BranchedSimulatorOperators <: AbstractSimulator
 end
 
 # Required interface methods
-qubit_count(sim::BranchedSimulatorOperators) = maximum(sim.n_qubits)
-device_id(sim::BranchedSimulatorOperators) = device_id(sim.base_simulator)
+qubit_count(sim::BranchedSimulator) = maximum(sim.n_qubits)
+device_id(sim::BranchedSimulator) = device_id(sim.base_simulator)
 
-function reinit!(sim::BranchedSimulatorOperators, qubit_count::Int, shots::Int)
+function reinit!(sim::BranchedSimulator, qubit_count::Int, shots::Int)
 	reinit!(sim.base_simulator, qubit_count, shots)
 	sim.n_qubits = qubit_count
 	sim.shots = [shots]
@@ -222,7 +222,7 @@ end
 ########################
 
 """
-	measure_qubit(sim::BranchedSimulatorOperators, path_idx::Int, qubit_idx::Int, qubit_name::String)
+	measure_qubit(sim::BranchedSimulator, path_idx::Int, qubit_idx::Int, qubit_name::String)
 
 Starting point for all simulation measurements.
 
@@ -231,7 +231,7 @@ Calculates the current state from scratch by applying all instructions.
 Returns true if the measurement had two possible outcomes and false otherwise.
 The state size is preserved, and half of the states have their probability set to 0.
 """
-function measure_qubit(sim::BranchedSimulatorOperators, path_idx::Int, qubit_idx::Int, qubit_name::String)
+function measure_qubit(sim::BranchedSimulator, path_idx::Int, qubit_idx::Int, qubit_name::String)
 	# Calculate current state and probabilities by applying all instructions from scratch
 	current_state = calculate_current_state(sim, path_idx)
 	probs = get_measurement_probabilities(current_state, qubit_idx)
@@ -252,12 +252,12 @@ end
 
 
 """
-	store_measurement_outcome!(sim::BranchedSimulatorOperators, path_idx::Int, qubit_name::String, outcome::Int)
+	store_measurement_outcome!(sim::BranchedSimulator, path_idx::Int, qubit_name::String, outcome::Int)
 
 Store the measurement outcome for a specific qubit in a specific path.
 If the qubit already has measurement outcomes, append the new outcome.
 """
-function store_measurement_outcome!(sim::BranchedSimulatorOperators, path_idx::Int, qubit_name::String, outcome::Int)
+function store_measurement_outcome!(sim::BranchedSimulator, path_idx::Int, qubit_name::String, outcome::Int)
 	# Check if the qubit already has measurement outcomes
 	if haskey(sim.measurements[path_idx], qubit_name)
 		push!(sim.measurements[path_idx][qubit_name], outcome)
@@ -267,12 +267,12 @@ function store_measurement_outcome!(sim::BranchedSimulatorOperators, path_idx::I
 end
 
 """
-	handle_branching_measurement!(sim::BranchedSimulatorOperators, path_idx::Int, qubit_name::String, probs::Vector{Float64})
+	handle_branching_measurement!(sim::BranchedSimulator, path_idx::Int, qubit_name::String, probs::Vector{Float64})
 
 Handle the case where measurement can result in multiple outcomes, creating a new branch.
 Keep the full state size and set probabilities to 0 for the states that don't match the measurement outcome.
 """
-function handle_branching_measurement!(sim::BranchedSimulatorOperators, path_idx::Int, qubit_name::String, shots_for_outcome_0::Int, shots_for_outcome_1::Int)
+function handle_branching_measurement!(sim::BranchedSimulator, path_idx::Int, qubit_name::String, shots_for_outcome_0::Int, shots_for_outcome_1::Int)
 
 	sim.shots[path_idx] = shots_for_outcome_0
 
@@ -304,63 +304,63 @@ function handle_branching_measurement!(sim::BranchedSimulatorOperators, path_idx
 end
 
 """
-	handle_deterministic_measurement!(sim::BranchedSimulatorOperators, path_idx::Int, qubit_name::String, probs::Vector{Float64})
+	handle_deterministic_measurement!(sim::BranchedSimulator, path_idx::Int, qubit_name::String, probs::Vector{Float64})
 
 Handle the case where measurement has only one possible outcome. No need for branching or anything, just store
 the value of the classical variables.
 """
-function handle_deterministic_measurement!(sim::BranchedSimulatorOperators, path_idx::Int, qubit_name::String, outcome::Int)
+function handle_deterministic_measurement!(sim::BranchedSimulator, path_idx::Int, qubit_name::String, outcome::Int)
 	# Store the measurement outcome
 	store_measurement_outcome!(sim, path_idx, qubit_name, outcome)
 end
 
 
 """
-	filter_paths!(sim::BranchedSimulatorOperators, condition_func)
+	filter_paths!(sim::BranchedSimulator, condition_func)
 
 Filter active paths based on a condition function.
 """
-function filter_paths!(sim::BranchedSimulatorOperators, condition_func)
+function filter_paths!(sim::BranchedSimulator, condition_func)
 	sim.active_paths = filter(path_idx -> condition_func(path_idx, sim), sim.active_paths)
 	return nothing
 end
 
 """
-	set_variable!(sim::BranchedSimulatorOperators, path_idx::Int, var_name::String, value)
+	set_variable!(sim::BranchedSimulator, path_idx::Int, var_name::String, value)
 
 Set a classical variable value for a specific path.
 """
-function set_variable!(sim::BranchedSimulatorOperators, path_idx::Int, var_name::String, value::ClassicalVariable)
+function set_variable!(sim::BranchedSimulator, path_idx::Int, var_name::String, value::ClassicalVariable)
 	# Convert ClassicalVariable to FramedVariable with current frame number
 	sim.variables[path_idx][var_name] = FramedVariable(value, sim.curr_frame)
 end
 
 """
-	set_variable!(sim::BranchedSimulatorOperators, path_idx::Int, var_name::String, type, val, is_const)
+	set_variable!(sim::BranchedSimulator, path_idx::Int, var_name::String, type, val, is_const)
 
 Set a variable value for a specific path with individual components.
 """
-function set_variable!(sim::BranchedSimulatorOperators, path_idx::Int, var_name::String, type::Any, val::Any, is_const::Bool)
+function set_variable!(sim::BranchedSimulator, path_idx::Int, var_name::String, type::Any, val::Any, is_const::Bool)
 	sim.variables[path_idx][var_name] = FramedVariable(var_name, type, val, is_const, sim.curr_frame)
 end
 
 """
-	get_variable(sim::BranchedSimulatorOperators, path_idx::Int, var_name::String, default=nothing)
+	get_variable(sim::BranchedSimulator, path_idx::Int, var_name::String, default=nothing)
 
 Get a classical variable value for a specific path.
 """
-function get_variable(sim::BranchedSimulatorOperators, path_idx::Int, var_name::String, default = nothing)
+function get_variable(sim::BranchedSimulator, path_idx::Int, var_name::String, default = nothing)
 	return haskey(sim.variables[path_idx], var_name) ? sim.variables[path_idx][var_name] : default
 end
 
 
 """
-	calculate_current_state(sim::BranchedSimulatorOperators, path_idx::Int) -> Any
+	calculate_current_state(sim::BranchedSimulator, path_idx::Int) -> Any
 
 Calculate the current state for a specific path by applying 
 all stored instructions to a fresh initial state using the evolve! function.
 """
-function calculate_current_state(sim::BranchedSimulatorOperators, path_idx::Int)
+function calculate_current_state(sim::BranchedSimulator, path_idx::Int)
 	# Create a fresh simulator of the same type as the base simulator
 	base_sim = similar(sim.base_simulator)
 
@@ -387,13 +387,13 @@ function calculate_current_state(sim::BranchedSimulatorOperators, path_idx::Int)
 end
 
 """
-	calculate_current_state(sim::BranchedSimulatorOperators) -> Dict{Int, Any}
+	calculate_current_state(sim::BranchedSimulator) -> Dict{Int, Any}
 
 Calculate the current state for all active paths by applying 
 all stored instructions to fresh initial states using the evolve! function.
 Returns a dictionary mapping path indices to their respective states.
 """
-function calculate_current_state(sim::BranchedSimulatorOperators)
+function calculate_current_state(sim::BranchedSimulator)
 	# Create a dictionary to store results for each path
 	results = Dict{Int, Any}()
 	
