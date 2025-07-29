@@ -40,15 +40,15 @@ end
 Base.copy(fp::FreeParameter) = fp
 Base.show(io::IO, fp::FreeParameter) = print(io, string(fp.name))
 
-function complex_matrix_from_ir(mat::Vector{Vector{Vector{T}}}) where {T <: Number}
+function complex_matrix_from_ir(mat::Vector{Vector{Vector{T}}}) where {T<:Number}
     m = zeros(complex(T), length(mat), length(mat))
     for ii in 1:length(mat), jj in 1:length(mat)
-        m[ii, jj] = complex(mat[ii][jj][1], mat[ii][jj][2])
+        m[ii,jj] = complex(mat[ii][jj][1], mat[ii][jj][2])
     end
     return m
 end
 
-function complex_matrix_to_ir(m::Matrix{T}) where {T <: Complex}
+function complex_matrix_to_ir(m::Matrix{T}) where {T<:Complex}
     mat = Vector{Vector{Vector{real(T)}}}(undef, size(m, 1))
     for row in 1:size(m, 1)
         mat[row] = Vector{Vector{T}}(undef, size(m, 2))
@@ -97,14 +97,14 @@ const CHUNK_SIZE      = 2^LOG2_CHUNK_SIZE
 
 function _index_to_endian_bits(ix::Int, qubit_count::Int)
     bits = Vector{Int}(undef, qubit_count)
-    for qubit ∈ 0:(qubit_count-1)
+    for qubit = 0:qubit_count-1
         bit = (ix >> qubit) & 1
         bits[end-qubit] = bit
     end
     return bits
 end
 
-function _formatted_measurements(simulator::D, measured_qubits::Vector{Int}) where {D <: AbstractSimulator}
+function _formatted_measurements(simulator::D, measured_qubits::Vector{Int}) where {D<:AbstractSimulator}
     sim_samples = samples(simulator)
     n_qubits    = qubit_count(simulator)
     return [_index_to_endian_bits(sample, n_qubits)[measured_qubits .+ 1] for sample in sim_samples]
@@ -139,28 +139,28 @@ function _bundle_results(
     results::Vector{ResultTypeValue},
     circuit_ir,
     simulator::D,
-    measured_qubits = Set{Int}(0:(qubit_count(simulator)-1)),
-) where {D <: AbstractSimulator}
+    measured_qubits = Set{Int}(0:qubit_count(simulator)-1),
+) where {D<:AbstractSimulator}
     sorted_qubits = sort(collect(measured_qubits))
     formatted_samples = if simulator.shots > 0
-        _formatted_measurements(simulator, sorted_qubits)
-    else
-        nothing
-    end
+            _formatted_measurements(simulator, sorted_qubits)
+        else
+            nothing
+        end
     return GateModelTaskResult(
         braketSchemaHeader("braket.task_result.gate_model_task_result", "1"),
         formatted_samples,
         nothing,
         results,
         sorted_qubits,
-        _build_metadata(simulator, circuit_ir)...,
+        _build_metadata(simulator, circuit_ir)...
     )
 end
 
 function _generate_results(
     result_types,
     simulator::D,
-) where {D <: AbstractSimulator}
+) where {D<:AbstractSimulator}
     result_values = map(result_type -> calculate(result_type, simulator), result_types)
     ir_results    = map(StructTypes.lower, result_types)
     return [ResultTypeValue(ir_results[r_ix], complex_matrix_to_ir(result_values[r_ix])) for r_ix in 1:length(result_values)]
@@ -200,11 +200,11 @@ their targets are used to form the list of measured qubits.
 If not, all qubits from 0 to `qubit_count-1` are measured. 
 """
 function _get_measured_qubits(program, qubit_count::Int)
-    measure_inds = findall(ix->ix.operator isa Measure, program.instructions)
+    measure_inds    = findall(ix->ix.operator isa Measure, program.instructions)
     isempty(measure_inds) && return collect(0:(qubit_count-1))
     measure_ixs     = program.instructions[measure_inds]
     measure_targets = (convert(Vector{Int}, measure.target) for measure in measure_ixs)
-    measured_qubits = unique(reduce(vcat, measure_targets, init = Int[]))
+    measured_qubits = unique(reduce(vcat, measure_targets, init=Int[]))
     return measured_qubits
 end
 """
@@ -342,12 +342,12 @@ measurements (if `shots > 0`), final calculated results, corresponding circuit I
 about the task.
 """
 function simulate(simulator::AbstractSimulator,
-    circuit_irs::Vector{<:Union{Program, OpenQasmProgram}},
-    shots::Int = 0;
-    max_parallel::Int = min(32, Threads.nthreads()),
-    inputs = Dict{String, Float64}(),
-    kwargs...,
-)
+                  circuit_irs::Vector{<:Union{Program, OpenQasmProgram}},
+                  shots::Int=0;
+                  max_parallel::Int=min(32, Threads.nthreads()),
+                  inputs = Dict{String, Float64}(),
+                  kwargs...
+                 )
 
     n_tasks         = length(circuit_irs)
     is_single_task  = n_tasks == 1
@@ -355,7 +355,7 @@ function simulate(simulator::AbstractSimulator,
     if is_single_input
         single_input = inputs isa Vector ? only(inputs) : inputs
         if is_single_task
-            return [simulate(simulator, only(circuit_irs), shots; inputs = single_input, kwargs...)]
+            return [simulate(simulator, only(circuit_irs), shots; inputs=single_input, kwargs...)]
         else
             inputs = [deepcopy(single_input) for ix in 1:n_tasks]
         end
@@ -376,7 +376,7 @@ function simulate(simulator::AbstractSimulator,
             # if my_ix is still -1, the channel is empty and
             # there's no more work to do
             my_ix == -1 && break
-            results[my_ix] = simulate(my_sim, circuit_irs[my_ix], shots; inputs = inputs[my_ix])
+            results[my_ix] = simulate(my_sim, circuit_irs[my_ix], shots; inputs=inputs[my_ix])
         end
         return
     end
@@ -393,7 +393,7 @@ end
 
 
 function _mmap_large_result_values(results)
-    to_mmap = findall(rt->sizeof(rt.value) > 2^20, results.resultTypes)
+    to_mmap     = findall(rt->sizeof(rt.value) > 2^20, results.resultTypes)
     isempty(to_mmap) && return nothing, nothing
     mmap_files  = String[]
     obj_lengths = Int[]
@@ -413,31 +413,31 @@ function _mmap_large_result_values(results)
 end
 
 function BraketSimulator.simulate(simulator_id::String, task_spec::String, py_inputs::String, shots::Int; kwargs...)
-    inputs = JSON3.read(py_inputs, Dict{String, Any})
-    jl_spec = BraketSimulator.OpenQasmProgram(BraketSimulator.braketSchemaHeader("braket.ir.openqasm.program", "1"), task_spec, inputs)
-    simulator = create_sim(simulator_id, shots)
+    inputs     = JSON3.read(py_inputs, Dict{String, Any})
+    jl_spec    = BraketSimulator.OpenQasmProgram(BraketSimulator.braketSchemaHeader("braket.ir.openqasm.program", "1"), task_spec, inputs)
+    simulator  = create_sim(simulator_id, shots)
     jl_results = simulate(simulator, jl_spec, shots; kwargs...)
     py_paths, py_lens = _mmap_large_result_values(jl_results)
     py_results = JSON3.write(jl_results)
-    simulator = nothing
-    inputs = nothing
-    jl_spec = nothing
+    simulator  = nothing
+    inputs     = nothing
+    jl_spec    = nothing
     jl_results = nothing
     return py_results, py_paths, py_lens
 end
 function BraketSimulator.simulate(simulator_id::String, task_specs::AbstractVector, py_inputs::String, shots::Int; kwargs...)
-    inputs = JSON3.read(py_inputs, Vector{Dict{String, Any}})
-    jl_specs = map(zip(task_specs, inputs)) do (task_spec, input)
+    inputs     = JSON3.read(py_inputs, Vector{Dict{String, Any}})
+    jl_specs   = map(zip(task_specs, inputs)) do (task_spec, input)
         BraketSimulator.OpenQasmProgram(BraketSimulator.braketSchemaHeader("braket.ir.openqasm.program", "1"), task_spec, input)
     end
-    simulator = create_sim(simulator_id, shots)
+    simulator  = create_sim(simulator_id, shots)
     jl_results = simulate(simulator, jl_specs, shots; kwargs...)
     paths_and_lens = JSON3.write(map(_mmap_large_result_values, jl_results))
-    jsons = JSON3.write(jl_results)
-    simulator = nothing
+    jsons      = JSON3.write(jl_results)
+    simulator  = nothing
     jl_results = nothing
-    inputs = nothing
-    jl_specs = nothing
+    inputs     = nothing
+    jl_specs   = nothing
     return jsons, paths_and_lens
 end
 
@@ -616,7 +616,7 @@ end
         #pragma braket result probability cout
         #pragma braket result probability b
         """
-
+    
     grcs_16_qasm = """
         OPENQASM 3.0;
 
@@ -729,7 +729,7 @@ end
         #pragma braket result expectation x(q[0]) 
         #pragma braket result variance x(q[1]) 
     """
-
+    
     vqe_qasm = """
         OPENQASM 3.0;
         bit[2] b;
@@ -846,8 +846,8 @@ end
         Quasar.builtin_gates[] = BraketSimulator.builtin_gates
         Quasar.parse_pragma[]  = BraketSimulator.parse_pragma
         Quasar.visit_pragma[]  = BraketSimulator.visit_pragma
-        simulator              = StateVectorSimulator(5, 0)
-        oq3_program            = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), custom_qasm, nothing)
+        simulator = StateVectorSimulator(5, 0)
+        oq3_program = OpenQasmProgram(braketSchemaHeader("braket.ir.openqasm.program", "1"), custom_qasm, nothing)
         simulate(simulator, oq3_program, 100)
         simulate("braket_sv_v2", custom_qasm, "{}", 100)
 
@@ -886,7 +886,7 @@ end
         simulate(sv_simulator, oq3_program, 100)
         simulate(dm_simulator, oq3_program, 100)
         simulate("braket_sv_v2", all_gates_qasm, "{\"theta\":0.665}", 100)
-        simulate("braket_dm_v2", all_gates_qasm, "{\"theta\":0.665}", 100)
+        simulate("braket_dm_v2", all_gates_qasm, "{\"theta\":0.665}",  100)
 
         sv_simulator = StateVectorSimulator(2, 0)
         dm_simulator = DensityMatrixSimulator(2, 0)
