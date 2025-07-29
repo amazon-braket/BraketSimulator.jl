@@ -139,7 +139,7 @@ function _bundle_results(
     results::Vector{ResultTypeValue},
     circuit_ir,
     simulator::D,
-    measured_qubits = Set{Int}(0:qubit_count(simulator)-1),
+    measured_qubits = Set{Int}(0:qubit_count(simulator)-1)
 ) where {D<:AbstractSimulator}
     sorted_qubits = sort(collect(measured_qubits))
     formatted_samples = if simulator.shots > 0
@@ -201,9 +201,9 @@ If not, all qubits from 0 to `qubit_count-1` are measured.
 """
 function _get_measured_qubits(program, qubit_count::Int)
     measure_inds    = findall(ix->ix.operator isa Measure, program.instructions)
-    isempty(measure_inds) && return collect(0:(qubit_count-1))
+    isempty(measure_inds) && return collect(0:qubit_count-1)
     measure_ixs     = program.instructions[measure_inds]
-    measure_targets = (convert(Vector{Int}, measure.target) for measure in measure_ixs)
+    measure_targets = (convert(Vector{Int}, measure.target) for measure in measure_ixs) 
     measured_qubits = unique(reduce(vcat, measure_targets, init=Int[]))
     return measured_qubits
 end
@@ -290,11 +290,11 @@ function simulate(
 )
     program, n_qubits = _prepare_program(circuit_ir, inputs, shots)
     _validate_circuit_ir(simulator, program, n_qubits, shots)
-    operations = _combine_operations(program, shots)
+    operations        = _combine_operations(program, shots)
     reinit!(simulator, n_qubits, shots)
-    simulator       = evolve!(simulator, operations)
-    measured_qubits = _get_measured_qubits(program, n_qubits)
-    results         = _compute_results(simulator, program, n_qubits, shots)
+    simulator         = evolve!(simulator, operations)
+    measured_qubits   = _get_measured_qubits(program, n_qubits)
+    results           = _compute_results(simulator, program, n_qubits, shots)
     return _bundle_results(results, circuit_ir, simulator, measured_qubits)
 end
 
@@ -349,7 +349,7 @@ function simulate(simulator::AbstractSimulator,
                   kwargs...
                  )
 
-    n_tasks         = length(circuit_irs)
+    n_tasks = length(circuit_irs)
     is_single_task  = n_tasks == 1
     is_single_input = inputs isa Dict || length(inputs) == 1
     if is_single_input
@@ -426,8 +426,8 @@ function BraketSimulator.simulate(simulator_id::String, task_spec::String, py_in
     return py_results, py_paths, py_lens
 end
 function BraketSimulator.simulate(simulator_id::String, task_specs::AbstractVector, py_inputs::String, shots::Int; kwargs...)
-    inputs     = JSON3.read(py_inputs, Vector{Dict{String, Any}})
-    jl_specs   = map(zip(task_specs, inputs)) do (task_spec, input)
+    inputs    = JSON3.read(py_inputs, Vector{Dict{String, Any}})
+    jl_specs  = map(zip(task_specs, inputs)) do (task_spec, input)
         BraketSimulator.OpenQasmProgram(BraketSimulator.braketSchemaHeader("braket.ir.openqasm.program", "1"), task_spec, input)
     end
     simulator  = create_sim(simulator_id, shots)
