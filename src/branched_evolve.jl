@@ -42,11 +42,7 @@ function evaluate_qubits(sim::BranchedSimulator, qubit_expr::QasmExpression)
 			if !isnothing(var) && var.type == :qubit_declaration && !isnothing(var.val)
 				# If it's a qubit parameter, use the stored qubit name
 				stored_qubit_idx = var.val
-				if stored_qubit_idx isa Vector
-					append!(all_qubits, stored_qubit_idx)
-				else
-					push!(all_qubits, stored_qubit_idx)
-				end
+				push!(all_qubits, stored_qubit_idx)
 				# Check if it's a qubit alias
 			elseif !isnothing(var) && var.type == :qubit_alias && !isnothing(var.val)
 				# If it's a qubit alias, use the stored qubit indices
@@ -105,29 +101,6 @@ function evaluate_qubits(sim::BranchedSimulator, qubit_expr::QasmExpression)
 			if !isnothing(var) && var.type == :qubit_alias && !isnothing(var.val)
 				# If the base name is an alias for a register, use the indexed qubit from the register
 				register_qubits = var.val
-
-				# Handle array indexing
-				if path_qubit_ix isa Vector
-					for ix in path_qubit_ix
-						# Make sure the index is valid
-						if ix >= 0 && ix < length(register_qubits)
-							push!(all_qubits, register_qubits[ix+1])  # Convert to 1-based indexing
-						else
-							error("Index $ix out of bounds for register $qubit_name")
-						end
-					end
-				else
-					# Make sure the index is valid
-					if path_qubit_ix >= 0 && path_qubit_ix < length(register_qubits)
-						push!(all_qubits, register_qubits[path_qubit_ix+1])  # Convert to 1-based indexing
-					else
-						error("Index $path_qubit_ix out of bounds for register $qubit_name")
-					end
-				end
-				# Then check if the base name is an alias for a register in qubit_mapping
-			elseif haskey(sim.qubit_mapping, qubit_name) && sim.qubit_mapping[qubit_name] isa Vector
-				# If the base name is an alias for a register, use the indexed qubit from the register
-				register_qubits = sim.qubit_mapping[qubit_name]
 
 				# Handle array indexing
 				if path_qubit_ix isa Vector
@@ -256,10 +229,7 @@ function evaluate_modifiers(sim::BranchedSimulator, expr::QasmExpression)
 				results[path_idx] = (QasmExpression(new_head), inner)
 			end
 		end
-
 		return results
-	else
-		error("Unknown modifier type: $(head(expr))")
 	end
 end
 
@@ -304,10 +274,6 @@ function _apply_modifiers(gate_op::QuantumOperator, modifiers::Vector, target_in
 		elseif modifier_type == :negctrl
 			# Special handling for global phase gates
 			if isa(gate_op, GPhase)
-				# For PhaseShift (gphase), we only need one control qubit
-				if length(target_indices) < 1
-					error("Negative control modifier requires at least 1 qubit for phase gates")
-				end
 
 				# Create a controlled version of the gate with control on |0⟩ state
 				bitvals = tuple(0)
@@ -328,37 +294,16 @@ function _apply_modifiers(gate_op::QuantumOperator, modifiers::Vector, target_in
 			end
 
 		elseif modifier_type == :pow
-			# Apply power modifier
-			if isa(gate_op, Control)
-				# If the gate is a controlled gate, apply the power modifier to the controlled gate itself
-				power_value = modifier.args[1]
+			# If the gate has a pow_exponent field, update it
+			power_value = modifier.args[1]
 
-				# If the gate already has a pow_exponent, multiply with the new value
-				if isdefined(gate_op, :pow_exponent)
-					gate_op.pow_exponent *= power_value
-				else
-					gate_op.pow_exponent = power_value
-				end
-			elseif hasfield(typeof(gate_op), :pow_exponent)
-				# If the gate has a pow_exponent field, update it
-				power_value = modifier.args[1]
-
-				# Multiply gate exponent with the new value
-				gate_op.pow_exponent *= power_value
-			else
-				# If the gate doesn't have a pow_exponent field, we can't apply the power modifier
-				error("Power modifier not supported for gate type $(typeof(gate_op))")
-			end
+			# Multiply gate exponent with the new value
+			gate_op.pow_exponent *= power_value
 
 		elseif modifier_type == :inv
 			# Apply inverse modifier
-			if hasfield(typeof(gate_op), :pow_exponent)
-				# If the gate has a pow_exponent field, negate it to invert
-				gate_op.pow_exponent = -gate_op.pow_exponent
-			else
-				# If the gate doesn't have a pow_exponent field, we can't apply the inverse modifier
-				error("Inverse modifier not supported for gate type $(typeof(gate_op))")
-			end
+			# If the gate has a pow_exponent field, negate it to invert
+			gate_op.pow_exponent = -gate_op.pow_exponent
 		end
 	end
 
@@ -452,10 +397,6 @@ function _handle_alias(sim::BranchedSimulator, expr::QasmExpression)
 
 		# Process for each active path
 		for path_idx in sim.active_paths
-			# Skip if this path doesn't have qubit indices for either side
-			if !haskey(left_qs_by_path, path_idx) || !haskey(right_qs_by_path, path_idx)
-				continue
-			end
 
 			# Concatenate the qubit indices
 			left_qs = sort(left_qs_by_path[path_idx])
@@ -466,7 +407,7 @@ function _handle_alias(sim::BranchedSimulator, expr::QasmExpression)
 			set_variable!(sim, path_idx, alias_name, ClassicalVariable(alias_name, :qubit_alias, alias_qubits, false))
 		end
 
-	elseif head(right_hand_side) == :identifier
+	elseif head(right_hand_side) == :identifier || head(right_hand_side) == :indexed_identifier
 		referent_name = Quasar.name(right_hand_side)
 
 		# Check if it's a physical qubit
@@ -477,51 +418,21 @@ function _handle_alias(sim::BranchedSimulator, expr::QasmExpression)
 		# Get the qubits from the identifier
 		qubits_by_path = evaluate_qubits(sim, right_hand_side)
 
-		# Process for each active path
-		for path_idx in sim.active_paths
-			# Skip if this path doesn't have qubit indices
-			if !haskey(qubits_by_path, path_idx)
-				continue
-			end
-
-			alias_qubits = qubits_by_path[path_idx]
-
-			# Store the alias in variables
-			set_variable!(sim, path_idx, alias_name, ClassicalVariable(alias_name, :qubit_alias, alias_qubits, false))
-		end
-	elseif head(right_hand_side) == :indexed_identifier
-		referent_name = Quasar.name(right_hand_side)
-
-		# Get the qubits from the indexed identifier
-		qubits_by_path = evaluate_qubits(sim, right_hand_side)
-
-		# Process for each active path
-		for path_idx in sim.active_paths
-			# Skip if this path doesn't have qubit indices
-			if !haskey(qubits_by_path, path_idx)
-				continue
-			end
-
-			alias_qubits = qubits_by_path[path_idx]
-
-			# Store the alias in variables
+		# Store qubit alias in variables
+		for (path_idx, alias_qubits) in qubits_by_path
 			set_variable!(sim, path_idx, alias_name, ClassicalVariable(alias_name, :qubit_alias, alias_qubits, false))
 		end
 	elseif head(right_hand_side) == :hw_qubit
 		# Trying to alias a physical qubit
 		error("Cannot alias physical qubits. The let keyword allows declared quantum bits and registers to be referred to by another name.")
-	else
-		error("Right hand side of alias must be either an identifier, indexed identifier, or concatenation")
 	end
 end
 
 function _handle_identifier(sim::BranchedSimulator, expr::QasmExpression)
+	"""
+	Handles classical variable retrieval
+	"""
 	id_name = Quasar.name(expr)
-
-	# Only process for active paths
-	if isempty(sim.active_paths)
-		error("No active paths when evaluating identifier $id_name")
-	end
 
 	# Create a dictionary to store results for each path
 	results = Dict{Int, Any}()
@@ -538,9 +449,6 @@ function _handle_identifier(sim::BranchedSimulator, expr::QasmExpression)
 			elseif !isnothing(var.val)
 				results[path_idx] = var.val
 			end
-			# Then check qubit_mapping
-		elseif haskey(sim.qubit_mapping, id_name)
-			results[path_idx] = sim.qubit_mapping[id_name]
 		else
 			# If we get here, the identifier is not defined
 			error("No identifier $id_name defined for path $path_idx")
@@ -552,15 +460,11 @@ end
 
 
 function _handle_indexed_identifier(sim::BranchedSimulator, expr::QasmExpression)
+	"""
+	Accesses variables at a certain index
+	"""
 	identifier_name = Quasar.name(expr)
-
-	# Only process for active paths
-	if isempty(sim.active_paths)
-		error("No active paths when evaluating indexed identifier $identifier_name")
-	end
-
 	indices = _evolve_branched_ast(sim, expr.args[2])
-
 
 	# Create a dictionary to store results for each path
 	results = Dict{Int, Any}()
@@ -809,21 +713,16 @@ end
 Handle a constant declaration in the branched simulation model.
 """
 function _handle_const_declaration(sim::BranchedSimulator, expr::QasmExpression)
-	# TODO: Update this to include all classical variable types
-	if head(expr.args[2]) == :classical_assignment
-		var_name = Quasar.name(expr.args[2].args[1].args[2])
-		var_type = expr.args[1].args[1]
+	var_name = Quasar.name(expr.args[2].args[1].args[2])
+	var_type = expr.args[1].args[1]
 
-		# Initialize variable for each active path
-		for path_idx in sim.active_paths
-			set_variable!(sim, path_idx, var_name, ClassicalVariable(var_name, var_type, undef, true))
-		end
-
-		# Handle the assignment
-		_handle_classical_assignment(sim, expr.args[2])
-	else
-		throw(QasmVisitorError("const declaration must assign an initial value."))
+	# Initialize variable for each active path
+	for path_idx in sim.active_paths
+		set_variable!(sim, path_idx, var_name, ClassicalVariable(var_name, var_type, undef, true))
 	end
+
+	# Handle the assignment
+	_handle_classical_assignment(sim, expr.args[2])
 end
 
 """
@@ -852,12 +751,7 @@ function _handle_qubit_declaration(sim::BranchedSimulator, expr::QasmExpression)
 		indexed_name = "$qubit_name[$i]"
 		sim.qubit_mapping[indexed_name] = qubit_idx
 	end
-
-	# Store the base name as well if it's a single qubit
-	if qubit_size == -1
-		sim.qubit_mapping[qubit_name] = current_qubit_count
-	end
-
+	
 	sim.n_qubits = current_qubit_count + qubit_size
 end
 
