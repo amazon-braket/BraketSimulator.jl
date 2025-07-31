@@ -17,7 +17,7 @@ using BraketSimulator
 			circuit = BraketSimulator.to_circuit(qasm_source)
 
 			# Create a simulator
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(2, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(2, 1000))
 
 			# Create a branched simulator operators instance
 			branched_sim = simulator
@@ -29,7 +29,7 @@ using BraketSimulator
 			@test isempty(branched_sim.measurements[1])
 
 			# Evolve the circuit
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Verify that the instruction sequence contains the expected operations
 			@test length(branched_sim.instruction_sequences[1]) == 2
@@ -41,8 +41,8 @@ using BraketSimulator
 			qubit[1] q;
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(1, 1000))
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			simulator = BranchedSimulator(StateVectorSimulator(1, 1000))
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			@test length(branched_sim.active_paths) == 1
 			@test isempty(branched_sim.instruction_sequences[1])
@@ -62,10 +62,10 @@ using BraketSimulator
 			"""
 
 			# Create a simulator
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(2, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(2, 1000))
 
 			# Evolve the program using the branched simulator operators
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Verify that we have two paths (one for each measurement outcome)
 			@test length(branched_sim.active_paths) == 2
@@ -107,10 +107,10 @@ using BraketSimulator
 			"""
 
 			# Create a simulator
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(2, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(2, 1000))
 
 			# Evolve the program using the branched simulator operators
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# We should have 2 paths (one for each outcome of the first measurement)
 			@test length(branched_sim.active_paths) == 2
@@ -163,10 +163,10 @@ using BraketSimulator
 			"""
 
 			# Create a simulator
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(2, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(2, 1000))
 
 			# Evolve the program using the branched simulator operators
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Verify that we have two paths (one for each measurement outcome)
 			@test length(branched_sim.active_paths) == 2
@@ -235,10 +235,10 @@ using BraketSimulator
 			"""
 
 			# Create a simulator
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(3, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(3, 1000))
 
 			# Evolve the program using the branched simulator operators
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Verify that we have three paths
 			@test length(branched_sim.active_paths) == 3
@@ -309,10 +309,10 @@ using BraketSimulator
 			"""
 
 			# Create a simulator
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(3, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(3, 1000))
 
 			# Evolve the program using the branched simulator operators
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Verify that we have four paths (one for each combination of measurement outcomes)
 			@test length(branched_sim.active_paths) == 4
@@ -399,10 +399,10 @@ using BraketSimulator
 			"""
 
 			# Create a simulator
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(3, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(3, 1000))
 
 			# Evolve the program using the branched simulator operators
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Verify that we have four paths (one for each combination of measurement outcomes)
 			@test length(branched_sim.active_paths) == 4
@@ -498,10 +498,10 @@ using BraketSimulator
 			"""
 
 			# Create a simulator
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(2, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(2, 1000))
 
 			# Evolve the program using the branched simulator operators
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# We should have 4 paths (2^2 possible measurement outcomes)
 			@test length(branched_sim.active_paths) == 4
@@ -615,10 +615,10 @@ using BraketSimulator
 			"""
 
 			# Create a simulator
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(2, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(2, 1000))
 
 			# Evolve the program using the branched simulator operators
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# We should have 4 paths (2^2 possible measurement outcomes)
 			@test length(branched_sim.active_paths) == 4
@@ -709,8 +709,8 @@ using BraketSimulator
 			b[0] = measure q[0];
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(3, 1000))
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			simulator = BranchedSimulator(StateVectorSimulator(3, 1000))
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Verify classical variable computations
 			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "z").val == 13
@@ -744,10 +744,10 @@ using BraketSimulator
 			"""
 
 			# Create a simulator
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(2, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(2, 1000))
 
 			# Evolve the program using the branched simulator operators
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# We should have 4 paths:
 			# 1. Measured 1 on first attempt
@@ -849,10 +849,10 @@ using BraketSimulator
 			"""
 
 			# Create a simulator
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(4, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(4, 1000))
 
 			# Evolve the program using the branched simulator operators
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# We should have 16 paths (2^4 possible measurement outcomes)
 			@test length(branched_sim.active_paths) == 16
@@ -949,8 +949,8 @@ using BraketSimulator
 			}
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(2, 1000))
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			simulator = BranchedSimulator(StateVectorSimulator(2, 1000))
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Verify branching paths exist
 			@test length(branched_sim.active_paths) > 0
@@ -1015,8 +1015,8 @@ using BraketSimulator
 			}
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(4, 1000))
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			simulator = BranchedSimulator(StateVectorSimulator(4, 1000))
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Verify that we have 4 paths (2^2 possible measurement outcomes for the 2 qubits with H applied)
 			@test length(branched_sim.active_paths) == 4
@@ -1083,8 +1083,8 @@ using BraketSimulator
 			}
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(3, 1000))
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			simulator = BranchedSimulator(StateVectorSimulator(3, 1000))
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Verify that we have multiple paths
 			@test length(branched_sim.active_paths) > 0
@@ -1179,10 +1179,10 @@ using BraketSimulator
 			"""
 
 			# Create a simulator
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(3, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(3, 1000))
 
 			# Evolve the program using the branched simulator operators
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# We should have 4 paths (one for each combination of measurement outcomes)
 			@test length(branched_sim.active_paths) == 4
@@ -1274,8 +1274,8 @@ using BraketSimulator
 			b[2] = measure q[2];
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(4, 1000))
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			simulator = BranchedSimulator(StateVectorSimulator(4, 1000))
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Verify expected number of paths
 			@test length(branched_sim.active_paths) == 8  # 2^3 possible measurement outcomes
@@ -1323,8 +1323,8 @@ using BraketSimulator
 			b[1] = measure q[1];
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(2, 1000))
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			simulator = BranchedSimulator(StateVectorSimulator(2, 1000))
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Verify branching based on measurement
 			@test length(branched_sim.active_paths) == 4
@@ -1372,7 +1372,7 @@ using BraketSimulator
 			b[2] = measure q[2];
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(3, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(3, 1000))
 
 			# First, let's calculate the expected state after QFT on |001⟩
 			# We'll create a circuit without measurements to get the state vector
@@ -1405,7 +1405,7 @@ using BraketSimulator
 			expected_state = BraketSimulator.state_vector(qft_sim)
 
 			# Now evolve the original circuit with measurements
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 			# Verify that we have 8 paths (2^3 possible measurement outcomes)
 			@test length(branched_sim.active_paths) == 8
 
@@ -1467,8 +1467,8 @@ using BraketSimulator
 			b[0] = measure_and_reset(q[0], b[1]);
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(2, 1000))
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			simulator = BranchedSimulator(StateVectorSimulator(2, 1000))
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Verify custom gate application
 			@test length(branched_sim.instruction_sequences[1]) > 0
@@ -1573,8 +1573,8 @@ using BraketSimulator
 			b[1] = measure q[1];
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(3, 1000))
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			simulator = BranchedSimulator(StateVectorSimulator(3, 1000))
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Verify that we have 4 paths (2 from first measurement × 2 from second measurement)
 			@test length(branched_sim.active_paths) == 3
@@ -1660,8 +1660,8 @@ using BraketSimulator
 			}
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(2, 1000))
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			simulator = BranchedSimulator(StateVectorSimulator(2, 1000))
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			@test length(branched_sim.active_paths) > 0
 		end
@@ -1685,8 +1685,8 @@ using BraketSimulator
 			b[1] = measure q[1];
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(2, 1000))
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			simulator = BranchedSimulator(StateVectorSimulator(2, 1000))
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Verify that we have 2 paths (2 possible measurement outcomes)
 			@test length(branched_sim.active_paths) == 2
@@ -1740,8 +1740,8 @@ using BraketSimulator
 			b[2] = measure q[2];
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(3, 1000))
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			simulator = BranchedSimulator(StateVectorSimulator(3, 1000))
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Calculate the final states for all paths
 			states = BraketSimulator.calculate_current_state(branched_sim)
@@ -1786,8 +1786,8 @@ using BraketSimulator
 			b[1] = measure q[1];
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(2, 1000))
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			simulator = BranchedSimulator(StateVectorSimulator(2, 1000))
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Calculate the final states for all paths
 			states = BraketSimulator.calculate_current_state(branched_sim)
@@ -1829,8 +1829,8 @@ using BraketSimulator
 			b[1] = measure q[1];
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(2, 1000))
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			simulator = BranchedSimulator(StateVectorSimulator(2, 1000))
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Calculate the final states for all paths
 			states = BraketSimulator.calculate_current_state(branched_sim)
@@ -1875,8 +1875,8 @@ using BraketSimulator
 			b[1] = measure q[1];
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(2, 1000))
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			simulator = BranchedSimulator(StateVectorSimulator(2, 1000))
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Calculate the final states for all paths
 			states = BraketSimulator.calculate_current_state(branched_sim)
@@ -1913,8 +1913,8 @@ using BraketSimulator
 			b[0] = measure q[0];
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(1, 1000))
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			simulator = BranchedSimulator(StateVectorSimulator(1, 1000))
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Calculate the final states for all paths
 			states = BraketSimulator.calculate_current_state(branched_sim)
@@ -1972,8 +1972,8 @@ using BraketSimulator
 			b[0] = measure q[0];
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(1, 1000))
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			simulator = BranchedSimulator(StateVectorSimulator(1, 1000))
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Verify that global_var was modified in the local scope
 			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "global_var").val == 30
@@ -2005,8 +2005,8 @@ using BraketSimulator
 			b[0] = measure q[0];
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(1, 1000))
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			simulator = BranchedSimulator(StateVectorSimulator(1, 1000))
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Verify that sum was calculated correctly in the loop
 			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "sum").val == 10
@@ -2045,8 +2045,8 @@ using BraketSimulator
 			// local_var is not accessible here
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(1, 1000))
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			simulator = BranchedSimulator(StateVectorSimulator(1, 1000))
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Verify that we have two paths (one for each measurement outcome)
 			@test length(branched_sim.active_paths) == 2
@@ -2102,8 +2102,8 @@ using BraketSimulator
 			b[0] = measure q[0];
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(1, 1000))
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			simulator = BranchedSimulator(StateVectorSimulator(1, 1000))
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Verify that global x is still 5
 			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "x").val == 5
@@ -2167,8 +2167,8 @@ using BraketSimulator
 			b[0] = measure q[0];
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(2, 1000))
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			simulator = BranchedSimulator(StateVectorSimulator(2, 1000))
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Verify that the program executed successfully
 			@test length(branched_sim.active_paths) == 2  # Two paths from measuring q[0]
@@ -2219,8 +2219,8 @@ using BraketSimulator
 			b[0] = measure q[0];
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(1, 1000))
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			simulator = BranchedSimulator(StateVectorSimulator(1, 1000))
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Verify that result has the correct value
 			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "result").val == 25
@@ -2262,8 +2262,8 @@ using BraketSimulator
 			b[0] = measure q[0];
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(1, 1000))
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			simulator = BranchedSimulator(StateVectorSimulator(1, 1000))
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Verify that result has the correct value
 			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "result").val == 24
@@ -2306,8 +2306,8 @@ using BraketSimulator
 			b[0] = measure q[0];
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(1, 1000))
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			simulator = BranchedSimulator(StateVectorSimulator(1, 1000))
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Verify that global x is unchanged
 			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "x").val == 5
@@ -2351,9 +2351,9 @@ using BraketSimulator
 			}
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(1, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(1, 1000))
 
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Verify that the global counter is still 5 after the while loop
 			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "counter").val == 5
@@ -2392,8 +2392,8 @@ using BraketSimulator
 			}
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(1, 1000))
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			simulator = BranchedSimulator(StateVectorSimulator(1, 1000))
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Verify that the global index is still 10 after the for loop
 			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "index").val == 10
@@ -2434,8 +2434,8 @@ using BraketSimulator
 			b[1] = measure q[1];
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(2, 1000))
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			simulator = BranchedSimulator(StateVectorSimulator(2, 1000))
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Verify that we have 2 paths (since we created a Bell state, measurements should be correlated)
 			@test length(branched_sim.active_paths) == 2
@@ -2502,13 +2502,13 @@ using BraketSimulator
 			"""
 
 			# Create a simulator
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(10, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(10, 1000))
 
 			# Convert to circuit with inputs
 			circuit = BraketSimulator.new_to_circuit(sv_adder_qasm)
 
 			# Evolve using branched simulator operators
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, circuit, Dict("a_in"=>3, "b_in"=>7))
+			branched_sim = BraketSimulator.evolve_branched(simulator, circuit, Dict("a_in"=>3, "b_in"=>7))
 
 			# Verify the instructions match the expected ones
 			correct_instructions = [
@@ -2576,13 +2576,13 @@ using BraketSimulator
 			"""
 
 			# Create a simulator
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(2, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(2, 1000))
 
 			# Convert to circuit
 			circuit = BraketSimulator.new_to_circuit(qasm)
 
 			# Evolve using branched simulator operators
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, circuit, Dict{String, Any}())
+			branched_sim = BraketSimulator.evolve_branched(simulator, circuit, Dict{String, Any}())
 
 			# Calculate the final state for the first path
 			state = BraketSimulator.calculate_current_state(branched_sim, branched_sim.active_paths[1])
@@ -2603,13 +2603,13 @@ using BraketSimulator
 			"""
 
 			# Create a simulator
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(2, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(2, 1000))
 
 			# Convert to circuit
 			circuit = BraketSimulator.new_to_circuit(qasm)
 
 			# Evolve using branched simulator operators
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, circuit, Dict{String, Any}())
+			branched_sim = BraketSimulator.evolve_branched(simulator, circuit, Dict{String, Any}())
 
 			# Verify the instructions
 			canonical_ixs = [BraketSimulator.Instruction(BraketSimulator.GPhase{2}(-(0.2 + 0.3)/2), (0, 1)), BraketSimulator.Instruction(BraketSimulator.U(0.1, 0.2, 0.3), 0)]
@@ -2623,13 +2623,13 @@ using BraketSimulator
 			"""
 
 			# Create a simulator
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(2, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(2, 1000))
 
 			# Convert to circuit
 			circuit = BraketSimulator.new_to_circuit(qasm)
 
 			# Evolve using branched simulator operators
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, circuit, Dict{String, Any}())
+			branched_sim = BraketSimulator.evolve_branched(simulator, circuit, Dict{String, Any}())
 
 			# Verify the instructions
 			@test branched_sim.instruction_sequences[1] == [BraketSimulator.Instruction(BraketSimulator.H(), 0), BraketSimulator.Instruction(BraketSimulator.CNot(), [0, 1])]
@@ -2654,13 +2654,13 @@ using BraketSimulator
 			"""
 
 			# Create a simulator
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(4, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(4, 1000))
 
 			# Convert to circuit
 			circuit = BraketSimulator.new_to_circuit(qasm_str)
 
 			# Evolve using branched simulator operators
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, circuit, Dict("theta"=>0.2))
+			branched_sim = BraketSimulator.evolve_branched(simulator, circuit, Dict("theta"=>0.2))
 
 			# Verify the instructions (excluding measurements)
 			expected_instructions = [BraketSimulator.Instruction(BraketSimulator.H(), 0),
@@ -2708,13 +2708,13 @@ using BraketSimulator
 			inputs = Dict("x"=>x, "y"=>y)
 
 			# Create a simulator
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(1, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(1, 1000))
 
 			# Convert to circuit
 			circuit = BraketSimulator.new_to_circuit(qasm)
 
 			# Evolve using branched simulator operators
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, circuit, inputs)
+			branched_sim = BraketSimulator.evolve_branched(simulator, circuit, inputs)
 
 			# Verify the instructions
 			expected_ixs = [BraketSimulator.Instruction(BraketSimulator.Rx(x), 0),
@@ -2747,13 +2747,13 @@ using BraketSimulator
 			"""
 
 			# Create a simulator
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(4, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(4, 1000))
 
 			# Convert to circuit
 			circuit = BraketSimulator.new_to_circuit(qasm)
 
 			# Evolve using branched simulator operators
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, circuit, Dict{String, Any}())
+			branched_sim = BraketSimulator.evolve_branched(simulator, circuit, Dict{String, Any}())
 
 			# Verify the instructions
 			@test branched_sim.instruction_sequences[1] == [BraketSimulator.Instruction(BraketSimulator.X(), 1), BraketSimulator.Instruction(BraketSimulator.X(), 2),
@@ -2775,18 +2775,18 @@ using BraketSimulator
 			"""
 
 			# Create a simulator
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(1, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(1, 1000))
 
 			# Test with x = -1
 			circuit1a = BraketSimulator.new_to_circuit(qasm1)
-			branched_sim1a = BraketSimulator.evolve_branched_operators(simulator, circuit1a, Dict("x" => -1))
+			branched_sim1a = BraketSimulator.evolve_branched(simulator, circuit1a, Dict("x" => -1))
 			@test isempty(branched_sim1a.instruction_sequences[1])
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(1, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(1, 1000))
 
 			# Test with x = 0
 			circuit1b = BraketSimulator.new_to_circuit(qasm1)
-			branched_sim1b = BraketSimulator.evolve_branched_operators(simulator, circuit1b, Dict("x" => 0))
+			branched_sim1b = BraketSimulator.evolve_branched(simulator, circuit1b, Dict("x" => 0))
 			@test branched_sim1b.instruction_sequences[1] == [BraketSimulator.Instruction(BraketSimulator.Z(), 0)]
 
 			# Test switch with multiple cases
@@ -2795,25 +2795,25 @@ using BraketSimulator
 			switch (x) { case 0 {} case 1, 2 { z \$0; } }
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(1, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(1, 1000))
 
 			# Test with x = 0
 			circuit2a = BraketSimulator.new_to_circuit(qasm2)
-			branched_sim2a = BraketSimulator.evolve_branched_operators(simulator, circuit2a, Dict("x" => 0))
+			branched_sim2a = BraketSimulator.evolve_branched(simulator, circuit2a, Dict("x" => 0))
 			@test isempty(branched_sim2a.instruction_sequences[1])
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(1, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(1, 1000))
 
 			# Test with x = 1
 			circuit2b = BraketSimulator.new_to_circuit(qasm2)
-			branched_sim2b = BraketSimulator.evolve_branched_operators(simulator, circuit2b, Dict("x" => 1))
+			branched_sim2b = BraketSimulator.evolve_branched(simulator, circuit2b, Dict("x" => 1))
 			@test branched_sim2b.instruction_sequences[1] == [BraketSimulator.Instruction(BraketSimulator.Z(), 0)]
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(1, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(1, 1000))
 
 			# Test with x = 2
 			circuit2c = BraketSimulator.new_to_circuit(qasm2)
-			branched_sim2c = BraketSimulator.evolve_branched_operators(simulator, circuit2c, Dict("x" => 2))
+			branched_sim2c = BraketSimulator.evolve_branched(simulator, circuit2c, Dict("x" => 2))
 			@test branched_sim2c.instruction_sequences[1] == [BraketSimulator.Instruction(BraketSimulator.Z(), 0)]
 		end
 
@@ -2828,13 +2828,13 @@ using BraketSimulator
 			"""
 
 			# Create a simulator
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(2, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(2, 1000))
 
 			# Convert to circuit
 			circuit = BraketSimulator.new_to_circuit(qasm)
 
 			# Evolve using branched simulator operators
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, circuit, Dict{String, Any}())
+			branched_sim = BraketSimulator.evolve_branched(simulator, circuit, Dict{String, Any}())
 
 			# Calculate the final state
 			state = BraketSimulator.calculate_current_state(branched_sim, branched_sim.active_paths[1])
@@ -2855,13 +2855,13 @@ using BraketSimulator
 			"""
 
 			# Create a simulator
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(2, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(2, 1000))
 
 			# Convert to circuit
 			circuit_z = BraketSimulator.new_to_circuit(qasm_z)
 
 			# Evolve using branched simulator operators
-			branched_sim_z = BraketSimulator.evolve_branched_operators(simulator, circuit_z, Dict{String, Any}())
+			branched_sim_z = BraketSimulator.evolve_branched(simulator, circuit_z, Dict{String, Any}())
 
 			# Calculate the final state
 			state_z = BraketSimulator.calculate_current_state(branched_sim_z, branched_sim_z.active_paths[1])
@@ -2876,13 +2876,13 @@ using BraketSimulator
 			s q1;
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(1, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(1, 1000))
 
 			# Convert to circuit
 			circuit_s = BraketSimulator.new_to_circuit(qasm_s)
 
 			# Evolve using branched simulator operators
-			branched_sim_s = BraketSimulator.evolve_branched_operators(simulator, circuit_s, Dict{String, Any}())
+			branched_sim_s = BraketSimulator.evolve_branched(simulator, circuit_s, Dict{String, Any}())
 
 			# Calculate the final state
 			state_s = BraketSimulator.calculate_current_state(branched_sim_s, branched_sim_s.active_paths[1])
@@ -2903,10 +2903,10 @@ using BraketSimulator
 			# Convert to circuit
 			circuit_x = BraketSimulator.new_to_circuit(qasm_x)
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(1, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(1, 1000))
 
 			# Evolve using branched simulator operators
-			branched_sim_x = BraketSimulator.evolve_branched_operators(simulator, circuit_x, Dict{String, Any}())
+			branched_sim_x = BraketSimulator.evolve_branched(simulator, circuit_x, Dict{String, Any}())
 
 			# Calculate the final state
 			state_x = BraketSimulator.calculate_current_state(branched_sim_x, branched_sim_x.active_paths[1])
@@ -2924,10 +2924,10 @@ using BraketSimulator
 			# Convert to circuit
 			circuit_v = BraketSimulator.new_to_circuit(qasm_v)
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(1, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(1, 1000))
 
 			# Evolve using branched simulator operators
-			branched_sim_v = BraketSimulator.evolve_branched_operators(simulator, circuit_v, Dict{String, Any}())
+			branched_sim_v = BraketSimulator.evolve_branched(simulator, circuit_v, Dict{String, Any}())
 
 			# Calculate the final state
 			state_v = BraketSimulator.calculate_current_state(branched_sim_v, branched_sim_v.active_paths[1])
@@ -2974,13 +2974,13 @@ using BraketSimulator
 			"""
 
 			# Create a simulator
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(5, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(5, 1000))
 
 			# Convert to circuit
 			circuit = BraketSimulator.new_to_circuit(qasm)
 
 			# Evolve using branched simulator operators
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, circuit, Dict{String, Any}())
+			branched_sim = BraketSimulator.evolve_branched(simulator, circuit, Dict{String, Any}())
 
 			# Calculate the final state
 			state = BraketSimulator.calculate_current_state(branched_sim, branched_sim.active_paths[1])
@@ -3031,13 +3031,13 @@ using BraketSimulator
 			"""
 
 			# Create a simulator
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(5, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(5, 1000))
 
 			# Convert to circuit
 			circuit = BraketSimulator.new_to_circuit(qasm)
 
 			# Evolve using branched simulator operators
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, circuit, Dict{String, Any}())
+			branched_sim = BraketSimulator.evolve_branched(simulator, circuit, Dict{String, Any}())
 
 			# Calculate the final state
 			state = BraketSimulator.calculate_current_state(branched_sim, branched_sim.active_paths[1])
@@ -3100,13 +3100,13 @@ using BraketSimulator
 			"""
 
 			# Create a simulator
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(1, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(1, 1000))
 
 			# Convert to circuit
 			circuit = BraketSimulator.new_to_circuit(qasm)
 
 			# Evolve using branched simulator operators
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, circuit, Dict{String, Any}())
+			branched_sim = BraketSimulator.evolve_branched(simulator, circuit, Dict{String, Any}())
 
 			# Calculate the final state
 			state = BraketSimulator.calculate_current_state(branched_sim, branched_sim.active_paths[1])
@@ -3129,13 +3129,13 @@ using BraketSimulator
 			"""
 
 			# Create a simulator
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(4, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(4, 1000))
 
 			# Convert to circuit
 			circuit = BraketSimulator.new_to_circuit(qasm)
 
 			# Evolve using branched simulator operators
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, circuit, Dict{String, Any}())
+			branched_sim = BraketSimulator.evolve_branched(simulator, circuit, Dict{String, Any}())
 
 			# Calculate the final state
 			state = BraketSimulator.calculate_current_state(branched_sim, branched_sim.active_paths[1])
@@ -3152,13 +3152,13 @@ using BraketSimulator
 			"""
 
 			# Create a simulator
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(1, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(1, 1000))
 
 			# Convert to circuit
 			circuit = BraketSimulator.new_to_circuit(qasm_pi)
 
 			# Evolve using branched simulator operators
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, circuit, Dict{String, Any}())
+			branched_sim = BraketSimulator.evolve_branched(simulator, circuit, Dict{String, Any}())
 
 			# Calculate the final state
 			state = BraketSimulator.calculate_current_state(branched_sim, branched_sim.active_paths[1])
@@ -3176,10 +3176,10 @@ using BraketSimulator
 			# Convert to circuit
 			circuit_expr = BraketSimulator.new_to_circuit(qasm_expr)
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(1, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(1, 1000))
 
 			# Evolve using branched simulator operators
-			branched_sim_expr = BraketSimulator.evolve_branched_operators(simulator, circuit_expr, Dict{String, Any}())
+			branched_sim_expr = BraketSimulator.evolve_branched(simulator, circuit_expr, Dict{String, Any}())
 
 			# Calculate the final state
 			state_expr = BraketSimulator.calculate_current_state(branched_sim_expr, branched_sim_expr.active_paths[1])
@@ -3206,8 +3206,8 @@ using BraketSimulator
 			cnot q1[1], q1[3];
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(4, 1000))
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			simulator = BranchedSimulator(StateVectorSimulator(4, 1000))
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Verify that the operations were applied correctly
 			state = BraketSimulator.calculate_current_state(branched_sim, branched_sim.active_paths[1])
@@ -3237,8 +3237,8 @@ using BraketSimulator
 			cnot combined[0], combined[3];
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(4, 1000))
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			simulator = BranchedSimulator(StateVectorSimulator(4, 1000))
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Verify that the operations were applied correctly
 			state = BraketSimulator.calculate_current_state(branched_sim, branched_sim.active_paths[1])
@@ -3265,10 +3265,10 @@ using BraketSimulator
 			cnot q0, q1;
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(2, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(2, 1000))
 			failed = false
 			try
-				branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+				branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 			catch e
 				failed = true
 			end
@@ -3294,8 +3294,8 @@ using BraketSimulator
 			cnot q1, q3;
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(4, 1000))
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			simulator = BranchedSimulator(StateVectorSimulator(4, 1000))
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Verify that the operations were applied correctly
 			state = BraketSimulator.calculate_current_state(branched_sim, branched_sim.active_paths[1])
@@ -3336,8 +3336,8 @@ using BraketSimulator
 			b[1] = measure q[1];
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(2, 1000))
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			simulator = BranchedSimulator(StateVectorSimulator(2, 1000))
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Verify that we have 2 paths (since we created a Bell state, measurements should be correlated)
 			@test length(branched_sim.active_paths) == 2
@@ -3395,8 +3395,8 @@ using BraketSimulator
 			b[1] = measure q[1];
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(3, 1000))
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			simulator = BranchedSimulator(StateVectorSimulator(3, 1000))
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Verify that count is 3 (loop should break after 3 iterations)
 			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "count").val == 3
@@ -3443,8 +3443,8 @@ using BraketSimulator
 			b[1] = measure q[1];
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(3, 1000))
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			simulator = BranchedSimulator(StateVectorSimulator(3, 1000))
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Verify that count is 5 (loop should run all 5 iterations)
 			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "count").val == 5
@@ -3503,8 +3503,8 @@ using BraketSimulator
 			b[1] = measure q[1];
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(3, 1000))
-			branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+			simulator = BranchedSimulator(StateVectorSimulator(3, 1000))
+			branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 
 			# Verify that outer_count is 4 (outer loop should run all 4 iterations)
 			@test BraketSimulator.get_variable(branched_sim, branched_sim.active_paths[1], "outer_count").val == 4
@@ -3540,12 +3540,12 @@ using BraketSimulator
 			b[0] = measure q[0];
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(2, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(2, 1000))
 
 			# Test that the error is caught when evolving the circuit
 			error_caught = false
 			try
-				branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+				branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 			catch e
 				error_caught = true
 				# Verify that it's an index out of bounds error
@@ -3571,12 +3571,12 @@ using BraketSimulator
 			b[0] = measure q[0];
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(1, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(1, 1000))
 
 			# Test that the error is caught when evolving the circuit
 			error_caught = false
 			try
-				branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+				branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 			catch e
 				error_caught = true
 				# Verify that it's a type mismatch error
@@ -3604,12 +3604,12 @@ using BraketSimulator
 			b[0] = measure q[0];
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(1, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(1, 1000))
 
 			# Test that the error is caught when evolving the circuit
 			error_caught = false
 			try
-				branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+				branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 			catch e
 				error_caught = true
 				# Verify that it's an undefined variable error
@@ -3632,12 +3632,12 @@ using BraketSimulator
 			b[0] = measure q[0];
 			"""
 
-			simulator = BranchedSimulatorOperators(StateVectorSimulator(1, 1000))
+			simulator = BranchedSimulator(StateVectorSimulator(1, 1000))
 
 			# Test that the error is caught when evolving the circuit
 			error_caught = false
 			try
-				branched_sim = BraketSimulator.evolve_branched_operators(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
+				branched_sim = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_source), Dict{String, Any}())
 			catch e
 				error_caught = true
 				# Verify that it's an invalid gate argument error
