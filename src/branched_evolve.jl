@@ -922,7 +922,7 @@ function _handle_conditional(sim::BranchedSimulator, expr::QasmExpression)
     condition_values = _evaluate_condition(sim, expr.args[1])
 
     for (path_idx, condition_value) in condition_values
-        if condition_value || condition_value > 0
+        if (condition_value isa Bool && condition_value) || condition_value > 0
             push!(true_paths, path_idx)
         else
             push!(false_paths, path_idx)
