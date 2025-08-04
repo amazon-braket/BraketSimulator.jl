@@ -22,170 +22,195 @@ The same indices are used for all active simulations since we can't define qubit
 As of now, this only works with registers and classical bits. Functionality for any classical variable
 still needs to be implemented.
 """
-function evaluate_qubits(sim::BranchedSimulator, qubit_expr::QasmExpression)
-    # TODO: Update function to include functionality for any classical variable
-    # Create a dictionary to store results for each path
+
+function evaluate_qubits_identifier(sim::BranchedSimulator, qubit_expr::QasmExpression)
+    qubit_name = Quasar.name(qubit_expr)
     results = Dict{Int, Vector{Int}}()
 
-    # Process the expression to get qubit indices
-    expr_type = head(qubit_expr)
+    for path_idx in sim.active_paths
+        all_qubits = Int[]
 
-    if expr_type == :identifier
-        qubit_name = Quasar.name(qubit_expr)
+        # First check if it's a function parameter that refers to a qubit
+        var = get_variable(sim, path_idx, qubit_name)
 
-        for path_idx in sim.active_paths
-            all_qubits = Int[]
+        if !isnothing(var) && var.type == :qubit_declaration && !isnothing(var.val)
+            # If it's a qubit parameter, use the stored qubit name
+            stored_qubit_idx = var.val
+            push!(all_qubits, stored_qubit_idx)
+            # Check if it's a qubit alias
+        elseif !isnothing(var) && var.type == :qubit_alias && !isnothing(var.val)
+            # If it's a qubit alias, use the stored qubit indices
+            alias_qubits = var.val
+            if alias_qubits isa Vector
+                append!(all_qubits, alias_qubits)
+            else
+                push!(all_qubits, alias_qubits)
+            end
+        else
+            # Check if it's a register by looking for indexed qubits
+            register_qubits = []
+            for (key, value) in sim.qubit_mapping
+                if startswith(key, "$qubit_name")
+                    push!(register_qubits, value)
+                end
+            end
 
-            # First check if it's a function parameter that refers to a qubit
-            var = get_variable(sim, path_idx, qubit_name)
+            sort!(register_qubits)
 
-            if !isnothing(var) && var.type == :qubit_declaration && !isnothing(var.val)
-                # If it's a qubit parameter, use the stored qubit name
-                stored_qubit_idx = var.val
-                push!(all_qubits, stored_qubit_idx)
-                # Check if it's a qubit alias
-            elseif !isnothing(var) && var.type == :qubit_alias && !isnothing(var.val)
-                # If it's a qubit alias, use the stored qubit indices
-                alias_qubits = var.val
-                if alias_qubits isa Vector
-                    append!(all_qubits, alias_qubits)
-                else
-                    push!(all_qubits, alias_qubits)
+            if !isempty(register_qubits)
+                for qubit_idx in register_qubits
+                    push!(all_qubits, qubit_idx)
                 end
             else
-                # Check if it's a register by looking for indexed qubits
-                register_qubits = []
-                for (key, value) in sim.qubit_mapping
-                    if startswith(key, "$qubit_name")
-                        push!(register_qubits, value)
-                    end
-                end
-
-                sort!(register_qubits)
-
-                if !isempty(register_qubits)
-                    for qubit_idx in register_qubits
-                        push!(all_qubits, qubit_idx)
-                    end
-                else
-                    error("Missing qubit '$qubit_name'")
-                end
+                error("Missing qubit '$qubit_name'")
             end
-
-            results[path_idx] = all_qubits
         end
-    elseif expr_type == :indexed_identifier
-        qubit_name = Quasar.name(qubit_expr)
 
-        # Get the index
-        qubit_ix = _evolve_branched_ast(sim, qubit_expr.args[2])
-
-        for path_idx in sim.active_paths
-            all_qubits = Int[]
-
-            # Get the index for this specific path
-            path_qubit_ix = if isa(qubit_ix, Dict)
-                # If it's a dictionary, get the value for this path
-                if haskey(qubit_ix, path_idx)
-                    qubit_ix[path_idx]
-                else
-                    # If this path isn't in the dictionary, use the first value
-                    first(values(qubit_ix))
-                end
-            else
-                qubit_ix
-            end
-
-            # First check if it's a qubit alias in variables
-            var = get_variable(sim, path_idx, qubit_name)
-            if !isnothing(var) && var.type == :qubit_alias && !isnothing(var.val)
-                # If the base name is an alias for a register, use the indexed qubit from the register
-                register_qubits = var.val
-
-                # Handle array indexing
-                if path_qubit_ix isa Vector
-                    for ix in path_qubit_ix
-                        # Make sure the index is valid
-                        if ix >= 0 && ix < length(register_qubits)
-                            push!(all_qubits, register_qubits[ix+1])  # Convert to 1-based indexing
-                        else
-                            error("Index $ix out of bounds for register $qubit_name")
-                        end
-                    end
-                else
-                    # Make sure the index is valid
-                    if path_qubit_ix >= 0 && path_qubit_ix < length(register_qubits)
-                        push!(all_qubits, register_qubits[path_qubit_ix+1])  # Convert to 1-based indexing
-                    else
-                        error("Index $path_qubit_ix out of bounds for register $qubit_name")
-                    end
-                end
-            else
-                # Handle array indexing for regular qubits
-                if path_qubit_ix isa Vector
-                    for ix in path_qubit_ix
-                        indexed_name = "$qubit_name[$ix]"
-                        haskey(sim.qubit_mapping, indexed_name) || error("Missing qubit '$indexed_name'")
-                        qubit_idx = sim.qubit_mapping[indexed_name]
-                        push!(all_qubits, qubit_idx)
-                    end
-                else
-                    if haskey(sim.qubit_mapping, qubit_name) # For single qubit registers
-                        push!(all_qubits, sim.qubit_mapping[qubit_name])
-                    else
-                        indexed_name = "$qubit_name[$path_qubit_ix]"
-                        haskey(sim.qubit_mapping, indexed_name) || error("Missing qubit '$indexed_name'")
-                        qubit_idx = sim.qubit_mapping[indexed_name]
-                        push!(all_qubits, qubit_idx)
-                    end
-                end
-            end
-
-            results[path_idx] = all_qubits
-        end
-    elseif expr_type == :array_literal
-        # For array literals, recursively evaluate each element
-        for path_idx in sim.active_paths
-            all_qubits = Int[]
-
-            for element in qubit_expr.args
-                # Save the original active paths
-                original_active_paths = copy(sim.active_paths)
-
-                # Temporarily set this path as the only active one for evaluation
-                sim.active_paths = [path_idx]
-
-                # Get qubits for this specific path
-                path_qubits = evaluate_qubits(sim, element)
-
-                # Restore original active paths
-                sim.active_paths = original_active_paths
-
-                if !isempty(path_qubits) && haskey(path_qubits, path_idx)
-                    append!(all_qubits, path_qubits[path_idx])
-                end
-            end
-
-            results[path_idx] = all_qubits
-        end
-    elseif expr_type == :hw_qubit
-        # Hardware qubit reference (e.g., $0, $1)
-        qubit_idx = parse(Int, replace(qubit_expr.args[1], "\$" => ""))
-
-        for path_idx in sim.active_paths
-            results[path_idx] = [qubit_idx]
-        end
+        results[path_idx] = all_qubits
     end
 
     return results
 end
 
-"""
-    evaluate_modifiers(sim::BranchedSimulator, expr::QasmExpression)
+function evaluate_qubits_indexed(sim::BranchedSimulator, qubit_expr::QasmExpression)
+    qubit_name = Quasar.name(qubit_expr)
+    results = Dict{Int, Vector{Int}}()
 
-Evaluates gate modifiers. Always returns a dictionary mapping path indices to tuples of (modifier_expr, inner_expr).
+    # Get the index
+    qubit_ix = _evolve_branched_ast(sim, qubit_expr.args[2])
+
+    for path_idx in sim.active_paths
+        all_qubits = Int[]
+
+        # Get the index for this specific path
+        path_qubit_ix = if isa(qubit_ix, Dict)
+            # If it's a dictionary, get the value for this path
+            if haskey(qubit_ix, path_idx)
+                qubit_ix[path_idx]
+            else
+                # If this path isn't in the dictionary, use the first value
+                first(values(qubit_ix))
+            end
+        else
+            qubit_ix
+        end
+
+        # First check if it's a qubit alias in variables
+        var = get_variable(sim, path_idx, qubit_name)
+        if !isnothing(var) && var.type == :qubit_alias && !isnothing(var.val)
+            # If the base name is an alias for a register, use the indexed qubit from the register
+            register_qubits = var.val
+
+            # Handle array indexing
+            if path_qubit_ix isa Vector
+                for ix in path_qubit_ix
+                    # Make sure the index is valid
+                    if ix >= 0 && ix < length(register_qubits)
+                        push!(all_qubits, register_qubits[ix+1])  # Convert to 1-based indexing
+                    else
+                        error("Index $ix out of bounds for register $qubit_name")
+                    end
+                end
+            else
+                # Make sure the index is valid
+                if path_qubit_ix >= 0 && path_qubit_ix < length(register_qubits)
+                    push!(all_qubits, register_qubits[path_qubit_ix+1])  # Convert to 1-based indexing
+                else
+                    error("Index $path_qubit_ix out of bounds for register $qubit_name")
+                end
+            end
+        else
+            # Handle array indexing for regular qubits
+            if path_qubit_ix isa Vector
+                for ix in path_qubit_ix
+                    indexed_name = "$qubit_name[$ix]"
+                    haskey(sim.qubit_mapping, indexed_name) || error("Missing qubit '$indexed_name'")
+                    qubit_idx = sim.qubit_mapping[indexed_name]
+                    push!(all_qubits, qubit_idx)
+                end
+            else
+                if haskey(sim.qubit_mapping, qubit_name) # For single qubit registers
+                    push!(all_qubits, sim.qubit_mapping[qubit_name])
+                else
+                    indexed_name = "$qubit_name[$path_qubit_ix]"
+                    haskey(sim.qubit_mapping, indexed_name) || error("Missing qubit '$indexed_name'")
+                    qubit_idx = sim.qubit_mapping[indexed_name]
+                    push!(all_qubits, qubit_idx)
+                end
+            end
+        end
+
+        results[path_idx] = all_qubits
+    end
+
+    return results
+end
+
+
+function evaluate_qubits_array(sim::BranchedSimulator, qubit_expr::QasmExpression)
+    results = Dict{Int, Vector{Int}}()
+
+    # For array literals, recursively evaluate each element
+    for path_idx in sim.active_paths
+        all_qubits = Int[]
+
+        for element in qubit_expr.args
+            # Save the original active paths
+            original_active_paths = copy(sim.active_paths)
+
+            # Temporarily set this path as the only active one for evaluation
+            sim.active_paths = [path_idx]
+
+            # Get qubits for this specific path
+            path_qubits = evaluate_qubits(sim, element)
+
+            # Restore original active paths
+            sim.active_paths = original_active_paths
+
+            if !isempty(path_qubits) && haskey(path_qubits, path_idx)
+                append!(all_qubits, path_qubits[path_idx])
+            end
+        end
+
+        results[path_idx] = all_qubits
+    end
+
+    return results
+end
+
+function evaluate_qubits_hardware(sim::BranchedSimulator, qubit_expr::QasmExpression)
+    results = Dict{Int, Vector{Int}}()
+
+    # Hardware qubit reference (e.g., $0, $1)
+    qubit_idx = parse(Int, replace(qubit_expr.args[1], "\$" => ""))
+
+    for path_idx in sim.active_paths
+        results[path_idx] = [qubit_idx]
+    end
+
+    return results
+end
+
+qubit_eval = Dict(
+    :identifier => evaluate_qubits_identifier,
+    :indexed_identifier => evaluate_qubits_indexed,
+    :array_literal => evaluate_qubits_array,
+    :hw_qubit => evaluate_qubits_hardware, 
+)
+
+function evaluate_qubits(sim::BranchedSimulator, qubit_expr::QasmExpression)
+    return qubit_eval[head(qubit_expr)](sim, qubit_expr)
+end
+
+
 """
-function evaluate_modifiers(sim::BranchedSimulator, expr::QasmExpression)
+    _evaluate_modifiers(sim::BranchedSimulator, expr::QasmExpression)
+
+Evaluates gate modifier arguments and expands the control/negctrl if there are more than 1.
+Always returns a dictionary mapping path indices to tuples of (modifier_expr, inner_expr).
+Modified expression contains the inner gate call AST node embedded in a series of modifier nodes.
+"""
+function _evaluate_modifiers(sim::BranchedSimulator, expr::QasmExpression)
     # Create a dictionary to store results for each path
     results = Dict{Int, Tuple{QasmExpression, Any}}()
 
@@ -238,12 +263,12 @@ function evaluate_modifiers(sim::BranchedSimulator, expr::QasmExpression)
 end
 
 """
-    _apply_modifiers(gate_op::QuantumOperator, modifiers::Vector, target_indices::Vector{Int}) -> QuantumOperator
+    _apply_modifiers(gate_op::QuantumOperator, modifiers::Vector) -> QuantumOperator
 
-Apply gate modifiers to a gate operator. This function takes a gate operator and a list of modifiers,
+Apply gate modifiers to a gate operator object. This function takes a gate operator and a list of modifiers,
 and returns a new gate operator with the modifiers applied.
 """
-function _apply_modifiers(gate_op::QuantumOperator, modifiers::Vector, target_indices::Vector{Int})
+function _apply_modifiers(gate_op::QuantumOperator, modifiers::Vector)
     # Process each modifier in reverse order to handle nested modifiers correctly
     for modifier in reverse(modifiers)
         modifier_type = head(modifier)
@@ -521,8 +546,6 @@ function _handle_classical_assignment(sim::BranchedSimulator, expr::QasmExpressi
 
     var_name = Quasar.name(lhs)
 
-    new_active_paths = []
-
     # Evaluate the LHS and RHS for all active paths (for assignment operation, we ignore the lhs value)
     lhs_value = op == Symbol("=") ? nothing : _evolve_branched_ast(sim, lhs)
     rhs_value = _evolve_branched_ast(sim, rhs)
@@ -535,109 +558,114 @@ function _handle_classical_assignment(sim::BranchedSimulator, expr::QasmExpressi
 
     # This is for assigning to a bit register or any classical variable
     if head(lhs) == :identifier
-        for current_path_idx in current_paths
-            lhs_val = !isnothing(lhs_value) && haskey(lhs_value, current_path_idx) ? lhs_value[current_path_idx] : nothing # Default to nothing because if no value then we are declaring the variable
+        _handle_classical_assignment_identifier(sim, is_measurement, current_paths, lhs_value, rhs_value, var_name, op)
+    elseif head(lhs) == :indexed_identifier
+        _handle_classical_assignment_index(sim, is_measurement, current_paths, lhs, lhs_value, rhs_value, var_name, op)
+    end
+end
 
-            if is_measurement
-                # Process measurement outcomes for this path
-                if haskey(rhs_value.path_outcomes, current_path_idx)
-                    outcomes = rhs_value.path_outcomes[current_path_idx]
+function _handle_classical_assignment_identifier(sim::BranchedSimulator, is_measurement, current_paths, lhs_value, rhs_value, var_name, op)
+    for current_path_idx in current_paths
+        lhs_val = !isnothing(lhs_value) && haskey(lhs_value, current_path_idx) ? lhs_value[current_path_idx] : nothing # Default to nothing because if no value then we are declaring the variable
 
-                    # Get the existing variable
-                    var = get(sim.variables[current_path_idx], var_name, nothing)
+        if is_measurement
+            # Process measurement outcomes for this path
+            if haskey(rhs_value.path_outcomes, current_path_idx)
+                outcomes = rhs_value.path_outcomes[current_path_idx]
 
-                    if !isnothing(var) && !isempty(outcomes)
-                        # Sort outcomes by qubit name for consistent ordering
-                        sorted_outcomes = sort(collect(outcomes))
-
-                        # Extract bit values and reverse them to use little endian notation
-                        # This matches the array access pattern which is little endian
-                        bit_values = reverse([outcome for (_, outcome) in sorted_outcomes])
-
-                        # The register size should already be set during initialization
-                        # We're just updating the array with the measurement values
-                        bit_array = var.val
-                        if bit_array isa Vector && length(bit_array) == length(bit_values)
-                            # Update the array directly
-                            var.val = bit_values
-                        elseif bit_array isa Int && length(bit_values) == 1
-                            # For when you are just assigning qubit to a bit, not a register
-                            var.val = bit_values[1]
-                        else
-                            error("Assignment must be to a register of the right size")
-                        end
-                    end
-                end
-            else
-                # Standard variable assignment
                 # Get the existing variable
                 var = get(sim.variables[current_path_idx], var_name, nothing)
 
-                curr_val = rhs_value[current_path_idx]
+                if !isnothing(var) && !isempty(outcomes)
+                    # Sort outcomes by qubit name for consistent ordering
+                    sorted_outcomes = sort(collect(outcomes))
 
-                if typeof(curr_val) == String && var.type isa Quasar.SizedBitVector
-                    new_val = [parse(Int, c) for c in curr_val if isdigit(c)]
-                    var.val = new_val
-                else
-                    new_val = evaluate_binary_op(op, lhs_val, curr_val)
-                    var.val = new_val
-                end
-            end
-        end
-        # This is for assigning to a specific bit in a register
-    elseif head(lhs) == :indexed_identifier
-        # Handle indexed assignment
-        # Get the index for this path
-        index_value = _evolve_branched_ast(sim, lhs.args[2])
+                    # Extract bit values and reverse them to use little endian notation
+                    # This matches the array access pattern which is little endian
+                    bit_values = reverse([outcome for (_, outcome) in sorted_outcomes])
 
-        for current_path_idx in current_paths
-            lhs_val = !isnothing(lhs_value) && haskey(lhs_value, current_path_idx) ? lhs_value[current_path_idx] : nothing # Default to nothing because if no value then we are declaring the variable
-
-            index = get(index_value, current_path_idx, 0)
-
-            if is_measurement
-                # Process measurement for this path
-                if haskey(rhs_value.path_outcomes, current_path_idx)
-                    outcomes = rhs_value.path_outcomes[current_path_idx]
-
-                    # Get the existing register variable
-                    register_var = get(sim.variables[current_path_idx], var_name, nothing)
-
-                    if !isnothing(register_var) && !isempty(outcomes)
-                        # Use the first measurement outcome for the specified index
-                        _, outcome = first(outcomes)
-
-                        # Update the bit directly in the boolean array
-                        bit_array = register_var.val
-                        if bit_array isa Vector && index + 1 <= length(bit_array)
-                            # Convert to 1-based indexing for Julia arrays
-                            julia_index = index + 1
-                            bit_array[julia_index] = evaluate_binary_op(op, lhs_val, outcome)
-                        end
+                    # The register size should already be set during initialization
+                    # We're just updating the array with the measurement values
+                    bit_array = var.val
+                    if bit_array isa Vector && length(bit_array) == length(bit_values)
+                        # Update the array directly
+                        var.val = bit_values
+                    elseif bit_array isa Int && length(bit_values) == 1
+                        # For when you are just assigning qubit to a bit, not a register
+                        var.val = bit_values[1]
+                    else
+                        error("Assignment must be to a register of the right size")
                     end
                 end
-            else
-                # Standard indexed assignment
-                # Get the register variable
-                register_var = get(sim.variables[current_path_idx], var_name, nothing)
-                new_val = evaluate_binary_op(op, lhs_val, rhs_value[current_path_idx])
+            end
+        else
+            # Standard variable assignment
+            # Get the existing variable
+            var = get(sim.variables[current_path_idx], var_name, nothing)
 
-                if !isnothing(register_var)
+            curr_val = rhs_value[current_path_idx]
+
+            if typeof(curr_val) == String && var.type isa Quasar.SizedBitVector
+                new_val = [parse(Int, c) for c in curr_val if isdigit(c)]
+                var.val = new_val
+            else
+                new_val = evaluate_binary_op(op, lhs_val, curr_val)
+                var.val = new_val
+            end
+        end
+    end
+end
+
+function _handle_classical_assignment_index(sim::BranchedSimulator, is_measurement, current_paths, lhs, lhs_value, rhs_value, var_name, op)
+    # Handle indexed assignment
+    # Get the index for this path
+    index_value = _evolve_branched_ast(sim, lhs.args[2])
+
+    for current_path_idx in current_paths
+        lhs_val = !isnothing(lhs_value) && haskey(lhs_value, current_path_idx) ? lhs_value[current_path_idx] : nothing # Default to nothing because if no value then we are declaring the variable
+
+        index = get(index_value, current_path_idx, 0)
+
+        if is_measurement
+            # Process measurement for this path
+            if haskey(rhs_value.path_outcomes, current_path_idx)
+                outcomes = rhs_value.path_outcomes[current_path_idx]
+
+                # Get the existing register variable
+                register_var = get(sim.variables[current_path_idx], var_name, nothing)
+
+                if !isnothing(register_var) && !isempty(outcomes)
+                    # Use the first measurement outcome for the specified index
+                    _, outcome = first(outcomes)
+
+                    # Update the bit directly in the boolean array
                     bit_array = register_var.val
                     if bit_array isa Vector && index + 1 <= length(bit_array)
                         # Convert to 1-based indexing for Julia arrays
                         julia_index = index + 1
-                        new_val = new_val isa Vector ? new_val[1] : new_val
-                        bit_array[julia_index] = new_val
+                        bit_array[julia_index] = evaluate_binary_op(op, lhs_val, outcome)
                     end
+                end
+            end
+        else
+            # Standard indexed assignment
+            # Get the register variable
+            register_var = get(sim.variables[current_path_idx], var_name, nothing)
+            new_val = evaluate_binary_op(op, lhs_val, rhs_value[current_path_idx])
+
+            if !isnothing(register_var)
+                bit_array = register_var.val
+                if bit_array isa Vector && index + 1 <= length(bit_array)
+                    # Convert to 1-based indexing for Julia arrays
+                    julia_index = index + 1
+                    new_val = new_val isa Vector ? new_val[1] : new_val
+                    bit_array[julia_index] = new_val
                 end
             end
         end
     end
-    # Add all the active paths generated in the new_active_paths variable
-    append!(new_active_paths, sim.active_paths)
-    sim.active_paths = copy(new_active_paths)
 end
+
 
 """
     _handle_classical_declaration(sim::BranchedSimulator, expr::QasmExpression)
@@ -1246,7 +1274,7 @@ function _handle_gate_modifiers(sim::BranchedSimulator, expr::QasmExpression)
     original_active_paths = copy(sim.active_paths)
 
     # Get modifiers for each path
-    modifiers_by_path = evaluate_modifiers(sim, expr)
+    modifiers_by_path = _evaluate_modifiers(sim, expr)
 
     # Process each path separately
     for (path_idx, (mod_expr, inner_expr)) in modifiers_by_path
@@ -1263,7 +1291,7 @@ function _handle_gate_modifiers(sim::BranchedSimulator, expr::QasmExpression)
         # Process nested modifiers
         while head(inner) != :gate_call
             # Get modifiers for this inner expression
-            inner_modifiers = evaluate_modifiers(sim, inner)
+            inner_modifiers = _evaluate_modifiers(sim, inner)
 
             mod_expr, inner = inner_modifiers[path_idx]
             push!(mods, mod_expr)
@@ -1422,7 +1450,7 @@ function _handle_gate_call(sim::BranchedSimulator, expr::QasmExpression)
                                 gate_op.pow_exponent = -gate_op.pow_exponent
                             else
                                 # Apply other modifiers (ctrl, negctrl)
-                                gate_op = _apply_modifiers(gate_op, [modifier], target_indices)
+                                gate_op = _apply_modifiers(gate_op, [modifier])
                                 push!(targets, target_indices[ctrl_idx])
                                 ctrl_idx += 1
                             end
@@ -1489,7 +1517,7 @@ function _handle_gate_call(sim::BranchedSimulator, expr::QasmExpression)
 
             # Apply modifiers if any
             if !isempty(modifiers)
-                gate_op = _apply_modifiers(gate_op, modifiers, target_indices)
+                gate_op = _apply_modifiers(gate_op, modifiers)
             end
 
             # Store gate instruction for this path
