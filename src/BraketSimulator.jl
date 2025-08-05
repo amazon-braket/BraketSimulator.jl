@@ -501,7 +501,7 @@ function create_sim(simulator_id::String, shots::Int)
     elseif simulator_id == "braket_dm_v2"
         DensityMatrixSimulator(0, shots)
     elseif simulator_id == "braket_sv_branched"
-        BranchedSimulator(StateVectorSimulator(0, shots)) # Fix this
+        BranchedSimulator(StateVectorSimulator(0, shots))
     end
 end
 

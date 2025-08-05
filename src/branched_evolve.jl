@@ -703,7 +703,7 @@ function _handle_classical_declaration(sim::BranchedSimulator, expr::QasmExpress
                 elseif var_type isa Quasar.SizedArray
                     set_variable!(sim, path_idx, var_name, ClassicalVariable(var_name, var_type, [0], false))
                 else
-                    error("Additional variable types are unimplemented")
+                    set_variable!(sim, path_idx, var_name, ClassicalVariable(var_name, var_type, false, false))
                 end
             end
         end
