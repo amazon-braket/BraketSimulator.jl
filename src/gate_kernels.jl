@@ -532,15 +532,7 @@ function apply_gate!(::Reset, state_vec::AbstractStateVector{T}, qubit::Int) whe
         qubit_value = (i & mask) >> endian_qubit
         if qubit_value == 1
             prob_one += abs2(state_vec[i+1])
-        end
-    end
-    
-    # Now reset the qubit to |0⟩ by transferring amplitudes
-    for i in 0:n_amps-1
-        # Check if the qubit is in state 1
-        qubit_value = (i & mask) >> endian_qubit
-        if qubit_value == 1
-            # Calculate the corresponding index with the qubit set to 0
+
             zero_index = i & ~mask
             
             # Transfer the amplitude (with proper scaling)
