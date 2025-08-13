@@ -274,40 +274,13 @@ function _apply_modifiers(gate_op::QuantumOperator, modifiers::Vector)
         modifier_type = head(modifier)
 
         if modifier_type == :ctrl
-            # Special handling for global phase gates
-            if isa(gate_op, GPhase)
-                # Create a controlled version of the gate
-                # For phase gates, the control is the only qubit
-                bitvals = tuple(1)
-
-                # Create the controlled gate
-                gate_op = Control(gate_op, bitvals)
-            else
-                # Create a controlled version of the gate
-                # The first qubit is the control, the rest are targets for the gate
-                bitvals = tuple(1)
-
-                # Create the controlled gate
-                gate_op = Control(gate_op, bitvals)
-            end
-
+            bitvals = tuple(1)
+            # Create the controlled gate
+            gate_op = Control(gate_op, bitvals)
         elseif modifier_type == :negctrl
-            # Special handling for global phase gates
-            if isa(gate_op, GPhase)
-
-                # Create a controlled version of the gate with control on |0⟩ state
-                bitvals = tuple(0)
-
-                # Create the negatively controlled gate
-                gate_op = Control(gate_op, bitvals)
-            else
-                # Create a controlled version of the gate with control on |0⟩ state
-                bitvals = tuple(0)
-
-                # Create the negatively controlled gate
-                gate_op = Control(gate_op, bitvals)
-            end
-
+            bitvals = tuple(0)
+            # Create the negatively controlled gate
+            gate_op = Control(gate_op, bitvals)
         elseif modifier_type == :pow
             # If the gate has a pow_exponent field, update it
             power_value = modifier.args[1]
@@ -478,6 +451,8 @@ Accesses variables at a certain index
 function _handle_indexed_identifier(sim::BranchedSimulator, expr::QasmExpression)
 
     identifier_name = Quasar.name(expr)
+
+    # Generate indices used to index a classical variable for each path, can be a ArrayLiteral, IntegerLiteral
     indices = _evolve_branched_ast(sim, expr.args[2])
 
     # Create a dictionary to store results for each path
@@ -569,33 +544,30 @@ function _handle_classical_assignment_identifier(sim::BranchedSimulator, is_meas
         lhs_val = !isnothing(lhs_value) && haskey(lhs_value, current_path_idx) ? lhs_value[current_path_idx] : nothing # Default to nothing because if no value then we are declaring the variable
 
         if is_measurement
-            # Process measurement outcomes for this path
-            if haskey(rhs_value.path_outcomes, current_path_idx)
-                outcomes = rhs_value.path_outcomes[current_path_idx]
+            outcomes = rhs_value.path_outcomes[current_path_idx]
 
-                # Get the existing variable
-                var = get(sim.variables[current_path_idx], var_name, nothing)
+            # Get the existing variable
+            var = get(sim.variables[current_path_idx], var_name, nothing)
 
-                if !isnothing(var) && !isempty(outcomes)
-                    # Sort outcomes by qubit name for consistent ordering
-                    sorted_outcomes = sort(collect(outcomes))
+            if !isnothing(var) && !isempty(outcomes)
+                # Sort outcomes by qubit name for consistent ordering
+                sorted_outcomes = sort(collect(outcomes))
 
-                    # Extract bit values and reverse them to use little endian notation
-                    # This matches the array access pattern which is little endian
-                    bit_values = reverse([outcome for (_, outcome) in sorted_outcomes])
+                # Extract bit values and reverse them to use little endian notation
+                # This matches the array access pattern which is little endian
+                bit_values = reverse([outcome for (_, outcome) in sorted_outcomes])
 
-                    # The register size should already be set during initialization
-                    # We're just updating the array with the measurement values
-                    bit_array = var.val
-                    if bit_array isa Vector && length(bit_array) == length(bit_values)
-                        # Update the array directly
-                        var.val = bit_values
-                    elseif bit_array isa Int && length(bit_values) == 1
-                        # For when you are just assigning qubit to a bit, not a register
-                        var.val = bit_values[1]
-                    else
-                        error("Assignment must be to a register of the right size")
-                    end
+                # The register size should already be set during initialization
+                # We're just updating the array with the measurement values
+                bit_array = var.val
+                if bit_array isa Vector && length(bit_array) == length(bit_values)
+                    # Update the array directly
+                    var.val = bit_values
+                elseif bit_array isa Int && length(bit_values) == 1
+                    # For when you are just assigning qubit to a bit, not a register
+                    var.val = bit_values[1]
+                else
+                    error("Assignment must be to a register of the right size")
                 end
             end
         else
@@ -627,24 +599,20 @@ function _handle_classical_assignment_index(sim::BranchedSimulator, is_measureme
         index = get(index_value, current_path_idx, 0)
 
         if is_measurement
-            # Process measurement for this path
-            if haskey(rhs_value.path_outcomes, current_path_idx)
-                outcomes = rhs_value.path_outcomes[current_path_idx]
+            outcomes = rhs_value.path_outcomes[current_path_idx]
+            # Get the existing register variable
+            register_var = get(sim.variables[current_path_idx], var_name, nothing)
 
-                # Get the existing register variable
-                register_var = get(sim.variables[current_path_idx], var_name, nothing)
+            if !isnothing(register_var) && !isempty(outcomes)
+                # Use the first measurement outcome for the specified index
+                _, outcome = first(outcomes)
 
-                if !isnothing(register_var) && !isempty(outcomes)
-                    # Use the first measurement outcome for the specified index
-                    _, outcome = first(outcomes)
-
-                    # Update the bit directly in the boolean array
-                    bit_array = register_var.val
-                    if bit_array isa Vector && index + 1 <= length(bit_array)
-                        # Convert to 1-based indexing for Julia arrays
-                        julia_index = index + 1
-                        bit_array[julia_index] = evaluate_binary_op(op, lhs_val, outcome)
-                    end
+                # Update the bit directly in the boolean array
+                bit_array = register_var.val
+                if bit_array isa Vector && index + 1 <= length(bit_array)
+                    # Convert to 1-based indexing for Julia arrays
+                    julia_index = index + 1
+                    bit_array[julia_index] = evaluate_binary_op(op, lhs_val, outcome)
                 end
             end
         else
@@ -797,7 +765,10 @@ end
 
 function _handle_casting(sim::BranchedSimulator, expr::QasmExpression)
     casting_to = expr.args[1].args[1]
+
+    # Evaluate arbitrary value type that will be casted into the type specified by casting_to
     value = _evolve_branched_ast(sim, expr.args[2])
+
     results = Dict{Int, Any}()
 
     # For each path, apply the cast operation to the path-specific value
@@ -880,8 +851,8 @@ function _handle_for_loop(sim::BranchedSimulator, expr::QasmExpression)
 
         for loop_value in loop_variable_vals
             # Set the loop variable for each active path
-            for path_idx in sim.active_paths
-                set_variable!(sim, path_idx, loop_variable_name, ClassicalVariable(loop_variable_name, loop_variable_type, loop_value, false))
+            for path_idx_current in sim.active_paths
+                set_variable!(sim, path_idx_current, loop_variable_name, ClassicalVariable(loop_variable_name, loop_variable_type, loop_value, false))
             end
 
             # Process loop body
@@ -1334,7 +1305,7 @@ function _handle_gate_call(sim::BranchedSimulator, expr::QasmExpression)
 
         # Convert the parameter results to a dictionary mapping path indices to parameter vectors
         for path_idx in sim.active_paths
-            if param_results isa Dict && haskey(param_results, path_idx)
+            if haskey(param_results, path_idx)
                 if param_results[path_idx] isa Vector
                     evaluated_params[path_idx] = param_results[path_idx]
                 else
@@ -1369,166 +1340,10 @@ function _handle_gate_call(sim::BranchedSimulator, expr::QasmExpression)
         # Get target indices for this path
         target_indices = target_indices_dict[path_idx]
 
-        # User-defined gate - create a new scope and execute the body
         if haskey(sim.gate_defs, gate_name)
-            gate_def = sim.gate_defs[gate_name]
-
-            original_active_paths = copy(sim.active_paths)
-            sim.active_paths = [path_idx]
-            original_variables = _create_const_only_scope(sim)
-
-            # Bind parameters to the gate scope if this is a parametric gate
-            if haskey(evaluated_params, path_idx) && !isempty(gate_def.arguments)
-                path_params = evaluated_params[path_idx]
-                for (i, param_name) in enumerate(gate_def.arguments)
-                    if i <= length(path_params)
-                        # Store parameters with their actual type, not just Any
-                        param_value = path_params[i]
-                        param_type = typeof(param_value)
-                        set_variable!(sim, path_idx, param_name, param_type, param_value, false)
-                    end
-                end
-            end
-
-            num_ctrl = sum([(head(modifier) == :ctrl || head(modifier) == :negctrl) ? 1 : 0 for modifier in modifiers])
-
-            # Bind qubit targets to the gate scope
-            if !isempty(target_indices) && !isempty(gate_def.qubit_targets)
-                for (i, name) in enumerate(gate_def.qubit_targets)
-                    set_variable!(sim, path_idx, name, :qubit_declaration, target_indices[i+num_ctrl], false)
-                end
-            end
-
-            # Execute the gate body
-            instruction = gate_def.body
-
-            # Check for inv modifier - need to reverse the order of operations
-            has_inv = any(head(modifier) == :inv for modifier in modifiers)
-
-            # For pow modifier, we need to apply the entire gate sequence multiple times
-            pow_value = 1.0
-            for modifier in modifiers
-                if head(modifier) == :pow
-                    pow_value *= modifier.args[1]
-                end
-            end
-
-            # Store the original instructions before processing
-            original_instruction_length = length(sim.instruction_sequences[path_idx])
-
-            # Process the gate body
-            gate_calls = instruction.args
-
-            # If inverse, reverse the order of operations
-            if has_inv
-                gate_calls = reverse(gate_calls)
-            end
-
-            # Apply the gate sequence
-            for gate_call in gate_calls
-                _evolve_branched_ast(sim, gate_call)
-            end
-
-            # Get the new instructions that were added
-            new_instructions = sim.instruction_sequences[path_idx][(original_instruction_length+1):end]
-
-            # Remove the newly added instructions (we'll add them back with proper modifiers)
-            resize!(sim.instruction_sequences[path_idx], original_instruction_length)
-
-            # Apply modifiers to each instruction
-            modified_instructions = Instruction[]
-            for instruction in new_instructions
-                gate_op = instruction.operator
-                targets = []
-                ctrl_idx = 1
-                # Apply all modifiers except pow (we handle that separately)
-                if !isempty(modifiers)
-                    for modifier in modifiers
-                        if head(modifier) != :pow
-                            # For inv, we've already reversed the order, so just apply to each gate
-                            if head(modifier) == :inv
-                                gate_op.pow_exponent = -gate_op.pow_exponent
-                            else
-                                # Apply other modifiers (ctrl, negctrl)
-                                gate_op = _apply_modifiers(gate_op, [modifier])
-                                push!(targets, target_indices[ctrl_idx])
-                                ctrl_idx += 1
-                            end
-                        end
-                    end
-                end
-
-                append!(targets, instruction.target)
-
-                push!(modified_instructions, Instruction(gate_op, targets))
-            end
-
-            # For pow modifier, repeat the entire sequence |pow_value| times
-            # If pow_value is negative, we've already inverted each gate and reversed the order
-            abs_pow = abs(pow_value)
-            integer_pow = floor(Int, abs_pow)
-
-            # Add the integer part of the power
-            for _ in 1:integer_pow
-                for instruction in modified_instructions
-                    push!(sim.instruction_sequences[path_idx], instruction)
-                end
-            end
-
-            # Handle fractional part if needed
-            fractional_part = abs_pow - integer_pow
-            if fractional_part > 0
-                for instruction in modified_instructions
-                    gate_op = instruction.operator
-                    gate_op.pow_exponent *= fractional_part
-                    push!(sim.instruction_sequences[path_idx], Instruction(gate_op, instruction.target))
-                end
-            end
-
-            _restore_original_scope(sim, original_variables)
-            sim.active_paths = original_active_paths
-        elseif haskey(sim.gate_name_mapping, gate_name) # Builtin gate
-            path_params = haskey(evaluated_params, path_idx) ? evaluated_params[path_idx] : []
-
-            # Special case for GPhase gate which needs to know the number of qubits
-            if gate_name == "gphase"
-                # Determine N based on the context
-                N = if isempty(target_indices)
-                    # No targets specified, use all qubits
-                    sim.n_qubits
-                else
-                    # Specific targets specified, use the number of targets
-                    length(target_indices)
-                end
-
-                # Create GPhase{N} gate with the correct number of qubits
-                gate_op = GPhase{N}(tuple(path_params...))
-            else
-                # Built-in gate - use the mapping to get the gate type
-                gate_type = getfield(BraketSimulator, sim.gate_name_mapping[gate_name])
-
-                # Create gate operator
-                gate_op = if !isempty(path_params)
-                    gate_type(tuple(path_params...))
-                else
-                    gate_type()
-                end
-            end
-
-            # Apply modifiers if any
-            if !isempty(modifiers)
-                gate_op = _apply_modifiers(gate_op, modifiers)
-            end
-
-            # Store gate instruction for this path
-            instruction = Instruction(gate_op, target_indices)
-
-            # If we have a gphase with no targets, it acts on the whole statevector
-            if (gate_name == "gphase") && isempty(target_indices)
-                instruction = Instruction(gate_op, range(0, sim.n_qubits-1))
-            end
-
-            push!(sim.instruction_sequences[path_idx], instruction)
+            _handle_custom_gate(sim, gate_name, modifiers, evaluated_params, path_idx, target_indices)
+        elseif haskey(sim.gate_name_mapping, gate_name)
+            _handle_builtin_gate(sim, gate_name, modifiers, evaluated_params, path_idx, target_indices)
         else
             error("Gate $gate_name not defined!")
         end
@@ -1536,6 +1351,219 @@ function _handle_gate_call(sim::BranchedSimulator, expr::QasmExpression)
 
     return nothing
 end
+
+
+"""
+    _handle_custom_gate(
+        sim::BranchedSimulator, 
+        gate_name::String, 
+        modifiers::Vector, 
+        evaluated_params::Dict{Int, Vector{Any}}, 
+        path_idx::Int, 
+        target_indices::Vector{Int}
+    )
+
+Applies a user defined gate indicated by `gate_name` to the path identified by `path_idx`. It does this
+by adding the instructions stored in the gate body into the instruction_sequences parameters.
+
+The bulk of the complexity comes from applying the modifiers to the overall gate. For instance,
+applying the inv modifier requires reversing the order of the gate instructions and applying the modifier
+on each instruction.
+
+Also generates new scope to evaluate the inside gate instructions according to the openqasm spec.
+"""
+function _handle_custom_gate(
+    sim::BranchedSimulator, 
+    gate_name::String, 
+    modifiers::Vector, 
+    evaluated_params::Dict{Int, Vector{Any}}, 
+    path_idx::Int, 
+    target_indices::Vector{Int}
+)
+    gate_def = sim.gate_defs[gate_name]
+    original_active_paths = copy(sim.active_paths)
+    sim.active_paths = [path_idx]
+    original_variables = _create_const_only_scope(sim)
+
+    # Bind parameters to the gate scope if this is a parametric gate
+    if haskey(evaluated_params, path_idx) && !isempty(gate_def.arguments)
+        path_params = evaluated_params[path_idx]
+        for (i, param_name) in enumerate(gate_def.arguments)
+            if i <= length(path_params)
+                # Store parameters with their actual type, not just Any
+                param_value = path_params[i]
+                param_type = typeof(param_value)
+                set_variable!(sim, path_idx, param_name, param_type, param_value, false)
+            end
+        end
+    end
+
+    num_ctrl = sum([(head(modifier) == :ctrl || head(modifier) == :negctrl) ? 1 : 0 for modifier in modifiers])
+
+    # Bind qubit targets to the gate scope
+    if !isempty(target_indices) && !isempty(gate_def.qubit_targets)
+        for (i, name) in enumerate(gate_def.qubit_targets)
+            set_variable!(sim, path_idx, name, :qubit_declaration, target_indices[i+num_ctrl], false)
+        end
+    end
+
+    # Execute the gate body
+    instruction = gate_def.body
+
+    # Check for inv modifier - need to reverse the order of operations
+    has_inv = any(head(modifier) == :inv for modifier in modifiers)
+
+    # For pow modifier, we need to apply the entire gate sequence multiple times
+    pow_value = 1.0
+    for modifier in modifiers
+        if head(modifier) == :pow
+            pow_value *= modifier.args[1]
+        end
+    end
+
+    # Store the original instructions before processing
+    original_instruction_length = length(sim.instruction_sequences[path_idx])
+
+    # Process the gate body
+    gate_calls = instruction.args
+
+    # If inverse, reverse the order of operations
+    if has_inv
+        gate_calls = reverse(gate_calls)
+    end
+
+    # Apply the gate sequence
+    for gate_call in gate_calls
+        _evolve_branched_ast(sim, gate_call)
+    end
+
+    # Get the new instructions that were added
+    new_instructions = sim.instruction_sequences[path_idx][(original_instruction_length+1):end]
+
+    # Remove the newly added instructions (we'll add them back with proper modifiers)
+    resize!(sim.instruction_sequences[path_idx], original_instruction_length)
+
+    # Apply modifiers to each instruction
+    modified_instructions = Instruction[]
+    for instruction in new_instructions
+        gate_op = instruction.operator
+        targets = []
+        ctrl_idx = 1
+        # Apply all modifiers except pow (we handle that separately)
+        if !isempty(modifiers)
+            for modifier in modifiers
+                if head(modifier) != :pow
+                    # For inv, we've already reversed the order, so just apply to each gate
+                    if head(modifier) == :inv
+                        gate_op.pow_exponent = -gate_op.pow_exponent
+                    else
+                        # Apply other modifiers (ctrl, negctrl)
+                        gate_op = _apply_modifiers(gate_op, [modifier])
+                        push!(targets, target_indices[ctrl_idx])
+                        ctrl_idx += 1
+                    end
+                end
+            end
+        end
+
+        append!(targets, instruction.target)
+
+        push!(modified_instructions, Instruction(gate_op, targets))
+    end
+
+    # For pow modifier, repeat the entire sequence |pow_value| times
+    # If pow_value is negative, we've already inverted each gate and reversed the order
+    abs_pow = abs(pow_value)
+    integer_pow = floor(Int, abs_pow)
+
+    # Add the integer part of the power
+    for _ in 1:integer_pow
+        for instruction in modified_instructions
+            push!(sim.instruction_sequences[path_idx], instruction)
+        end
+    end
+
+    # Handle fractional part if needed
+    fractional_part = abs_pow - integer_pow
+    if fractional_part > 0
+        for instruction in modified_instructions
+            gate_op = instruction.operator
+            gate_op.pow_exponent *= fractional_part
+            push!(sim.instruction_sequences[path_idx], Instruction(gate_op, instruction.target))
+        end
+    end
+
+    _restore_original_scope(sim, original_variables)
+    sim.active_paths = original_active_paths
+end
+
+
+"""
+    _handle_builtin_gate(
+        sim::BranchedSimulator, 
+        gate_name::String, 
+        modifiers::Vector, 
+        evaluated_params::Dict{Int, Vector{Any}}, 
+        path_idx::Int, 
+        target_indices::Vector{Int}
+    )
+
+Adds the instruction corresponding to the builtin gate with name `gate_name` to the path identified by `path_idx`.
+Includes a special case for the GPhase gate.
+Also includes modifiers (ctrl, negctrl, pow, inv) on the builtin gate if they exist
+
+"""
+function _handle_builtin_gate(
+    sim::BranchedSimulator, 
+    gate_name::String, 
+    modifiers::Vector, 
+    evaluated_params::Dict{Int, Vector{Any}}, 
+    path_idx::Int, 
+    target_indices::Vector{Int}
+)
+    path_params = haskey(evaluated_params, path_idx) ? evaluated_params[path_idx] : []
+
+    # Special case for GPhase gate which needs to know the number of qubits
+    if gate_name == "gphase"
+        # Determine N based on the context
+        N = if isempty(target_indices)
+            # No targets specified, use all qubits
+            sim.n_qubits
+        else
+            # Specific targets specified, use the number of targets
+            length(target_indices)
+        end
+
+        # Create GPhase{N} gate with the correct number of qubits
+        gate_op = GPhase{N}(tuple(path_params...))
+    else
+        # Built-in gate - use the mapping to get the gate type
+        gate_type = getfield(BraketSimulator, sim.gate_name_mapping[gate_name])
+
+        # Create gate operator
+        gate_op = if !isempty(path_params)
+            gate_type(tuple(path_params...))
+        else
+            gate_type()
+        end
+    end
+
+    # Apply modifiers if any
+    if !isempty(modifiers)
+        gate_op = _apply_modifiers(gate_op, modifiers)
+    end
+
+    # Store gate instruction for this path
+    instruction = Instruction(gate_op, target_indices)
+
+    # If we have a gphase with no targets, it acts on the whole statevector
+    if (gate_name == "gphase") && isempty(target_indices)
+        instruction = Instruction(gate_op, range(0, sim.n_qubits-1))
+    end
+
+    push!(sim.instruction_sequences[path_idx], instruction)
+end
+
 
 """
     _handle_gate_definition(sim::BranchedSimulator, expr::QasmExpression)
@@ -1814,9 +1842,7 @@ function _handle_function_call(sim::BranchedSimulator, expr::QasmExpression)
         end
 
         # Bind arguments to parameters if we have parameter definitions
-        for path_idx in sim.active_paths
-            arguments = evaluated_arguments[path_idx]
-
+        for (path_idx, arguments) in evaluated_arguments
             for (i, param_def) in enumerate(param_defs)
                 param_name = Quasar.name(param_def)
                 param_type = head(param_def)
