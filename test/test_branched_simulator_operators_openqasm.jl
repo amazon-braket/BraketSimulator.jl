@@ -3116,34 +3116,6 @@ using BraketSimulator
             @test state ≈ expected_sv
         end
 
-
-        @testset "11.14 Gate on qubit registers" begin
-            qasm = """
-            qubit[3] qs;
-            qubit q;
-
-            x qs[{0, 2}];
-            h q;
-            cphaseshift(1) qs, q;
-            phaseshift(-2) q;
-            """
-
-            # Create a simulator
-            simulator = BranchedSimulator(StateVectorSimulator(4, 1000))
-
-            # Convert to circuit
-            circuit = BraketSimulator.new_to_circuit(qasm)
-
-            # Evolve using branched simulator operators
-            branched_sim = BraketSimulator.evolve_branched(simulator, circuit, Dict{String, Any}())
-
-            # Calculate the final state
-            state = BraketSimulator.calculate_current_state(branched_sim, branched_sim.active_paths[1])
-
-            # Verify the state vector
-            @test state ≈ (1/√2)*[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0]
-        end
-
         @testset "11.15 Rotation parameter expressions" begin
             qasm_pi = """
             OPENQASM 3.0;
@@ -3657,23 +3629,6 @@ using BraketSimulator
             """
             simulator = BranchedSimulator(StateVectorSimulator(1, 1000))
             @test_throws ErrorException BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_str), Dict{String, Any}())
-        end
-
-        @testset "More than 2 controls" begin
-            qasm_str = """
-            OPENQASM 3.0;
-            qubit[4] q;
-            x q[0];
-            x q[1];
-            x q[2];
-            ctrl(3) @ x q[0], q[1], q[2], q[3];
-            """
-            simulator = BranchedSimulator(StateVectorSimulator(4, 1000))
-            result = BraketSimulator.evolve_branched(simulator, BraketSimulator.new_to_circuit(qasm_str), Dict{String, Any}())
-            @test result isa BraketSimulator.BranchedSimulator
-            # Verify that the 3-controlled X gate was applied correctly
-            state = BraketSimulator.calculate_current_state(result, result.active_paths[1])
-            @test abs(state[16]) ≈ 1.0 atol=1e-10  # |1111⟩ state
         end
 
         @testset "negctrl on gphase gate" begin

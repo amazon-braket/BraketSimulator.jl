@@ -57,12 +57,9 @@ function evaluate_qubits_identifier(sim::BranchedSimulator, qubit_expr::QasmExpr
 
             sort!(register_qubits)
 
-            if !isempty(register_qubits)
-                for qubit_idx in register_qubits
-                    push!(all_qubits, qubit_idx)
-                end
-            else
-                error("Missing qubit '$qubit_name'")
+            !isempty(register_qubits) || error("Missing qubit '$qubit_name'")
+            for qubit_idx in register_qubits
+                push!(all_qubits, qubit_idx)
             end
         end
 
@@ -105,19 +102,13 @@ function evaluate_qubits_indexed(sim::BranchedSimulator, qubit_expr::QasmExpress
             if path_qubit_ix isa Vector
                 for ix in path_qubit_ix
                     # Make sure the index is valid
-                    if ix >= 0 && ix < length(register_qubits)
-                        push!(all_qubits, register_qubits[ix+1])  # Convert to 1-based indexing
-                    else
-                        error("Index $ix out of bounds for register $qubit_name")
-                    end
+                    (ix >= 0 && ix < length(register_qubits)) || error("Index $ix out of bounds for register $qubit_name")
+                    push!(all_qubits, register_qubits[ix+1])
                 end
             else
                 # Make sure the index is valid
-                if path_qubit_ix >= 0 && path_qubit_ix < length(register_qubits)
-                    push!(all_qubits, register_qubits[path_qubit_ix+1])  # Convert to 1-based indexing
-                else
-                    error("Index $path_qubit_ix out of bounds for register $qubit_name")
-                end
+                path_qubit_ix >= 0 && path_qubit_ix < length(register_qubits) || error("Index $path_qubit_ix out of bounds for register $qubit_name")
+                push!(all_qubits, register_qubits[path_qubit_ix+1])  # Convert to 1-based indexing
             end
         else
             # Handle array indexing for regular qubits
@@ -468,13 +459,9 @@ function _handle_indexed_identifier(sim::BranchedSimulator, expr::QasmExpression
             if var.type isa Quasar.SizedBitVector
                 # Convert to 1-based indexing for Julia arrays
                 julia_index = index + 1
-
-                if julia_index <= length(var.val)
-                    # Access the bit directly from the boolean array
-                    results[path_idx] = var.val[julia_index]
-                else
-                    error("Index out of bounds error, index too large for bit vector")
-                end
+                julia_index <= length(var.val) || error("Index out of bounds error, index too large for bit vector")
+                # Access the bit directly from the boolean array
+                results[path_idx] = var.val[julia_index]
             elseif var.type isa Quasar.SizedUInt
                 size = var.type.size.args[1]
                 if index isa Vector
@@ -1780,24 +1767,17 @@ function _bind_qubit_parameter(sim::BranchedSimulator, path_idx::Int, param_name
         qubit_name = Quasar.name(arg_expr)
         index = arg_value
         indexed_name = "$qubit_name[$index]"
-
-        if haskey(sim.qubit_mapping, indexed_name)
-            qubit_idx = sim.qubit_mapping[indexed_name]
-            # Store the qubit index directly
-            sim.variables[path_idx][param_name] = ClassicalVariable(param_name, :qubit_declaration, qubit_idx, true)
-        else
-            error("Qubit $indexed_name not found in qubit mapping")
-        end
+        haskey(sim.qubit_mapping, indexed_name) || error("Qubit $indexed_name not found in qubit mapping")
+        qubit_idx = sim.qubit_mapping[indexed_name]
+        # Store the qubit index directly
+        sim.variables[path_idx][param_name] = ClassicalVariable(param_name, :qubit_declaration, qubit_idx, true)
     else
         # For direct qubit references
         qubit_name = Quasar.name(arg_expr)
-        if haskey(sim.qubit_mapping, qubit_name)
-            qubit_idx = sim.qubit_mapping[qubit_name]
-            # Store the qubit index directly
-            sim.variables[path_idx][param_name] = ClassicalVariable(param_name, :qubit_declaration, qubit_idx, true)
-        else
-            error("Qubit $qubit_name not found in qubit mapping")
-        end
+        haskey(sim.qubit_mapping, qubit_name) || error("Qubit $qubit_name not found in qubit mapping")
+        qubit_idx = sim.qubit_mapping[qubit_name]
+        # Store the qubit index directly
+        sim.variables[path_idx][param_name] = ClassicalVariable(param_name, :qubit_declaration, qubit_idx, true)
     end
 end
 
@@ -1860,23 +1840,18 @@ function _handle_function_call(sim::BranchedSimulator, expr::QasmExpression)
                         index = path_arg_value[1]
                         indexed_name = "$qubit_name[$index]"
 
-                        if haskey(sim.qubit_mapping, indexed_name)
-                            qubit_idx = sim.qubit_mapping[indexed_name]
-                            # Store the qubit index directly
-                            sim.variables[path_idx][param_name] = FramedVariable(param_name, :qubit_declaration, qubit_idx, false, sim.curr_frame+1)
-                        else
-                            error("Qubit $indexed_name not found in qubit mapping")
-                        end
+                        haskey(sim.qubit_mapping, indexed_name) || error("Qubit $indexed_name not found in qubit mapping")
+                        qubit_idx = sim.qubit_mapping[indexed_name]
+                        # Store the qubit index directly
+                        sim.variables[path_idx][param_name] = FramedVariable(param_name, :qubit_declaration, qubit_idx, false, sim.curr_frame+1)
+
                     else
-                        # For direct qubit references
                         qubit_name = Quasar.name(arg_expr)
-                        if haskey(sim.qubit_mapping, qubit_name)
-                            qubit_idx = sim.qubit_mapping[qubit_name]
-                            # Store the qubit index directly
-                            sim.variables[path_idx][param_name] = FramedVariable(param_name, :qubit_declaration, qubit_idx, false, sim.curr_frame+1)
-                        else
-                            error("Qubit $qubit_name not found in qubit mapping")
-                        end
+                        haskey(sim.qubit_mapping, qubit_name) || error("Qubit $qubit_name not found in qubit mapping")
+                        qubit_idx = sim.qubit_mapping[qubit_name]
+                        # Store the qubit index directly
+                        sim.variables[path_idx][param_name] = FramedVariable(param_name, :qubit_declaration, qubit_idx, false, sim.curr_frame+1)
+
                     end
                 else
                     var_type = param_def.args[1].args[1]
@@ -2098,7 +2073,6 @@ function _evolve_branched_ast(sim::BranchedSimulator, expr::QasmExpression)
 
     if expr_type in keys(evolution_dispatch_nodes)
         return evolution_dispatch_nodes[expr_type](sim, expr)
-    else
-        error("Cannot process expression of type $expr_type.")
     end
+    error("Cannot process expression of type $expr_type.")
 end

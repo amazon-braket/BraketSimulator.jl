@@ -458,12 +458,8 @@ function simulate(
     inputs = Dict{String, Float64}(),
     kwargs...,
 )
-    if shots <= 0
-        error("The number of inputted shots must be a positive integer")
-    end
-    if shots != simulator.shots[1]
-        error("The number of shots in the simulator must be equal to the number of shots passed in")
-    end
+    shots <= 0 || error("The number of inputted shots must be a positive integer")
+    shots != simulator.shots[1] || error("The number of shots in the simulator must be equal to the number of shots passed in")
 
     # Parse and prepare the program
     program = new_to_circuit(circuit_ir.source)
