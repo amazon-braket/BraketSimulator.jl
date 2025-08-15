@@ -10,3 +10,4 @@ lcov.info
 /.coverage
 .DS_Store
 */.DS_Store
+/test/Manifest.toml
