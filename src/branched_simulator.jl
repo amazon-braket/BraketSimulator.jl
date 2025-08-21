@@ -237,8 +237,9 @@ function measure_qubit(sim::BranchedSimulator, path_idx::Int, qubit_idx::Int, qu
     probs = get_measurement_probabilities(current_state, qubit_idx)
 
     path_shots = sim.shots[path_idx]
-    shots_for_outcome_1 = round(Int, path_shots * probs[2])
-    shots_for_outcome_0 = path_shots - shots_for_outcome_1
+    sampled_shots = countmap(sample([0, 1], Weights(probs), path_shots))
+    shots_for_outcome_0 = haskey(sampled_shots, 0) ? sampled_shots[0] : 0
+    shots_for_outcome_1 = haskey(sampled_shots, 1) ? sampled_shots[1] : 0
 
     # We branch only if there is a non zero probability of measuring both outcomes
     if shots_for_outcome_1 > 0 && shots_for_outcome_0 > 0

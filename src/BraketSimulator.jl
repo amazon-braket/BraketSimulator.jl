@@ -928,51 +928,8 @@ end
 
             # Calculate probabilities for all possible states
             probs = abs2.(current_state)
-
-            # Create a list of (state_idx, prob) pairs for states with non-zero probability
-            state_probs = [(i, p) for (i, p) in enumerate(probs) if p > 0]
-
-            # Sort by probability in descending order
-            sort!(state_probs, by = x -> x[2], rev = true)
-
-            # Allocate shots using a more accurate method that preserves the total
-            remaining_shots = path_shots
-            allocated_shots = Dict{Int, Int}()
-
-            # First pass: allocate integer shots based on probability
-            for (state_idx, prob) in state_probs
-                if remaining_shots <= 0
-                    break
-                end
-
-                # Calculate shots for this state (floor to ensure we don't over-allocate)
-                state_shots = floor(Int, path_shots * prob)
-
-                # Update remaining shots
-                remaining_shots -= state_shots
-
-                # Store allocated shots
-                allocated_shots[state_idx] = state_shots
-            end
-
-            # Second pass: distribute any remaining shots to states with highest fractional part
-            if remaining_shots > 0
-                # Calculate fractional parts
-                fractional_parts = [(i, path_shots * p - floor(path_shots * p)) for (i, p) in state_probs]
-
-                # Sort by fractional part in descending order
-                sort!(fractional_parts, by = x -> x[2], rev = true)
-
-                # Distribute remaining shots
-                for (state_idx, _) in fractional_parts
-                    if remaining_shots <= 0
-                        break
-                    end
-
-                    allocated_shots[state_idx] = get(allocated_shots, state_idx, 0) + 1
-                    remaining_shots -= 1
-                end
-            end
+            
+            allocated_shots = countmap(sample(range(1,length(probs)), Weights(probs), path_shots))
 
             # Convert state indices to binary strings and update shots_per_state
             for (state_idx, state_shots) in allocated_shots
