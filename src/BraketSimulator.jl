@@ -928,7 +928,7 @@ end
 
             # Calculate probabilities for all possible states
             probs = abs2.(current_state)
-            
+
             allocated_shots = countmap(sample(range(1,length(probs)), Weights(probs), path_shots))
 
             # Convert state indices to binary strings and update shots_per_state
