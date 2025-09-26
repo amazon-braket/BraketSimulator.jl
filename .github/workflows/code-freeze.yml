@@ -21,11 +21,13 @@ jobs:
       if: env.FROZEN == 'true'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_REPO: ${{ github.repository }}
+        GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
       run: |
         PR_DATA=$(curl -s \
           -H "Authorization: Bearer $GITHUB_TOKEN" \
           -H "Accept: application/vnd.github.v3+json" \
-          https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }})
+          "https://api.github.com/repos/$GITHUB_REPO/pulls/$GITHUB_PR_NUMBER)"
         BRANCH_NAME=$(echo $PR_DATA | jq .head.ref -r)
         PR_TITLE=$(echo $PR_DATA | jq .title -r)
 
