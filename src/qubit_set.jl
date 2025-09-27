@@ -1,12 +1,16 @@
 using OrderedCollections
 
-struct Qubit <: Integer
+mutable struct Qubit <: Integer
     index::Int
-    Qubit(q::Integer) = new(q)
-    Qubit(q::AbstractFloat) = new(Int(q))
-    Qubit(q::BigFloat) = new(Int(q))
+    name::String
+    measured::Bool
+    Qubit(q::Integer) = new(q, "q" * string(q), false)
+    Qubit(q::AbstractFloat) = new(Int(q), "q" * string(Int(q)), false)
+    Qubit(q::BigFloat) = new(Int(q), "q" * string(Int(q)), false)
+    Qubit(q::Integer, name::String) = new(q, name, false)
+    Qubit(q::Integer, name::String, measured::Bool) = new(q, name, measured)
 end
-Qubit(q::Qubit) = q
+Qubit(q::Qubit) = new(q.index, q.name, q.measured)
 Base.:(==)(q::Qubit, i::T) where {T<:Integer} = q.index==i
 Base.:(==)(i::T, q::Qubit) where {T<:Integer} = q.index==i
 Base.:(==)(i::BigInt, q::Qubit) = big(q.index)==i
@@ -14,7 +18,7 @@ Base.:(==)(q::Qubit, i::BigInt) = big(q.index)==i
 Base.:(==)(q1::Qubit, q2::Qubit) = q1.index==q2.index
 
 Base.hash(q::Qubit, h::UInt) = hash(q.index, h)
-Base.show(io::IO, q::Qubit) = print(io, "Qubit($(q.index))")
+Base.show(io::IO, q::Qubit) = print(io, "Qubit($(q.name))")
 const IntOrQubit    = Union{Int, Qubit}
 
 """

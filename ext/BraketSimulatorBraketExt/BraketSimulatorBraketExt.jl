@@ -165,6 +165,8 @@ function __init__()
         DensityMatrixSimulator{ComplexF64,Matrix{ComplexF64}}
     Braket._simulator_devices[]["braket_sv_v2"] =
         StateVectorSimulator{ComplexF64,Vector{ComplexF64}}
+    Braket._simulator_devices[]["braket_sv_branched"] = 
+        BranchedSimulatorOperators
 end
 
 end
