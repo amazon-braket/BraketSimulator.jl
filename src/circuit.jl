@@ -52,12 +52,7 @@ QubitSet with 2 elements:
 ```
 """
 qubits(c::Circuit) = (qs = union!(mapreduce(ix->ix.target, union, c.instructions, init=Set{Int}()), c.qubit_observable_set); QubitSet(qs))
-function qubits(p::Program)
-    inst_qubits = mapreduce(ix->ix.target, union, p.instructions, init=Set{Int}())
-    bri_qubits  = mapreduce(ix->ix.target, union, p.basis_rotation_instructions, init=Set{Int}())
-    res_qubits  = mapreduce(ix->(hasproperty(ix, :targets) && !isnothing(ix.targets)) ? reduce(vcat, ix.targets) : Set{Int}(), union, p.results, init=Set{Int}())
-    return union(inst_qubits, bri_qubits, res_qubits)
-end
+
 """
     qubit_count(c::Circuit) -> Int
 
@@ -76,14 +71,6 @@ julia> qubit_count(c)
 ```
 """
 qubit_count(c::Circuit) = length(qubits(c))
-qubit_count(p::Program) = length(qubits(p))
-
-function Base.convert(::Type{Program}, c::Circuit) # nosemgrep
-    lowered_rts = map(StructTypes.lower, c.result_types)
-    header = braketSchemaHeader("braket.ir.jaqcd.program" ,"1")
-    return Program(header, c.instructions, lowered_rts, c.basis_rotation_instructions)
-end
-Program(c::Circuit) = convert(Program, c)
 
 extract_observable(rt::ObservableResult) = rt.observable
 extract_observable(p::Probability) = Observables.Z()
@@ -274,6 +261,13 @@ function add_instruction!(c::Circuit, ix::Instruction{O}) where {O<:Operator}
     return c
 end
 
+"""
+    to_circuit(v::Quasar.QasmProgramVisitor) -> Circuit
+
+Convert a QasmProgramVisitor to a Circuit. If the circuit contains a measurement,
+only process instructions up to the measurement and store the remaining AST
+for later processing after the measurement outcome is known.
+"""
 function to_circuit(v::Quasar.QasmProgramVisitor)
     c = Circuit()
     foreach(v.instructions) do ix
@@ -304,7 +298,25 @@ function to_circuit(qasm_source::String, inputs)
     endswith(input_qasm, "\n") || (input_qasm *= "\n")
     parsed  = parse_qasm(input_qasm)
     visitor = QasmProgramVisitor(inputs)
-    visitor(parsed)
+    visitor(parsed) 
     return to_circuit(visitor) 
 end
 to_circuit(qasm_source::String) = to_circuit(qasm_source, Dict{String, Float64}())
+
+
+"""
+	new_to_circuit(qasm_source::String) -> QasmExpression
+
+Convers the input openqasm string into a QasmExpresion AST whose nodes are operations.
+Utilizes Quasar.jl to parse the input string.
+"""
+function new_to_circuit(qasm_source::String)
+    input_qasm = if endswith(qasm_source, ".qasm") && isfile(qasm_source)
+        read(qasm_source, String)
+    else
+        qasm_source
+    end
+    endswith(input_qasm, "\n") || (input_qasm *= "\n")
+    parsed  = parse_qasm(input_qasm)
+    return parsed
+end
