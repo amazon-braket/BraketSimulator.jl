@@ -142,9 +142,6 @@ Base.convert(::Type{Braket.Instruction}, ix::BraketSimulator.Instruction) = Brak
 
 Base.convert(::Type{BraketSimulator.OpenQasmProgram}, p::Braket.OpenQasmProgram) = BraketSimulator.OpenQasmProgram(BraketSimulator.braketSchemaHeader("braket.ir.openqasm.program", "1"), p.source, p.inputs)
 
-# Braket.jl v0.10 has no `Program` struct. A simulator-side `BraketSimulator.Program`
-# (which is just a lossless Julia-side container around a Circuit) is mapped back to
-# a placeholder `Braket.OpenQasmProgram` for `AdditionalMetadata.action` round-trips.
 Base.convert(::Type{Braket.AbstractProgram}, p::BraketSimulator.Program) = Braket.OpenQasmProgram(Braket.braketSchemaHeader("braket.ir.openqasm.program", "1"), "", nothing)
 Base.convert(::Type{Braket.AbstractProgram}, p::BraketSimulator.OpenQasmProgram) = Braket.OpenQasmProgram(Braket.braketSchemaHeader("braket.ir.openqasm.program", "1"), p.source, p.inputs)
 
