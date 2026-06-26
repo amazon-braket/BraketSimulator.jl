@@ -80,7 +80,7 @@ qubit_count(p::Program) = length(qubits(p))
 
 function Base.convert(::Type{Program}, c::Circuit) # nosemgrep
     lowered_rts = map(StructTypes.lower, c.result_types)
-    header = braketSchemaHeader("braket.ir.jaqcd.program" ,"1")
+    header = braketSchemaHeader("braket.ir.openqasm.program", "1")
     return Program(header, c.instructions, lowered_rts, c.basis_rotation_instructions)
 end
 Program(c::Circuit) = convert(Program, c)

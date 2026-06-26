@@ -398,7 +398,7 @@ LARGE_TESTS = get(ENV, "BRAKET_SIM_LARGE_TESTS", "false") == "true"
     end
     @testset "batch" begin
         function make_ghz(num_qubits)
-            ghz = BraketSimulator.Program(BraketSimulator.braketSchemaHeader("braket.ir.jaqcd.program", "1"), BraketSimulator.Instruction[BraketSimulator.Instruction(BraketSimulator.H(), 0)], BraketSimulator.AbstractProgramResult[], BraketSimulator.Instruction[])
+            ghz = BraketSimulator.Program(BraketSimulator.braketSchemaHeader("braket.ir.openqasm.program", "1"), BraketSimulator.Instruction[BraketSimulator.Instruction(BraketSimulator.H(), 0)], BraketSimulator.AbstractProgramResult[], BraketSimulator.Instruction[])
             for ii in 1:num_qubits-1
                 push!(ghz.instructions, BraketSimulator.Instruction(BraketSimulator.CNot(), [0, ii]))
             end
@@ -529,71 +529,6 @@ LARGE_TESTS = get(ENV, "BRAKET_SIM_LARGE_TESTS", "false") == "true"
                 :shotsRange => [0, new_sv_max_shots],
             ),
             :action => Dict(
-                "braket.ir.jaqcd.program" => Dict(
-                    :actionType => "braket.ir.jaqcd.program",
-                    :version => ["1"],
-                    :supportedOperations => [
-                        "ccnot",
-                        "cnot",
-                        "cphaseshift",
-                        "cphaseshift00",
-                        "cphaseshift01",
-                        "cphaseshift10",
-                        "cswap",
-                        "cv",
-                        "cy",
-                        "cz",
-                        "ecr",
-                        "h",
-                        "i",
-                        "iswap",
-                        "pswap",
-                        "phaseshift",
-                        "prx",
-                        "rx",
-                        "ry",
-                        "rz",
-                        "s",
-                        "si",
-                        "swap",
-                        "t",
-                        "ti",
-                        "unitary",
-                        "v",
-                        "vi",
-                        "x",
-                        "xx",
-                        "xy",
-                        "y",
-                        "yy",
-                        "z",
-                        "zz",
-                    ],
-                    :supportedResultTypes => [
-                        Dict(
-                            :name => "Sample",
-                            :observables => new_sv_observables,
-                            :minShots => 1,
-                            :maxShots => new_sv_max_shots,
-                        ),
-                        Dict(
-                            :name => "Expectation",
-                            :observables => new_sv_observables,
-                            :minShots => 0,
-                            :maxShots => new_sv_max_shots,
-                        ),
-                        Dict(
-                            :name => "Variance",
-                            :observables => new_sv_observables,
-                            :minShots => 0,
-                            :maxShots => new_sv_max_shots,
-                        ),
-                        Dict(:name => "Probability", :minShots => 0, :maxShots => new_sv_max_shots),
-                        Dict(:name => "StateVector", :minShots => 0, :maxShots => 0),
-                        Dict(:name => "DensityMatrix", :minShots => 0, :maxShots => 0),
-                        Dict(:name => "Amplitude", :minShots => 0, :maxShots => 0),
-                    ],
-                ),
                 "braket.ir.openqasm.program" => Dict(
                     :actionType => "braket.ir.openqasm.program",
                     :version => ["1"],

@@ -381,7 +381,7 @@ LARGE_TESTS = get(ENV, "BRAKET_SIM_LARGE_TESTS", "false") == "true"
     end
     @testset "batch" begin
         function make_ghz(num_qubits)
-            ghz = BraketSimulator.Program(BraketSimulator.braketSchemaHeader("braket.ir.jaqcd.program", "1"), BraketSimulator.Instruction[BraketSimulator.Instruction(BraketSimulator.H(), 0)], BraketSimulator.AbstractProgramResult[], BraketSimulator.Instruction[])
+            ghz = BraketSimulator.Program(BraketSimulator.braketSchemaHeader("braket.ir.openqasm.program", "1"), BraketSimulator.Instruction[BraketSimulator.Instruction(BraketSimulator.H(), 0)], BraketSimulator.AbstractProgramResult[], BraketSimulator.Instruction[])
             for ii in 0:num_qubits-2
                 push!(ghz.instructions, BraketSimulator.Instruction(BraketSimulator.CNot(), [ii, ii+1]))
             end

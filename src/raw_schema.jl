@@ -16,8 +16,8 @@ abstract type AbstractProgram <: BraketSchemaBase end
 StructTypes.StructType(::Type{AbstractProgram}) = StructTypes.AbstractType()
 function bsh_f(raw_symbol::Symbol)
     raw = String(raw_symbol)
-    v   = eval(Meta.parse(raw))
-    return v["name"] == "braket.ir.openqasm.program" ? OpenQasmProgram : Program
+    eval(Meta.parse(raw))
+    return OpenQasmProgram
 end
 StructTypes.subtypes(::Type{AbstractProgram}) = StructTypes.SubTypeClosure(bsh_f)
 StructTypes.subtypekey(::Type{AbstractProgram}) = :braketSchemaHeader
@@ -91,7 +91,7 @@ end # module
 
 using .IR
 
-@enum DeviceActionType openqasm jaqcd
+@enum DeviceActionType openqasm
 DeviceActionTypeDict = Dict(string(inst)=>inst for inst in instances(DeviceActionType))
 
 struct ResultType
@@ -135,14 +135,6 @@ end
 ResultTypeValue(nt::@NamedTuple{type::AbstractProgramResult, value::Union{Float64, Dict, Vector}}) = ResultTypeValue(nt.type, nt.value)
 StructTypes.lowertype(::Type{ResultTypeValue}) = @NamedTuple{type::AbstractProgramResult, value::Union{Float64, Dict, Vector}} 
 
-struct JaqcdDeviceActionProperties <: DeviceActionProperties
-    version::Vector{String}
-    actionType::String
-    supportedOperations::Union{Nothing, Vector{String}}
-    supportedResultTypes::Union{Nothing, Vector{ResultType}}
-    disabledQubitRewiringSupported::Union{Nothing, Bool}
-end
-
 struct ControlMod
     name::String
     max_qubits::Union{Nothing, Int}
@@ -180,6 +172,7 @@ struct OpenQASMDeviceActionProperties <: DeviceActionProperties
     disabledQubitRewiringSupported::Bool
     supportedResultTypes::Union{Nothing, Vector{ResultType}}
 end
+StructTypes.defaults(::Type{OpenQASMDeviceActionProperties}) = Dict{Symbol, Any}(:supportedModifiers => Any[], :supportsUnassignedMeasurements => true, :requiresAllQubitsMeasurement => false, :supportedPragmas => Any[], :supportPhysicalQubits => false, :supportsPartialVerbatimBox => true, :forbiddenPragmas => Any[], :requiresContiguousQubitIndices => false, :disabledQubitRewiringSupported => false, :forbiddenArrayOperations => String[], :maximumQubitArrays => nothing, :maximumClassicalArrays => nothing)
 
 struct GateModelParameters <: BraketSchemaBase
     braketSchemaHeader::braketSchemaHeader
@@ -206,13 +199,14 @@ struct DeviceServiceProperties <: BraketSchemaBase
     braketSchemaHeader::braketSchemaHeader
     executionWindows::Vector{DeviceExecutionWindow}
     shotsRange::Tuple{Int, Int}
+    reservationShotsRange::Union{Nothing, Tuple{Int, Int}}
     deviceCost::Nothing
     deviceDocumentation::Nothing
     deviceLocation::Nothing
     updatedAt::Nothing
     getTaskPollIntervalMillis::Nothing
 end
-StructTypes.defaults(::Type{DeviceServiceProperties}) = Dict{Symbol, Any}(:braketSchemaHeader => braketSchemaHeader("braket.device_schema.device_service_properties", "1"))
+StructTypes.defaults(::Type{DeviceServiceProperties}) = Dict{Symbol, Any}(:braketSchemaHeader => braketSchemaHeader("braket.device_schema.device_service_properties", "1"), :reservationShotsRange => nothing)
 
 struct GateModelSimulatorParadigmProperties <: BraketSchemaBase
     braketSchemaHeader::braketSchemaHeader
@@ -222,7 +216,7 @@ StructTypes.defaults(::Type{GateModelSimulatorParadigmProperties}) = Dict{Symbol
 
 struct GateModelSimulatorDeviceCapabilities <: BraketSchemaBase
     service::DeviceServiceProperties
-    action::Dict{Union{DeviceActionType, String}, Union{OpenQASMDeviceActionProperties, JaqcdDeviceActionProperties}}
+    action::Dict{Union{DeviceActionType, String}, OpenQASMDeviceActionProperties}
     deviceParameters::Dict
     braketSchemaHeader::braketSchemaHeader
     paradigm::GateModelSimulatorParadigmProperties
@@ -246,15 +240,19 @@ struct TaskMetadata <: BraketSchemaBase
     failureReason::Union{Nothing, String}
 end
 
+const OutputValue = Any
+
 struct GateModelTaskResult <: BraketSchemaBase
     braketSchemaHeader::braketSchemaHeader
     measurements::Union{Nothing, Vector{Vector{Int}}}
     measurementProbabilities::Union{Nothing, Dict{String, Float64}}
     resultTypes::Union{Nothing, Vector{ResultTypeValue}}
     measuredQubits::Union{Nothing, Vector{Int}}
+    outputs::Union{Nothing, Vector{Dict{String, OutputValue}}}
     taskMetadata::TaskMetadata
     additionalMetadata::AdditionalMetadata
 end
+StructTypes.defaults(::Type{GateModelTaskResult}) = Dict{Symbol, Any}(:outputs => nothing)
 
 struct GenericDeviceActionProperties <: DeviceActionProperties
     version::Vector{String}

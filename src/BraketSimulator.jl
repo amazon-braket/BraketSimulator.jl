@@ -143,6 +143,7 @@ function _bundle_results(
         nothing,
         results,
         sorted_qubits,
+        nothing,
         _build_metadata(simulator, circuit_ir)...
     )
 end
@@ -198,10 +199,10 @@ function _get_measured_qubits(program, qubit_count::Int)
     return measured_qubits
 end
 """
-    _prepare_program(circuit_ir::OpenQasmProgram, inputs::Dict{String, <:Any}, shots::Int) -> (Program, Int)
+    _prepare_program(circuit_ir::OpenQasmProgram, inputs::Dict{String, <:Any}, shots::Int) -> (Circuit, Int)
 
 Parse the OpenQASM3 source, apply any `inputs` provided for the simulation, and compute
-basis rotation instructions if running with non-zero shots. Return the `Program` after
+basis rotation instructions if running with non-zero shots. Return the `Circuit` after
 parsing and the qubit count of the circuit.
 """
 function _prepare_program(circuit_ir::OpenQasmProgram, inputs::Dict{String, <:Any}, shots::Int)
@@ -234,7 +235,7 @@ function _prepare_program(circuit_ir::Program, inputs::Dict{String, <:Any}, shot
     return bound_program, qubit_count(circuit_ir)
 end
 """
-    _combine_operations(program, shots::Int) -> Program
+    _combine_operations(program, shots::Int) -> Vector{Instruction}
 
 Combine explicit instructions and basis rotation instructions (if necessary).
 Validate that all operations are performed on qubits within `qubit_count`.
@@ -248,14 +249,17 @@ function _combine_operations(program, shots::Int)
     return operations
 end
 """
-    _compute_results(::, simulator, program::Program, n_qubits::Int, shots::Int) -> Vector{ResultTypeValue}
+    _compute_results(simulator, program, n_qubits::Int, shots::Int) -> Vector{ResultTypeValue}
 
-Compute the results once `simulator` has finished applying all the instructions. The results depend on the IR type if `shots>0`:
+Compute the results once `simulator` has finished applying all the instructions. The
+behavior depends on the IR shape and on shot count:
 
-- For JAQCD IR (`Program`), the results array is *empty* because the Braket SDK computes the results from the IR directly.
-- For OpenQASM IR (`OpenQasmProgram`), the results array is *empty* only if no results are present in the parsed IR. Otherwise,
-  the results array is populated with the parsed result types (to help the Braket SDK compute them from the sampled measurements)
-  and a placeholder zero value.
+- For Julia-side `Program` IR, the results array is *empty* when `shots > 0` because the
+  Braket SDK will compute results from the IR directly; for `shots == 0` the results are
+  computed analytically from the simulator state.
+- For `OpenQasmProgram` IR (which is parsed into a `Circuit`), the results array is empty
+  only if no results are present; otherwise it is populated with the parsed result types
+  (and a placeholder zero value if shots > 0) so the SDK can compute them from samples.
 """
 function _compute_results(simulator, program::Circuit, n_qubits, shots)
     results          = program.result_types
@@ -278,14 +282,14 @@ function _compute_results(simulator, program::Program, n_qubits, shots)
     end
 end
 function _validate_circuit_ir(simulator, circuit_ir::Program, qubit_count::Int, shots::Int)
-    _validate_ir_results_compatibility(simulator, circuit_ir.results, Val(:JAQCD))
-    _validate_ir_instructions_compatibility(simulator, circuit_ir, Val(:JAQCD))
+    _validate_ir_results_compatibility(simulator, circuit_ir.results, Val(:OpenQASM))
+    _validate_ir_instructions_compatibility(simulator, circuit_ir, Val(:OpenQASM))
     _validate_shots_and_ir_results(shots, circuit_ir.results, qubit_count)
     return
 end
 function _validate_circuit_ir(simulator, circuit_ir::Circuit, qubit_count::Int, shots::Int)
-    _validate_ir_results_compatibility(simulator, circuit_ir.result_types, Val(:JAQCD))
-    _validate_ir_instructions_compatibility(simulator, circuit_ir, Val(:JAQCD))
+    _validate_ir_results_compatibility(simulator, circuit_ir.result_types, Val(:OpenQASM))
+    _validate_ir_instructions_compatibility(simulator, circuit_ir, Val(:OpenQASM))
     _validate_shots_and_ir_results(shots, circuit_ir.result_types, qubit_count)
     return
 end
@@ -294,11 +298,11 @@ end
     simulate(simulator::AbstractSimulator, circuit_ir::Union{OpenQasmProgram, Program}, shots::Int; kwargs...) -> GateModelTaskResult
 
 Simulate the evolution of a state vector or density matrix using the passed-in `simulator`.
-The instructions to apply (gates and noise channels) and measurements to make are
-encoded in `circuit_ir`. Supported IR formats are `OpenQASMProgram` (OpenQASM3)
-and `Program` (JAQCD). Returns a `GateModelTaskResult` containing the individual shot
-measurements (if `shots > 0`), final calculated results, circuit IR, and metadata
-about the task.
+The instructions to apply (gates and noise channels) and measurements to make are encoded in
+`circuit_ir`. Supported IR formats are `OpenQasmProgram` (OpenQASM3 source string) and the
+Julia-side `Program` container (typically built via `Program(c::Circuit)`).
+Returns a `GateModelTaskResult` containing the individual shot measurements (if `shots > 0`),
+final calculated results, circuit IR, and metadata about the task.
 """
 function simulate(
     simulator::AbstractSimulator,
@@ -321,9 +325,9 @@ end
     simulate(simulator::AbstractSimulator, circuit_irs::Vector{<:Union{Program, OpenQasmProgram}}, shots::Int; max_parallel::Int=min(32, Threads.nthreads()), inputs=Dict{String,Float64}(), kwargs...) -> Vector{GateModelTaskResult}
 
 Simulate the evolution of a *batch* of state vectors or density matrices using the passed in `simulator`.
-The instructions to apply (gates and noise channels) and measurements to make are
-encoded in `circuit_irs`. Supported IR formats are `OpenQASMProgram` (OpenQASM3)
-and `Program` (JAQCD).
+The instructions to apply (gates and noise channels) and measurements to make are encoded in
+`circuit_irs`. Supported IR formats are `OpenQasmProgram` (OpenQASM3 source string) and the
+Julia-side `Program` container.
 
 The simulation of the batch is done in parallel using threads.
 The keyword argument `max_parallel` specifies the number of evolutions to simulate in
