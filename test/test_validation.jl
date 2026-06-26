@@ -9,7 +9,7 @@ using Test, BraketSimulator
         type::String
         NotARealIRResult() = new("notarealresult")
     end
-    @test_throws ErrorException BraketSimulator._validate_ir_results_compatibility(sim, [NotARealIRResult()], Val(:JAQCD))
+    @test_throws ErrorException BraketSimulator._validate_ir_results_compatibility(sim, [NotARealIRResult()], Val(:OpenQASM))
     c = BraketSimulator.Circuit()
     BraketSimulator.add_instruction!(c, BraketSimulator.Instruction(BraketSimulator.Rx(BraketSimulator.FreeParameter(:α)), 0))
     @test_throws ErrorException BraketSimulator._validate_input_provided(c)
@@ -36,11 +36,11 @@ using Test, BraketSimulator
 
     sim = DensityMatrixSimulator(2, 0)
     @test_logs (:warn, "You are running a noise-free circuit on the density matrix simulator. Consider running this circuit on the state vector simulator: LocalSimulator(\"braket_sv_v2\") for a better user experience.") BraketSimulator._validate_ir_instructions_compatibility(sim, c, Val(:OpenQASM))
-    @test_logs (:warn, "You are running a noise-free circuit on the density matrix simulator. Consider running this circuit on the state vector simulator: LocalSimulator(\"braket_sv_v2\") for a better user experience.") BraketSimulator._validate_ir_instructions_compatibility(sim, c, Val(:JAQCD))
+    @test_logs (:warn, "You are running a noise-free circuit on the density matrix simulator. Consider running this circuit on the state vector simulator: LocalSimulator(\"braket_sv_v2\") for a better user experience.") BraketSimulator._validate_ir_instructions_compatibility(sim, c, Val(:OpenQASM))
     sim = StateVectorSimulator(2, 0)
     BraketSimulator.add_instruction!(c, BraketSimulator.Instruction(BraketSimulator.BitFlip(0.1), 0))
     @test_throws ValidationError BraketSimulator._validate_ir_instructions_compatibility(sim, c, Val(:OpenQASM))
-    @test_throws ValidationError BraketSimulator._validate_ir_instructions_compatibility(sim, c, Val(:JAQCD))
+    @test_throws ValidationError BraketSimulator._validate_ir_instructions_compatibility(sim, c, Val(:OpenQASM))
 
     mat = rand(4, 4)
     obs = BraketSimulator.Observables.HermitianObservable(mat + mat')

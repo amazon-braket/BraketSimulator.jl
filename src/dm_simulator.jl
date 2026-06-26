@@ -71,10 +71,8 @@ Query the properties and capabilities of a `DensityMatrixSimulator`, including w
 """
 properties(d::DensityMatrixSimulator) = dm_props
 supported_operations(d::DensityMatrixSimulator, ::Val{:OpenQASM}) = dm_props.action["braket.ir.openqasm.program"].supportedOperations
-supported_operations(d::DensityMatrixSimulator, ::Val{:JAQCD}) = dm_props.action["braket.ir.jaqcd.program"].supportedOperations
 supported_operations(d::DensityMatrixSimulator) = supported_operations(d::DensityMatrixSimulator, Val(:OpenQASM))
 supported_result_types(d::DensityMatrixSimulator, ::Val{:OpenQASM}) = dm_props.action["braket.ir.openqasm.program"].supportedResultTypes
-supported_result_types(d::DensityMatrixSimulator, ::Val{:JAQCD}) = dm_props.action["braket.ir.jaqcd.program"].supportedResultTypes
 supported_result_types(d::DensityMatrixSimulator) = supported_result_types(d::DensityMatrixSimulator, Val(:OpenQASM))
 device_id(dms::DensityMatrixSimulator) = "braket_dm_v2"
 name(dms::DensityMatrixSimulator) = "DensityMatrixSimulator"

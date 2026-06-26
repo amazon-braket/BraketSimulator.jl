@@ -75,9 +75,7 @@ Query the properties and capabilities of a `StateVectorSimulator`, including whi
 properties(svs::StateVectorSimulator) = sv_props
 supported_operations(svs::StateVectorSimulator, ::Val{:OpenQASM}) = sv_props.action["braket.ir.openqasm.program"].supportedOperations
 supported_operations(svs::StateVectorSimulator) = supported_operations(svs::StateVectorSimulator, Val(:OpenQASM))
-supported_operations(svs::StateVectorSimulator, ::Val{:JAQCD}) = sv_props.action["braket.ir.jaqcd.program"].supportedOperations
 supported_result_types(svs::StateVectorSimulator, ::Val{:OpenQASM}) = sv_props.action["braket.ir.openqasm.program"].supportedResultTypes
-supported_result_types(svs::StateVectorSimulator, ::Val{:JAQCD}) = sv_props.action["braket.ir.jaqcd.program"].supportedResultTypes
 supported_result_types(svs::StateVectorSimulator) = supported_result_types(svs::StateVectorSimulator, Val(:OpenQASM))
 device_id(svs::StateVectorSimulator) = "braket_sv_v2"
 name(svs::StateVectorSimulator) = "StateVectorSimulator"

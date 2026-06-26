@@ -1,7 +1,7 @@
 name = "BraketSimulator"
 uuid = "76d27892-9a0b-406c-98e4-7c178e9b3dff"
-authors = ["Katharine Hyatt <hyatkath@amazon.com> and contributors"]
-version = "0.0.7"
+authors = ["Katharine Hyatt <hyatkath@amazon.com> and contributors", "Amazon Web Services"]
+version = "0.0.8"
 
 [deps]
 Combinatorics = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"
@@ -27,7 +27,7 @@ BraketSimulatorBraketExt = "Braket"
 
 [compat]
 Aqua = "=0.8"
-Braket = "0.9.5"
+Braket = "0.10"
 Combinatorics = "=1.0.2"
 DataStructures = "=0.18.20"
 Dates = "1.6"

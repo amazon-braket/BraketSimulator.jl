@@ -4,9 +4,9 @@
 lcov.info
 *.profraw
 *.json
-/Manifest.toml
-/docs/Manifest.toml
+Manifest.toml
 /docs/build/
 /.coverage
+.CondaPkg/
 .DS_Store
 */.DS_Store

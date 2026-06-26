@@ -9,7 +9,6 @@ end
 Braket.name(d::BraketSimulator.AbstractSimulator) = BraketSimulator.name(d)
 Braket.properties(d::BraketSimulator.AbstractSimulator) = BraketSimulator.properties(d)
 Braket.simulate(d::BraketSimulator.AbstractSimulator, program::Braket.OpenQasmProgram, args...; kwargs...) = convert(Braket.GateModelTaskResult, BraketSimulator.simulate(d, convert(BraketSimulator.OpenQasmProgram, program), args...; kwargs...))
-Braket.simulate(d::BraketSimulator.AbstractSimulator, program::Braket.Program, qubit_count::Int, shots::Int; kwargs...) = convert(Braket.GateModelTaskResult, BraketSimulator.simulate(d, convert(BraketSimulator.Program, program), shots; kwargs...))
 
 Base.convert(::Type{Braket.TaskMetadata}, tm::BraketSimulator.TaskMetadata) = Braket.TaskMetadata(Braket.braketSchemaHeader("braket.task_result.task_metadata", "1"), tm.id, tm.shots, tm.deviceId, tm.deviceParameters, tm.createdAt, tm.endedAt, tm.status, tm.failureReason)
 Base.convert(::Type{Braket.AdditionalMetadata}, am::BraketSimulator.AdditionalMetadata) = Braket.AdditionalMetadata(convert(Braket.AbstractProgram, am.action), nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing)
@@ -26,6 +25,7 @@ function Base.convert(::Type{Braket.GateModelTaskResult}, r::BraketSimulator.Gat
                                       r.measurementProbabilities,
                                       rts,
                                       r.measuredQubits,
+                                      r.outputs,
                                       task_meta,
                                       addl_meta)
 end
@@ -142,22 +142,10 @@ Base.convert(::Type{Braket.Instruction}, ix::BraketSimulator.Instruction) = Brak
 
 Base.convert(::Type{BraketSimulator.OpenQasmProgram}, p::Braket.OpenQasmProgram) = BraketSimulator.OpenQasmProgram(BraketSimulator.braketSchemaHeader("braket.ir.openqasm.program", "1"), p.source, p.inputs)
 
-# have to handle the special case of 2-qubit Hermitians carefully due to endianness
-# nosemgrep
-function Base.convert(::Type{BraketSimulator.Program}, p::Braket.Program)
-    ixs = [convert(BraketSimulator.Instruction, ix) for ix in p.instructions]
-    rts = [convert(BraketSimulator.AbstractProgramResult, rt) for rt in p.results]
-    bris = map(p.basis_rotation_instructions) do bri
-        if bri.operator isa Unitary && length(bri.target) == 2
-            return BraketSimulator.Instruction(BraketSimulator.Unitary(BraketSimulator.fix_endianness(bri.operator.matrix)), bri.target)
-        else
-            return convert(BraketSimulator.Instruction, bri)
-        end
-    end
-    p = BraketSimulator.Program(BraketSimulator.braketSchemaHeader("braket.ir.jaqcd.program", "1"), ixs, rts, bris)
-    return p
-end
-Base.convert(::Type{Braket.AbstractProgram}, p::BraketSimulator.Program) = Braket.Program(Braket.braketSchemaHeader("braket.ir.jaqcd.program", "1"), [convert(Braket.Instruction, ix) for ix in p.instructions],[convert(Braket.AbstractProgramResult, rt) for rt in p.results], [convert(Braket.Instruction, ix) for ix in p.basis_rotation_instructions])
+# Braket.jl v0.10 has no `Program` struct. A simulator-side `BraketSimulator.Program`
+# (which is just a lossless Julia-side container around a Circuit) is mapped back to
+# a placeholder `Braket.OpenQasmProgram` for `AdditionalMetadata.action` round-trips.
+Base.convert(::Type{Braket.AbstractProgram}, p::BraketSimulator.Program) = Braket.OpenQasmProgram(Braket.braketSchemaHeader("braket.ir.openqasm.program", "1"), "", nothing)
 Base.convert(::Type{Braket.AbstractProgram}, p::BraketSimulator.OpenQasmProgram) = Braket.OpenQasmProgram(Braket.braketSchemaHeader("braket.ir.openqasm.program", "1"), p.source, p.inputs)
 
 function __init__()
