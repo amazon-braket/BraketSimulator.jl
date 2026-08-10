@@ -145,6 +145,13 @@ Base.convert(::Type{BraketSimulator.OpenQasmProgram}, p::Braket.OpenQasmProgram)
 Base.convert(::Type{Braket.AbstractProgram}, p::BraketSimulator.Program) = Braket.OpenQasmProgram(Braket.braketSchemaHeader("braket.ir.openqasm.program", "1"), "", nothing)
 Base.convert(::Type{Braket.AbstractProgram}, p::BraketSimulator.OpenQasmProgram) = Braket.OpenQasmProgram(Braket.braketSchemaHeader("braket.ir.openqasm.program", "1"), p.source, p.inputs)
 
+function Base.convert(::Type{Braket.Circuit}, c::BraketSimulator.Circuit) 
+    ixs = [convert(Braket.Instruction, ix) for ix in c.instructions]
+    rts = isempty(c.result_types) ? Braket.Result[] : [convert(Braket.Result, rt) for rt in c.result_types]
+    brs = [convert(Braket.Instruction, ix) for ix in c.basis_rotation_instructions] 
+    Braket.Circuit(Braket.Moments(), ixs, rts, brs)
+end
+
 function __init__()
     Braket._simulator_devices[]["braket_dm_v2"] =
         DensityMatrixSimulator{ComplexF64,Matrix{ComplexF64}}

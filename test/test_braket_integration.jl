@@ -27,6 +27,83 @@ using Braket: I, name
     end
 end
 
+@testset "BraketSimulator to Braket Conversion" begin
+@testset "Simple Circuit" begin
+  # Create a new circuit
+  circuit = Braket.Circuit()
+
+  # Add instructions to the circuit
+  Braket.add_instruction!(circuit, Braket.Instruction(Braket.H(), 0))          # Apply Hadamard to qubit 0
+  Braket.add_instruction!(circuit, Braket.Instruction(Braket.CZ(), 0, 1))      # Apply controlled-Z between qubit 0 and qubit 1
+  Braket.add_instruction!(circuit, Braket.Instruction(Braket.Measure(), 0))    # Measure qubit 0
+  Braket.add_instruction!(circuit, Braket.Instruction(Braket.Measure(), 1))    # Measure qubit 1
+
+  # Convert the circuit to QASM format
+  qasm = """
+       qubit[2] q;
+       bit[2] c;
+
+       h q[0];
+       cz q[0], q[1];
+       measure q -> c;
+       """
+
+  # Convert the QASM representation back to a Braket circuit
+  converted_circuit = convert(Braket.Circuit, BraketSimulator.Circuit(qasm))
+
+  # Assert that the original circuit and the converted circuit are equivalent
+  @test circuit == converted_circuit
+end
+
+@testset "Active Reset and Mid-Circuit Measurement Circuit" begin
+  # Blocked by Braket.jl/issues/99 and PR #46
+  # BLocked by Reset Instruction missing in Braket
+  # Create a new circuit using Braket
+  circuit = Braket.Circuit()
+
+  # Add instructions to the circuit
+  Braket.add_instruction!(circuit, Braket.Instruction(Braket.X(), 2))          # Apply X gate to qubit 2
+  Braket.add_instruction!(circuit, Braket.Instruction(Braket.H(), 2))          # Apply Hadamard gate to qubit 2
+  Braket.add_instruction!(circuit, Braket.Instruction(Braket.H(), 1))          # Apply Hadamard gate to qubit 1
+  Braket.add_instruction!(circuit, Braket.Instruction(Braket.CNot(), 1, 2))    # Apply CNot gate with qubit 1 as control and qubit 2 as target
+  Braket.add_instruction!(circuit, Braket.Instruction(Braket.H(), 1))          # Apply Hadamard gate to qubit 1
+  Braket.add_instruction!(circuit, Braket.Instruction(Braket.Measure(), 1))    # Measure qubit 1 and store result in bit 0
+  # Uncomment when Reset is added to Braket
+  # Braket.add_instruction!(circuit, Braket.Instruction(Braket.Reset(), 1))      # Reset qubit 1
+  Braket.add_instruction!(circuit, Braket.Instruction(Braket.H(), 1))          # Apply Hadamard gate to qubit 1 again
+  Braket.add_instruction!(circuit, Braket.Instruction(Braket.CNot(), 1, 2))    # Apply CNot gate again
+  Braket.add_instruction!(circuit, Braket.Instruction(Braket.H(), 1))          # Apply Hadamard gate to qubit 1 again
+  Braket.add_instruction!(circuit, Braket.Instruction(Braket.Measure(), 1))    # Measure qubit 1 again and store result in bit 0
+  # Uncomment when Reset is added to Braket
+  # Braket.add_instruction!(circuit, Braket.Instruction(Braket.Reset(), 1))      # Reset qubit 1 again
+
+  # Convert the circuit to QASM format
+  qasm = """
+  OPENQASM 3.0;
+  bit[2] b;
+  qubit[3] q;
+  x q[2];
+  h q[2];
+  h q[1];
+  cnot q[1], q[2];
+  h q[1];
+  b[0] = measure q[1];
+  // reset q[1]; // TODO add when Braket supports reset
+  h q[1];
+  cnot q[1], q[2];
+  h q[1];
+  b[0] = measure q[1];
+  // reset q[1]; // TODO add when Braket supports reset
+  """
+
+  # Convert the QASM representation back to a Braket circuit
+  converted_circuit = convert(Braket.Circuit, BraketSimulator.Circuit(qasm))
+
+  # Assert that the original circuit and the converted circuit are equivalent
+  @test circuit == converted_circuit
+end
+end
+
 @testset "Type conversions" begin
     @test convert(Braket.Operator, convert(BraketSimulator.Operator, Braket.Measure(2))) == Braket.Measure(2)
     @test convert(Braket.Operator, convert(BraketSimulator.Operator, Braket.Reset())) == Braket.Reset()
