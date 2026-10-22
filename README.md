@@ -68,7 +68,8 @@ end
 
 device = LocalSimulator("braket_sv_v2")
 n_qubits = 10
-task_result = simulate(device, ghz_circuit(n_qubits), shots=10)
+task = device(ghz_circuit(n_qubits), shots=10)
+task_result = result(task)
 ```
 
 ## Security
